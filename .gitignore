@@ -1,0 +1,13 @@
+# 화이트리스트 방식 : 기본적으로 전부 무시하고, 레포에 올릴 파일만 허용한다.
+# (데이터 .pkl, .env, 모델 joblib, 개인 PDF/기존 작업물이 올라가지 않도록)
+/*
+!/.gitignore
+!/README.md
+!/CLAUDE.md
+!/stuff_pipeline.py
+!/stuff_pipeline_*.ipynb
+!/업무일지/
+!/outputs/
+/outputs/*
+!/outputs/*.png
+!/outputs/*.csv
