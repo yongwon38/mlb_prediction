@@ -5,7 +5,7 @@
 ## 1. 프로젝트 목적
 - tjStuff+ 처럼 **타석 정보(타자·카운트·상황·로케이션) 없이 투구 물리량만으로 "구위 자체의 위력"을 평가**하는 지표를 만든다.
   - 참조 : tjStuff+ v3.0 — https://medium.com/@thomasjamesnestico/modelling-tjstuff-v3-0-10b48294c7fb
-- 데이터 출처 : `pybaseball` (Statcast). 로컬 캐시 `games_25_final.pkl`(2025 전체 시즌), `games_24.pkl`(2024).
+- 데이터 출처 : `pybaseball` (Statcast). 로컬 캐시 `games_25_final.pkl`(2025 전체 시즌), `games_24.pkl`(2024), `games_26.pkl`(2026, 웹 out-of-sample 점수용).
   - `games_25.pkl` 은 2025-06-30 까지만 있으므로 전체 시즌 분석에는 `games_25_final.pkl` 을 사용한다.
 
 ## 2. 파이프라인 정의 (변경 시 사용자와 협의)
@@ -49,7 +49,10 @@ stuff_pipeline_YYMMDD.ipynb    파이프라인 실행 노트북 (날짜 접미�
 models/                        학습된 모델 (joblib)
 outputs/                       예측 결과, 지표, 그림
 업무일지/업무일지_YYYYMMDD.md    일일 업무일지
+export_web_data.py             웹용 데이터 export (시즌별 구위 score -> web/public/data/*.json, 투수별 .json.gz)
+web/                           Next.js 분석 페이지 (static export, Vercel 배포)
 ```
+- 웹 데이터 갱신 : 모델(models/stage3·4)을 바꾼 뒤 `python export_web_data.py` -> `web/` 에서 재배포. `web/public/data/` 는 커밋하지 않는다
 - **절대경로 금지** — 프로젝트 루트 기준 상대경로만 사용 (OneDrive 동기화, 다른 PC 대응)
 - 난수 seed = 42 고정
 - 기존 파일(`modelling*.ipynb`, `preprocess_hits.py` 등 이전 작업물)은 사용자 요청 없이 수정하지 않는다.

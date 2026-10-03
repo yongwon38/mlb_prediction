@@ -18,6 +18,18 @@
 - 3단계 LGBM : RMSE 0.1609 (평균 baseline 0.1675), R² 0.077
 - 4단계 : 투수×구종(100구+) 구위 score vs whiff% Spearman 0.71, 투수 단위(300구+) 0.59
 
+### 웹 분석 페이지 (`web/`)
+투수를 이름 또는 리그→구단→선수 드롭다운으로 찾아(시즌 2025/2024 선택), 포수 시점 스트라이크 존에 투구별 구위를 색 농도로 표시하고 전력분석 패널을 함께 보여준다.
+- 패널 : 요약(구위 퍼센타일·Whiff%·CSW%·피안타율·xwOBA), 스카우팅 노트(규칙 기반), 구종 아스널, 구종별 구위 분포(리그 대비), 코스별 히트맵, 구위 구간별 결과(리그 대비), 카운트별 피치 믹스, 월별/경기 내 투구수별 구위 추이, 좌우 스플릿
+- 필터 : 구종, 결과, 타자 손, 카운트 상황, 구위 범위, 팀(이적 투수), 검증기간만
+- 시즌 : 2026 / 2025 / 2024. 2024·2026 은 2025 학습 모델을 그대로 적용한 out-of-sample 점수
+
+```bash
+python export_web_data.py          # web/public/data 생성 (games_24/25_final/26.pkl, models/ 필요. 없는 pkl 은 pybaseball 로 자동 다운로드)
+cd web && npm install && npm run dev
+npx vercel --prod --archive=tgz    # web/ 에서 배포 (투수별 파일이 많아 아카이브 업로드 필수)
+```
+
 ### 실행
 ```bash
 pip install pandas numpy scipy scikit-learn lightgbm shap matplotlib pyarrow pybaseball jupyter
