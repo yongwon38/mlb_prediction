@@ -79,21 +79,123 @@ SWING_DESC = ['swinging_strike', 'swinging_strike_blocked', 'foul', 'foul_tip', 
 
 
 # ---------------------------------------------------------------------------
+# 구위 산출 근거 : SHAP 기여도 -> 구위 점수 단위 (요인 그룹별 합)
+# ---------------------------------------------------------------------------
+# 서로 얽힌 변수는 SHAP 이 기여를 임의로 나눠 가지므로 그룹으로 묶어 보여 준다
+EXPLAIN_GROUPS = [
+    ('구속', ['release_speed', 'velo_diff', 'vy0', 'ay']),
+    ('수직 무브먼트', ['pfx_z', 'ivb_diff', 'az']),
+    ('수평 무브먼트', ['pfx_x', 'hb_diff', 'ax']),
+    ('진입각·궤적', ['vaa', 'haa', 'vx0', 'vz0']),
+    ('릴리스 위치', ['release_pos_x', 'release_pos_z', 'arm_angle']),
+    ('익스텐션', ['release_extension']),
+    ('회전', ['release_spin_rate', 'spin_axis']),
+    ('구종·투구손', ['pitch_type', 'p_throws']),
+]
+EXPLAIN_COLS = [f'e{j}' for j in range(len(EXPLAIN_GROUPS))]
+# 근거 문장용 원값 (모델 입력 기준 : 좌투는 좌우 반전 = 우투 기준, 무브먼트는 inch)
+EXPLAIN_FEATS = {'v': ('release_speed', 1), 'ivb': ('pfx_z', 1), 'hb': ('pfx_x', 1), 'spin': ('release_spin_rate', 0),
+                 'axis': ('spin_axis', 0), 'vaa': ('vaa', 1), 'haa': ('haa', 1), 'ext': ('release_extension', 1),
+                 'rz': ('release_pos_z', 1), 'arm': ('arm_angle', 0)}
+
+
+SHAP_DIR = os.path.join(CFG['outputs'], 'shap')    # compute_shap.py 가 만드는 정확한 SHAP 캐시
+KEY = ['game_pk', 'at_bat_number', 'pitch_number', 'pitcher']
+
+
+def saabas_contrib(booster, X):
+    """Saabas(경로 기반) 기여 : 트리마다 루트 -> 리프 경로에서 분기 변수에 노드값 변화를 귀속.
+    리프별 기여 벡터를 미리 만들어 두고 pred_leaf 로 조회 -> 수 분 안에 전체 시즌 계산. bias + 합 = 예측 (정확)"""
+    F = X.shape[1]
+    trees = booster.dump_model()['tree_info']
+    table = np.zeros((len(trees), max(t['num_leaves'] for t in trees), F))
+    bias = 0.0
+    for ti, tr in enumerate(trees):
+        root = tr['tree_structure']
+        if 'leaf_value' in root:
+            bias += root['leaf_value']
+            continue
+        bias += root['internal_value']
+        stack = [(root, np.zeros(F))]
+        while stack:
+            node, acc = stack.pop()
+            for ch in (node['left_child'], node['right_child']):
+                val = ch['leaf_value'] if 'leaf_index' in ch else ch['internal_value']
+                a = acc.copy()
+                a[node['split_feature']] += val - node['internal_value']
+                if 'leaf_index' in ch:
+                    table[ti, ch['leaf_index']] = a
+                else:
+                    stack.append((ch, a))
+    leaves = booster.predict(X, pred_leaf=True)
+    contrib = np.zeros((len(X), F))
+    for ti in range(len(trees)):
+        contrib += table[ti, leaves[:, ti]]
+    return contrib, bias
+
+
+def load_shap_cache(season, keys):
+    """compute_shap.py 의 정확한 SHAP 캐시 (모든 투구가 있을 때만 사용). 반환 (contrib, base) 또는 None"""
+    path = os.path.join(SHAP_DIR, f'shap_{season}.npz')
+    if not os.path.exists(path):
+        return None
+    z = np.load(path)
+    ref = pd.DataFrame(z['keys'], columns=KEY)
+    ref['row'] = np.arange(len(ref))
+    m = keys.astype('int64').merge(ref, on=KEY, how='left')
+    if m['row'].isna().any():
+        print(f'  SHAP 캐시 불완전 ({m["row"].isna().sum():,}구 없음) -> Saabas 사용')
+        return None
+    return z['contrib'][m['row'].astype(int).to_numpy()], float(z['base'])
+
+
+def explain_contrib(model, scaler, X, pred, score, season, keys):
+    """투구별 요인 그룹 기여 (구위 점수 단위). 반환 : (n, 그룹 수) 배열, 기준 점수 S0, 방법('shap'|'saabas')
+
+    기여 phi_ij 는 예측(타구질, 낮을수록 좋음) 단위 -> k_i = (s_i - S0) / (pred_i - base) 로 비례 배분해
+    S0 + sum_j c_ij = s_i 가 정확히 성립하게 한다. pred 가 base 와 거의 같으면 스케일러 수치 미분을 쓴다
+    """
+    feats = list(X.columns)
+    cached = load_shap_cache(season, keys)
+    if cached is not None:
+        contrib, base = cached
+        method = 'shap'
+    else:
+        contrib, base = saabas_contrib(model.booster_, X)
+        method = 'saabas'
+    assert np.abs(base + contrib.sum(axis=1) - pred).max() < 1e-6, '기여 합 != 예측'
+    S0 = float(scaler.transform([base])[0])
+    diff = pred - base
+    h = 2e-3
+    deriv = (scaler.transform(pred + h) - scaler.transform(pred - h)) / (2 * h)
+    near = np.abs(diff) < 1e-4
+    k = np.where(near, deriv, (score - S0) / np.where(near, 1.0, diff))
+    c = np.column_stack([contrib[:, [feats.index(f) for f in fs]].sum(axis=1) for _, fs in EXPLAIN_GROUPS]) * k[:, None]
+    err = np.abs(S0 + c.sum(axis=1) - score)[~near]
+    assert err.max() < 1e-6, f'기여도 가법성 오차 {err.max()}'
+    return c, S0, method
+
+
+# ---------------------------------------------------------------------------
 # 구위 score 산출
 # ---------------------------------------------------------------------------
-def score_season(df, model, scaler):
-    """정규시즌 투구 -> 구위 피처 -> 3단계 예측 -> 20~80 score (구종 제외 대상은 행 제외)"""
+def score_season(df, model, scaler, season):
+    """정규시즌 투구 -> 구위 피처 -> 3단계 예측 -> 20~80 score + 요인 기여 (구종 제외 대상은 행 제외). 반환 (d, 기준 점수 S0, 기여 방법)"""
     d = sp.add_stuff_features(df)
     for col, cats in zip(sp.STUFF_CAT_FEATURES, model.booster_.pandas_categorical):
         d[col] = pd.Categorical(d[col].astype(str), categories=cats)
     d = d[d['pitch_type'].notna()]    # 학습 시 없던 구종 제외
     pred = model.predict(d[CFG['features']])
     d['stuff_score'] = scaler.transform(pred)
+    c, S0, method = explain_contrib(model, scaler, d[CFG['features']], pred, d['stuff_score'].to_numpy(), season, d[KEY])
+    d[EXPLAIN_COLS] = c
     if CFG['drop_waste']:
-        d['stuff_score'] = d['stuff_score'].where(~sp.is_waste_ball(d))    # 터무니없는 위치의 볼 : 점수 없음
+        scored = ~sp.is_waste_ball(d)
+        d['stuff_score'] = d['stuff_score'].where(scored)    # 터무니없는 위치의 볼 : 점수 없음
+        d.loc[~scored, EXPLAIN_COLS] = np.nan
     for col in sp.STUFF_CAT_FEATURES:
         d[col] = d[col].astype(str)
-    return d
+    return d, S0, method
 
 
 def check_against_parquet(d):
@@ -216,6 +318,27 @@ def pitcher_payload(g, season_start, pitch_types, teams):
     }
 
 
+def explain_payload(g):
+    """설명 페이지 전용 투수 파일 (투수 파일과 같은 투구 순서). 기여는 0.1점 단위 정수"""
+    g = g.sort_values(['game_date', 'game_pk', 'at_bat_number', 'pitch_number'])
+    cols = {f'c{j}': _arr(g[col] * 10, 0) for j, col in enumerate(EXPLAIN_COLS)}
+    cols.update({k: _arr(g[src], nd) for k, (src, nd) in EXPLAIN_FEATS.items()})
+    return {'id': int(g['pitcher'].iloc[0]), 'n': int(len(g)), 'cols': cols}
+
+
+def explain_league(d, S0):
+    """리그 기준 : 구종별 평균 원값과 평균 그룹 기여 (점수 있는 투구만)"""
+    d = d[d['stuff_score'].notna()]
+    pts = {}
+    for pt, g in d.groupby('pitch_type'):
+        pts[pt] = {'n': int(len(g)),
+                   'feat': {k: round(float(g[src].mean()), 2) for k, (src, _) in EXPLAIN_FEATS.items()},
+                   'contrib': [round(float(v), 2) for v in g[EXPLAIN_COLS].mean()]}
+    return {'base': round(S0, 3), 'groups': [n for n, _ in EXPLAIN_GROUPS],
+            'groupFeatures': [fs for _, fs in EXPLAIN_GROUPS],
+            'overall': [round(float(v), 2) for v in d[EXPLAIN_COLS].mean()], 'pitchTypes': pts}
+
+
 def outcome_rates(g):
     """구간/그룹별 리그 기준 지표"""
     ab = g['pa_event'].between(1, 6)
@@ -285,7 +408,7 @@ def dump_gz(obj, path):
 def export_season(season, path, model, scaler):
     print(f'[{season}] {path}')
     raw = sp.load_regular_season(path, year=season)
-    d = score_season(raw, model, scaler)
+    d, S0, method = score_season(raw, model, scaler, season)
     print(f'  정규시즌 {len(raw):,}구 -> {len(d):,}구 (점수 없음 {d["stuff_score"].isna().sum():,}), '
           f'투수 {d["pitcher"].nunique():,}명')
     if season == 2025:
@@ -295,6 +418,7 @@ def export_season(season, path, model, scaler):
     out = os.path.join(OUT_DIR, str(season))
     # 폴더 자체는 지우지 않고 내용만 비운다 (OneDrive 가 폴더를 잡고 있으면 rmdir 이 거부됨)
     os.makedirs(os.path.join(out, 'p'), exist_ok=True)
+    os.makedirs(os.path.join(out, 'e'), exist_ok=True)
     for root, _, files in os.walk(out):
         for f in files:
             os.remove(os.path.join(root, f))
@@ -307,6 +431,7 @@ def export_season(season, path, model, scaler):
         teams = team_counts.index.tolist()    # 투구수 많은 팀 순
         pitch_types = g['pitch_type'].value_counts().index.tolist()
         dump_gz(pitcher_payload(g, season_start, pitch_types, teams), os.path.join(out, 'p', f'{int(pid)}.json.gz'))
+        dump_gz(explain_payload(g), os.path.join(out, 'e', f'{int(pid)}.json.gz'))
         pitchers.append({
             'id': int(pid),
             'name': display_name(g['player_name'].iloc[0]),
@@ -326,7 +451,18 @@ def export_season(season, path, model, scaler):
         'teams': {lg: {t: n for t, n in ts.items() if t in set(d['team'])} for lg, ts in TEAMS.items()},
         'pitchers': sorted(pitchers, key=lambda p: p['name']),
     }, os.path.join(out, 'index.json'))
-    dump(league_payload(d, valid_start), os.path.join(out, 'league.json'))
+    lg = league_payload(d, valid_start)
+    lg['explain'] = explain_league(d, S0)
+    lg['explain']['method'] = method
+    dump(lg, os.path.join(out, 'league.json'))
+    ex = lg['explain']
+    print(f"  설명 ({method}) : 기준 S0 {ex['base']:.2f}, 리그 평균 기여 " +
+          ', '.join(f'{n} {v:+.2f}' for n, v in zip(ex['groups'], ex['overall'])))
+    for pt in ['FF', 'SI', 'CH', 'FS', 'SL', 'CU', 'EP']:
+        if pt in ex['pitchTypes']:
+            print(f'    {pt} : ' + ', '.join(f'{n} {v:+.1f}' for n, v in zip(ex['groups'], ex['pitchTypes'][pt]['contrib'])))
+    size = sum(os.path.getsize(os.path.join(out, 'e', f)) for f in os.listdir(os.path.join(out, 'e')))
+    print(f'  설명 파일 {size / 1e6:.1f}MB')
     print(f'  저장 : {out} (투수 {len(pitchers):,}명)')
 
 

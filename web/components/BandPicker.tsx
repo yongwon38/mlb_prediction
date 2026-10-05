@@ -11,12 +11,14 @@ interface Props {
   ps: Pitch[]; // 전역 필터 적용 후 투구
   band: string[]; // 빈 배열 = 전체
   setBand: (b: string[]) => void;
-  ghost: boolean;
-  setGhost: (g: boolean) => void;
+  ghost?: boolean;
+  setGhost?: (g: boolean) => void; // 없으면 '나머지 흐리게' 토글을 숨김
+  note?: string;
+  showNone?: boolean; // '점수 제외' 칩 표시 여부
 }
 
 /** 투구 분포·타구 분포 공용 구위 구간 선택기 (다른 패널에는 영향 없음) */
-export default function BandPicker({ ps, band, setBand, ghost, setGhost }: Props) {
+export default function BandPicker({ ps, band, setBand, ghost, setGhost, note = "투구 로케이션과 타구 분포에만 적용됩니다.", showNone = true }: Props) {
   const dark = useDarkMode();
   const counts = useMemo(() => {
     const m = new Map<string, number>();
@@ -43,15 +45,19 @@ export default function BandPicker({ ps, band, setBand, ghost, setGhost }: Props
           </button>
         );
       })}
+      {showNone && (
       <button className="chip" aria-pressed={band.includes(BAND_NONE)} onClick={() => toggle(BAND_NONE)} title="존에서 크게 벗어난 볼 (구위 점수 없음)">
         <span className="w-2.5 h-2.5 rounded-full border border-muted" />
         점수 제외 <span className="tnum text-muted">{(counts.get(BAND_NONE) ?? 0).toLocaleString()}</span>
       </button>
-      <label className="ml-auto flex items-center gap-1.5 text-ink-2">
-        <input type="checkbox" checked={ghost} onChange={(e) => setGhost(e.target.checked)} disabled={!band.length} />
-        나머지 흐리게 표시
-      </label>
-      <span className="basis-full text-muted">투구 로케이션과 타구 분포에만 적용됩니다.</span>
+      )}
+      {setGhost && (
+        <label className="ml-auto flex items-center gap-1.5 text-ink-2">
+          <input type="checkbox" checked={!!ghost} onChange={(e) => setGhost(e.target.checked)} disabled={!band.length} />
+          나머지 흐리게 표시
+        </label>
+      )}
+      {note && <span className="basis-full text-muted">{note}</span>}
     </div>
   );
 }

@@ -17,9 +17,10 @@ interface Props {
   pitches: Pitch[];
   ghost?: Pitch[]; // 구위 구간 선택 시 나머지 공 (회색 배경, hover 제외)
   pitchNames: Record<string, string>;
+  onPick?: (p: Pitch) => void; // 마우스로 점을 클릭하면 호출 (산출 근거 페이지로 이동)
 }
 
-export default function StrikeZone({ pitches, ghost = [], pitchNames }: Props) {
+export default function StrikeZone({ pitches, ghost = [], pitchNames, onPick }: Props) {
   const dark = useDarkMode();
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<Pitch | null>(null);
@@ -91,6 +92,11 @@ export default function StrikeZone({ pitches, ghost = [], pitchNames }: Props) {
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
         onPointerDown={onMove}
+        onClick={(e) => {
+          // 터치는 탭 = 툴팁만, 마우스 클릭 = 산출 근거로 이동
+          if (onPick && hover && hover.s !== null && (e.nativeEvent as PointerEvent).pointerType !== "touch") onPick(hover);
+        }}
+        style={onPick && hover && hover.s !== null ? { cursor: "pointer" } : undefined}
       >
         <rect x={0} y={0} width={W} height={H} fill="var(--surface)" />
         {/* 존 바깥 영역 음영 기준 + 3×3 격자 */}
@@ -121,14 +127,14 @@ export default function StrikeZone({ pitches, ghost = [], pitchNames }: Props) {
         )}
       </svg>
 
-      {hover && hp && <Tooltip p={hover} left={(hp.x / W) * 100} top={(hp.y / H) * 100} pitchNames={pitchNames} />}
+      {hover && hp && <Tooltip p={hover} left={(hp.x / W) * 100} top={(hp.y / H) * 100} pitchNames={pitchNames} hint={onPick && hover.s !== null ? "클릭하면 구위 산출 근거" : undefined} />}
 
       <Legend dark={dark} n={pts.length} />
     </div>
   );
 }
 
-export function Tooltip({ p, left, top, pitchNames }: { p: Pitch; left: number; top: number; pitchNames: Record<string, string> }) {
+export function Tooltip({ p, left, top, pitchNames, hint }: { p: Pitch; left: number; top: number; pitchNames: Record<string, string>; hint?: string }) {
   const right = left > 55;
   const fmt = (v: number | null, d = 1, unit = "") => (v === null ? "-" : `${v.toFixed(d)}${unit}`);
   return (
@@ -173,6 +179,7 @@ export function Tooltip({ p, left, top, pitchNames }: { p: Pitch; left: number; 
         <dt>경기 내</dt>
         <dd>{p.gp}번째 투구</dd>
       </dl>
+      {hint && <div className="mt-1.5 text-accent-ink">{hint} →</div>}
     </div>
   );
 }

@@ -78,3 +78,20 @@ export const HIT_COLORS = {
   dark: ["#199e70", "#3987e5", "#c98500", "#d55181"],
 };
 export const hitColor = (cls: number, dark: boolean) => (dark ? HIT_COLORS.dark : HIT_COLORS.light)[cls];
+
+/** 기여도 diverging : + (구위를 올림) = 빨강 / − (깎음) = 파랑 / 0 = 회색. 양 극 validate_palette 라이트·다크 PASS */
+const DIV = {
+  light: { neg: "#2a78d6", mid: "#f0efec", pos: "#e34948" },
+  dark: { neg: "#3987e5", mid: "#383835", pos: "#e66767" },
+};
+
+/** v 를 [-dom, dom] 으로 보고 회색 -> 극 색으로 보간. ink 는 셀 위 글자색 */
+export function divergingColor(v: number, dom: number, dark: boolean) {
+  const p = dark ? DIV.dark : DIV.light;
+  const t = Math.min(1, Math.abs(v) / dom);
+  const fill = ramp([p.mid, v >= 0 ? p.pos : p.neg], t);
+  const ink = dark ? (t > 0.7 ? "#0b0b0b" : "#e8e6e1") : t > 0.65 ? "#ffffff" : "#1a1a19";
+  return { fill, ink };
+}
+
+export const divergingPole = (positive: boolean, dark: boolean) => (dark ? DIV.dark : DIV.light)[positive ? "pos" : "neg"];

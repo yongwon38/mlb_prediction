@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import SearchPanel from "@/components/SearchPanel";
 import StrikeZone from "@/components/StrikeZone";
 import SprayChart from "@/components/SprayChart";
@@ -27,6 +29,7 @@ export default function Home() {
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
   const [band, setBand] = useState<string[]>([]); // 투구·타구 분포 전용 구위 구간 (빈 배열 = 전체)
   const [ghost, setGhost] = useState(true);
+  const router = useRouter();
 
   // 초기 로드 : URL 의 시즌/투수 복원
   useEffect(() => {
@@ -143,6 +146,9 @@ export default function Home() {
               {data!.file.throws === "R" ? "우투" : "좌투"} · {data!.file.teams.join(" → ")} · {season} 시즌 {all!.length.toLocaleString()}구
             </span>
             <span className="ml-auto flex gap-4 text-xs">
+              <Link className="text-accent-ink underline underline-offset-2 font-medium" href={`/explain?season=${season}&pitcher=${data!.file.id}`}>
+                구위 산출 근거 →
+              </Link>
               <button className="text-accent-ink underline underline-offset-2" onClick={() => setPitcherId(null)}>
                 리더보드로
               </button>
@@ -166,7 +172,7 @@ export default function Home() {
 
           <div className="grid gap-4 lg:grid-cols-2">
             <Section title="투구 로케이션 × 구위" sub="포수 시점(존 높이는 타자별 정규화) · 빨갈수록 구위 높음 · 모양은 결과 · 점에 마우스를 올리면 상세">
-              <StrikeZone pitches={bandPs} ghost={ghostPs} pitchNames={meta!.pitchNames} />
+              <StrikeZone pitches={bandPs} ghost={ghostPs} pitchNames={meta!.pitchNames} onPick={(p) => router.push(`/explain?season=${season}&pitcher=${data!.file.id}&pitch=${p.i}`)} />
             </Section>
             <Section title="타구 분포" sub="인플레이 타구가 떨어진 위치 · 색과 모양은 결과 · 점에 마우스를 올리면 상세">
               <SprayChart ps={bandPs} ghost={ghostPs} all={ps} selecting={band.length > 0} pitchNames={meta!.pitchNames} />

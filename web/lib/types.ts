@@ -52,6 +52,30 @@ export interface League {
   stuffBins: number[];
   buckets: (Rates & { label: string })[];
   bucketsValid: (Rates & { label: string })[] | null;
+  explain?: LeagueExplain;
+}
+
+/** 구위 산출 근거 : 리그 기준 */
+export interface LeagueExplain {
+  method?: "shap" | "saabas"; // 기여 계산 방법
+  base: number; // 기준 점수 S0 (모든 요인 기여가 0 일 때의 구위)
+  groups: string[]; // 요인 그룹 이름
+  groupFeatures: string[][];
+  overall: number[]; // 리그 전체 평균 그룹 기여
+  pitchTypes: Record<string, { n: number; feat: Record<string, number>; contrib: number[] }>;
+}
+
+/** 설명 페이지 전용 투수 파일 (투수 파일과 같은 투구 순서) */
+export interface ExplainFile {
+  id: number;
+  n: number;
+  cols: Record<string, (number | null)[]>;
+}
+
+/** 투구 + 요인 기여 (점, 점수 없는 공은 null) + 근거용 원값 (우투 기준) */
+export interface ExplainPitch extends Pitch {
+  c: number[] | null;
+  f: Record<string, number | null>;
 }
 
 export interface PitcherFile {

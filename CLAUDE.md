@@ -59,7 +59,8 @@ stuff_pipeline_YYMMDD.ipynb    파이프라인 실행 노트북 (날짜 접미�
 models/                        학습된 모델 (joblib)
 outputs/                       예측 결과, 지표, 그림
 업무일지/업무일지_YYYYMMDD.md    일일 업무일지
-export_web_data.py             웹용 데이터 export (시즌별 구위 score -> web/public/data/*.json, 투수별 .json.gz)
+export_web_data.py             웹용 데이터 export (시즌별 구위 score -> web/public/data/*.json, 투수별 p/*.json.gz, 산출 근거 e/*.json.gz)
+compute_shap.py                정확한 SHAP 캐시 계산 (outputs/v2/shap/, 약 12시간). 없으면 export 가 Saabas 기여 사용
 web/                           Next.js 분석 페이지 (static export, Vercel 배포)
 ```
 - 웹 데이터 갱신 : 모델(models/stage3·4)을 바꾼 뒤 `python export_web_data.py` -> `web/` 에서 재배포. `web/public/data/` 는 커밋하지 않는다

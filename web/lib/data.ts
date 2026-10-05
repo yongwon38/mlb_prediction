@@ -1,4 +1,4 @@
-import type { League, Meta, Pitch, PitcherFile, SeasonIndex } from "./types";
+import type { ExplainFile, ExplainPitch, League, Meta, Pitch, PitcherFile, SeasonIndex } from "./types";
 
 const cache = new Map<string, Promise<unknown>>();
 
@@ -77,4 +77,22 @@ export async function loadPitches(season: number, id: number): Promise<{ file: P
     };
   });
   return { file, pitches };
+}
+
+export const EXPLAIN_FEATS = ["v", "ivb", "hb", "spin", "axis", "vaa", "haa", "ext", "rz", "arm"] as const;
+
+/** 설명 페이지 : 투수 파일 + 설명 파일을 합쳐 투구별 기여·원값을 붙인다 */
+export async function loadExplainPitches(season: number, id: number): Promise<{ file: PitcherFile; pitches: ExplainPitch[] }> {
+  const [{ file, pitches }, ex] = await Promise.all([loadPitches(season, id), getGzipJSON<ExplainFile>(`/data/${season}/e/${id}.json.gz`)]);
+  if (ex.n !== pitches.length) throw new Error(`설명 파일 투구 수 불일치 (${ex.n} / ${pitches.length})`);
+  const groups = Object.keys(ex.cols).filter((k) => /^c\d+$/.test(k)).length;
+  return {
+    file,
+    pitches: pitches.map((p, i) => {
+      const c0 = ex.cols.c0[i];
+      const c = c0 === null ? null : Array.from({ length: groups }, (_, j) => (ex.cols[`c${j}`][i] as number) / 10);
+      const f = Object.fromEntries(EXPLAIN_FEATS.map((k) => [k, ex.cols[k]?.[i] ?? null]));
+      return { ...p, c, f };
+    }),
+  };
 }
