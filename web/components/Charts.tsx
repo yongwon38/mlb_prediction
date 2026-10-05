@@ -3,7 +3,7 @@ import { useMemo, useState } from "react";
 import { Bar, BarChart, CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import type { League, Pitch, Rates } from "@/lib/types";
 import { COUNT_STATES, GAME_PITCH_BUCKETS, STUFF_BUCKETS, type Stats, groupBy, quantile, stats } from "@/lib/analysis";
-import { pitchColor, sequential, useDarkMode } from "@/lib/colors";
+import { pitchColor, sequential, useDarkMode, warmRamp } from "@/lib/colors";
 import { Toggle, f1, f3, pct } from "./Panels";
 
 const AXIS = { stroke: "var(--axis)", tick: { fill: "var(--muted)", fontSize: 11 }, tickLine: false };
@@ -139,8 +139,11 @@ export function ZoneHeatmap({ ps }: { ps: Pitch[] }) {
     const v = c ? spec.get(c as never) : null;
     const ok = c && v !== null && spec.min(c as never);
     const t = ok ? ((v as number) - spec.dom[0]) / (spec.dom[1] - spec.dom[0]) : 0;
-    const fill = ok ? sequential(t, dark) : "var(--surface-2)";
-    const light = dark ? t > 0.6 : t < 0.55;
+    // 평균 구위는 투구 분포도와 같은 웜 램프 (셀 도메인 40–60 을 램프 전체에 펼쳐 차이가 잘 보이게)
+    const isStuff = metric === "stuff";
+    const tc = Math.min(1, Math.max(0, t));
+    const fill = !ok ? "var(--surface-2)" : isStuff ? warmRamp(tc, dark) : sequential(t, dark);
+    const light = isStuff ? (dark ? tc < 0.85 : tc < 0.55) : dark ? t > 0.6 : t < 0.55;
     return { c, v, ok, fill, ink: ok ? (light ? (dark ? "#0b0b0b" : "#0b0b0b") : "#ffffff") : "var(--muted)" };
   };
 

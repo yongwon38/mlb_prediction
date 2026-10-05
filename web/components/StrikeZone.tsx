@@ -2,7 +2,7 @@
 import { useMemo, useRef, useState } from "react";
 import type { Pitch } from "@/lib/types";
 import { PA_LABELS, RESULT_LABELS, ZONE_BOT, ZONE_HALF_WIDTH, ZONE_TOP, resultGroup } from "@/lib/analysis";
-import { STUFF_DOMAIN, stuffColor, stuffOpacity, useDarkMode } from "@/lib/colors";
+import { STUFF_DOMAIN, stuffColor, stuffOpacity, stuffRadius, useDarkMode } from "@/lib/colors";
 
 const W = 440;
 const H = 500;
@@ -57,7 +57,7 @@ export default function StrikeZone({ pitches, ghost = [], pitchNames }: Props) {
           p.s === null ? (
             <Marker key={p.i} p={p} x={x} y={y} fill="none" opacity={0} ring="var(--muted)" />
           ) : (
-            <Marker key={p.i} p={p} x={x} y={y} fill={stuffColor(p.s, dark)} opacity={stuffOpacity(p.s)} ring="var(--surface)" />
+            <Marker key={p.i} p={p} x={x} y={y} r={stuffRadius(p.s)} fill={stuffColor(p.s, dark)} opacity={stuffOpacity(p.s)} ring="var(--surface)" />
           )
         ))}
       </g>
@@ -94,7 +94,7 @@ export default function StrikeZone({ pitches, ghost = [], pitchNames }: Props) {
         viewBox={`0 0 ${W} ${H}`}
         className="w-full h-auto touch-none select-none"
         role="img"
-        aria-label={`포수 시점 투구 위치 ${pts.length}구, 색이 진할수록 구위 높음`}
+        aria-label={`포수 시점 투구 위치 ${pts.length}구, 빨갛고 클수록 구위 높음`}
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
         onPointerDown={onMove}
@@ -197,6 +197,11 @@ function Legend({ dark, n }: { dark: boolean; n: number }) {
         <span className="tnum text-muted">≤{STUFF_DOMAIN[0]}</span>
         <span className="h-2.5 w-32 rounded-sm" style={{ background: `linear-gradient(90deg, ${stops.join(",")})` }} />
         <span className="tnum text-muted">{STUFF_DOMAIN[1]}≥</span>
+        <svg width={44} height={12} aria-label="점 크기 : 구위가 높을수록 큼">
+          {[30, 50, 70].map((s, i) => (
+            <circle key={s} cx={5 + i * 16} cy={6} r={stuffRadius(s)} fill={stuffColor(s, dark)} fillOpacity={stuffOpacity(s)} />
+          ))}
+        </svg>
       </div>
       <div className="flex items-center gap-3" aria-label="마커 모양">
         <span className="flex items-center gap-1">

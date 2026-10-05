@@ -165,7 +165,7 @@ export default function Home() {
           <BandPicker ps={ps} band={band} setBand={setBand} ghost={ghost} setGhost={setGhost} />
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <Section title="투구 로케이션 × 구위" sub="포수 시점(존 높이는 타자별 정규화) · 진하고 불투명할수록 구위 높음 · 모양은 결과 · 점에 마우스를 올리면 상세">
+            <Section title="투구 로케이션 × 구위" sub="포수 시점(존 높이는 타자별 정규화) · 빨갛고 클수록 구위 높음 · 모양은 결과 · 점에 마우스를 올리면 상세">
               <StrikeZone pitches={bandPs} ghost={ghostPs} pitchNames={meta!.pitchNames} />
             </Section>
             <Section title="타구 분포" sub="인플레이 타구가 떨어진 위치 · 색과 모양은 결과 · 점에 마우스를 올리면 상세">
@@ -173,7 +173,7 @@ export default function Home() {
             </Section>
           </div>
 
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+          <div className="grid gap-4 items-start lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
             <Section title="요약">
               <SummaryTiles st={st} league={league} />
             </Section>

@@ -23,22 +23,37 @@ function ramp(stops: string[], t: number) {
   return `rgb(${a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(",")})`;
 }
 
-/** 구위 색 도메인 : 30 이하 가장 옅게, 70 이상 가장 진하게 */
+// 구위 웜 램프 (노랑 -> 빨강). 라이트 : 명도 감소·표면 대비 1.6 -> 7.6 / 다크 : 채도 0.07 -> 0.23 증가, 대비 2.4 이상
+const WARM = ["#f2c13b", "#f5a031", "#f07a2b", "#e45127", "#cc2e20", "#a50f15"];
+const WARM_DARK = ["#6b5326", "#a87a1e", "#d98a1f", "#ee6a2a", "#f6472f", "#ff3b30"];
+
+/** 구위 색 도메인 : 30 이하 가장 옅고 작게, 70 이상 가장 진하고 크게 */
 export const STUFF_DOMAIN: [number, number] = [30, 70];
 
 export function sequential(t: number, dark: boolean) {
   return ramp(dark ? BLUE_DARK : BLUE, t);
 }
 
-/** 구위 마커 : 낮은 구위는 투명하게(옅게), 높은 구위는 불투명하게(진하게). 라이트 램프 300~700 / 다크 램프 450~150 */
+const stuffT = (s: number) => Math.min(1, Math.max(0, (s - STUFF_DOMAIN[0]) / (STUFF_DOMAIN[1] - STUFF_DOMAIN[0])));
+
+/** 구위 마커 색 : 낮은 구위 = 노랑(옅게), 높은 구위 = 진한 빨강 (라이트·다크 모두 빨강이 가장 강함) */
 export function stuffColor(s: number, dark: boolean) {
-  const t = Math.min(1, Math.max(0, (s - STUFF_DOMAIN[0]) / (STUFF_DOMAIN[1] - STUFF_DOMAIN[0])));
-  return dark ? ramp(BLUE_DARK, 0.3 + 0.55 * t) : ramp(BLUE, 0.33 + 0.67 * t);
+  return ramp(dark ? WARM_DARK : WARM, stuffT(s));
 }
 
+/** 웜 램프 직접 접근 (t = 0~1). 히트맵처럼 도메인을 따로 쓰는 곳용 */
+export function warmRamp(t: number, dark: boolean) {
+  return ramp(dark ? WARM_DARK : WARM, t);
+}
+
+/** 구위 마커 불투명도 : 0.45 -> 1 */
 export function stuffOpacity(s: number) {
-  const t = Math.min(1, Math.max(0, (s - STUFF_DOMAIN[0]) / (STUFF_DOMAIN[1] - STUFF_DOMAIN[0])));
-  return 0.18 + 0.82 * t;
+  return 0.45 + 0.55 * stuffT(s);
+}
+
+/** 구위 마커 반지름 (px) : 2.8 -> 5.2 */
+export function stuffRadius(s: number) {
+  return 2.8 + 2.4 * stuffT(s);
 }
 
 export function useDarkMode() {
