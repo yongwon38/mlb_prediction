@@ -190,8 +190,9 @@ def score_season(df, model, scaler, season):
     c, S0, method = explain_contrib(model, scaler, d[CFG['features']], pred, d['stuff_score'].to_numpy(), season, d[KEY])
     d[EXPLAIN_COLS] = c
     if CFG['drop_waste']:
-        scored = ~sp.is_waste_ball(d)
-        d['stuff_score'] = d['stuff_score'].where(scored)    # 터무니없는 위치의 볼 : 점수 없음
+        scored = ~sp.is_unscored(d)
+        d['stuff_score'] = d['stuff_score'].where(scored)    # 터무니없는 위치의 볼 + 사구 : 점수 없음
+        print(f"  점수 제외 : waste 볼 {sp.is_waste_ball(d).sum():,} + 사구 {(d['description'] == 'hit_by_pitch').sum():,}")
         d.loc[~scored, EXPLAIN_COLS] = np.nan
     for col in sp.STUFF_CAT_FEATURES:
         d[col] = d[col].astype(str)
@@ -205,7 +206,10 @@ def check_against_parquet(d):
         print('  (parquet 없음 - 검증 생략)')
         return
     key = ['game_pk', 'at_bat_number', 'pitch_number', 'pitcher']
-    ref = pd.read_parquet(path)[key + ['stuff_score']]
+    ref = pd.read_parquet(path)[key + ['description', 'stuff_score']]
+    if CFG['drop_waste']:    # 기준 parquet 은 waste 볼만 NaN -> 사구 제외 규칙을 같게 맞춘 뒤 대조
+        ref.loc[ref['description'] == 'hit_by_pitch', 'stuff_score'] = np.nan
+    ref = ref.drop(columns='description')
     cur = d[key + ['stuff_score']].astype({k: 'int64' for k in key})
     m = cur.merge(ref.astype({k: 'int64' for k in key}), on=key, suffixes=('', '_ref'))
     nan_ok = (m['stuff_score'].isna() == m['stuff_score_ref'].isna()).all()

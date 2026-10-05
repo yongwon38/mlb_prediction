@@ -46,7 +46,7 @@ export default function BandPicker({ ps, band, setBand, ghost, setGhost, note = 
         );
       })}
       {showNone && (
-      <button className="chip" aria-pressed={band.includes(BAND_NONE)} onClick={() => toggle(BAND_NONE)} title="존에서 크게 벗어난 볼 (구위 점수 없음)">
+      <button className="chip" aria-pressed={band.includes(BAND_NONE)} onClick={() => toggle(BAND_NONE)} title="존에서 크게 벗어난 볼·사구 (구위 점수 없음)">
         <span className="w-2.5 h-2.5 rounded-full border border-muted" />
         점수 제외 <span className="tnum text-muted">{(counts.get(BAND_NONE) ?? 0).toLocaleString()}</span>
       </button>

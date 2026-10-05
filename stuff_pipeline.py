@@ -219,6 +219,11 @@ def is_waste_ball(df):
     return df['description'].isin(BALL_DESC) & waste
 
 
+def is_unscored(df):
+    """화면에서 구위 점수를 매기지 않는 투구 : waste 볼 + 사구 (사구도 터무니없는 위치의 공)"""
+    return is_waste_ball(df) | (df['description'] == 'hit_by_pitch')
+
+
 def fit_stuff_model(X_tr, y_tr, X_es, y_es, n_iter=12, seed=SEED, verbose=True):
     """베이스라인 LGBM 회귀 모델 (추후 이 함수만 커스텀 모델로 교체)
 

@@ -148,7 +148,7 @@ export function Tooltip({ p, left, top, pitchNames, hint }: { p: Pitch; left: nu
         </span>
         <span className="tnum">{p.s === null ? "구위 -" : `구위 ${p.s.toFixed(1)}`}</span>
       </div>
-      {p.s === null && <div className="text-muted mb-1">존에서 크게 벗어난 볼 — 구위 점수 제외</div>}
+      {p.s === null && <div className="text-muted mb-1">{p.r === 9 ? "사구" : "존에서 크게 벗어난 볼"} — 구위 점수 제외</div>}
       <div className="text-muted mb-1">
         {p.date} · {p.inn}회 · {p.b}-{p.k} 카운트 · {p.lhb ? "좌타" : "우타"}
       </div>
@@ -204,7 +204,7 @@ function Legend({ dark, n }: { dark: boolean; n: number }) {
           <svg width={12} height={12}>
             <circle cx={6} cy={6} r={4.5} fill="none" stroke="var(--muted)" strokeWidth={1} />
           </svg>
-          점수 제외(존 밖 볼)
+          점수 제외(존 밖 볼·사구)
         </span>
         <span className="tnum text-muted">{n.toLocaleString()}구</span>
       </div>

@@ -99,7 +99,7 @@ export interface Pitch {
   inn: number;
   team: string;
   pt: string;
-  s: number | null; // 구위 score 20~80 (존에서 크게 벗어난 볼은 null : 점수 제외)
+  s: number | null; // 구위 score 20~80 (존에서 크게 벗어난 볼·사구는 null : 점수 제외)
   x: number | null; // plate_x (포수 시점, ft)
   z: number | null; // 존 높이 정규화 plate_z (ft)
   zone: number | null;

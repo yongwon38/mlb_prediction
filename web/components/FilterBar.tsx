@@ -35,7 +35,7 @@ export function applyFilters(ps: Pitch[], f: Filters, validStart: string | null)
       (f.hand === "all" || (f.hand === "L") === p.lhb) &&
       (!counts.length || counts.some((c) => c.test(p))) &&
       (!f.teams.length || f.teams.includes(p.team)) &&
-      // 점수 없는 공(존 밖 볼)은 구위 범위를 기본값(20~80)으로 둘 때만 표시
+      // 점수 없는 공(존 밖 볼·사구)은 구위 범위를 기본값(20~80)으로 둘 때만 표시
       (p.s === null ? f.stuffMin <= 20 && f.stuffMax >= 80 : p.s >= f.stuffMin && p.s <= f.stuffMax) &&
       (!f.validOnly || !validStart || p.date >= validStart),
   );

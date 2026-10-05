@@ -9,7 +9,7 @@
 | 1 | 타구방향·타구속도·발사각·공격각도 → 타구결과 (0 아웃 / 1 1루타 / 2 2·3루타 / 3 홈런) | RandomForest 다중분류 |
 | 2 | 예측확률 기대값(0~3) → **타구질 score (0~1)** | Gamma 적합 → Beta 변환 |
 | 3 | 투구 정보(+ VAA·HAA) → 타구질 score (헛스윙 = 0, 루킹삼진 제외) | LGBM |
-| 4 | 3단계 예측 → **구위 score (20~80, 중앙값 50, 대칭)**. 존에서 크게 벗어난 볼(Savant Waste)은 점수 제외 | ECDF → 정규분위수 |
+| 4 | 3단계 예측 → **구위 score (20~80, 중앙값 50, 대칭)**. 존에서 크게 벗어난 볼(Savant Waste)과 사구는 점수 제외 | ECDF → 정규분위수 |
 
 - 학습 : 정규시즌 ~ 2025-08-28 / 검증 : 정규시즌 마지막 1개월 (2025-08-29 ~ 09-28)
 
@@ -44,7 +44,7 @@ v1 과 동일 split·동일 표본(검증기간 인플레이 + 헛스윙)·waste
 - 시즌 : 2026 / 2025 / 2024. 2024·2026 은 2025 학습 모델을 그대로 적용한 out-of-sample 점수
 
 ```bash
-python compute_shap.py             # (선택) 정확한 SHAP 캐시, 약 12시간. 없으면 Saabas 기여 사용
+python compute_shap.py             # (선택) 정확한 SHAP 캐시, 약 12시간(현재 중단됨). 없으면 Saabas 기여 사용
 python export_web_data.py          # web/public/data 생성 (games_24/25_final/26.pkl, models/ 필요. 없는 pkl 은 pybaseball 로 자동 다운로드)
 cd web && npm install && npm run dev
 npx vercel --prod --archive=tgz    # web/ 에서 배포 (투수별 파일이 많아 아카이브 업로드 필수)

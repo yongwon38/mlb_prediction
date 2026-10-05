@@ -43,7 +43,7 @@ export const STUFF_BUCKETS = [
   { label: "60+", lo: 60, hi: Infinity },
 ];
 
-/** 구위 구간 키 : STUFF_BUCKETS 라벨, 점수 없는 공(존 밖 볼)은 "none" */
+/** 구위 구간 키 : STUFF_BUCKETS 라벨, 점수 없는 공(존 밖 볼·사구)은 "none" */
 export const BAND_NONE = "none";
 export function bandOf(s: number | null): string {
   if (s === null) return BAND_NONE;
