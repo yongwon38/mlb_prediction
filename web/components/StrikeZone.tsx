@@ -1,8 +1,9 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
 import type { Pitch } from "@/lib/types";
-import { PA_LABELS, RESULT_LABELS, ZONE_BOT, ZONE_HALF_WIDTH, ZONE_TOP, resultGroup } from "@/lib/analysis";
-import { STUFF_DOMAIN, stuffColor, stuffOpacity, stuffRadius, useDarkMode } from "@/lib/colors";
+import { PA_LABELS, RESULT_LABELS, ZONE_BOT, ZONE_HALF_WIDTH, ZONE_TOP, resultShape } from "@/lib/analysis";
+import { STUFF_DOMAIN, stuffColor, stuffOpacity, useDarkMode } from "@/lib/colors";
+import { ResultLegend, ResultMarker } from "@/components/ResultMarker";
 
 const W = 440;
 const H = 500;
@@ -16,14 +17,6 @@ interface Props {
   pitches: Pitch[];
   ghost?: Pitch[]; // 구위 구간 선택 시 나머지 공 (회색 배경, hover 제외)
   pitchNames: Record<string, string>;
-}
-
-function Marker({ p, x, y, fill, opacity, r = 3.8, ring }: { p: Pitch; x: number; y: number; fill: string; opacity: number; r?: number; ring: string }) {
-  const g = resultGroup(p.r);
-  const common = { fill, fillOpacity: opacity, stroke: ring, strokeWidth: 0.75 };
-  if (g === "hit") return <path d={`M${x},${y - r * 1.25} L${x + r * 1.15},${y + r * 0.85} L${x - r * 1.15},${y + r * 0.85} Z`} {...common} />;
-  if (g === "out") return <rect x={x - r * 0.9} y={y - r * 0.9} width={r * 1.8} height={r * 1.8} rx={1} {...common} />;
-  return <circle cx={x} cy={y} r={r} {...common} />;
 }
 
 export default function StrikeZone({ pitches, ghost = [], pitchNames }: Props) {
@@ -55,9 +48,9 @@ export default function StrikeZone({ pitches, ghost = [], pitchNames }: Props) {
         ))}
         {pts.map(({ p, x, y }) => (
           p.s === null ? (
-            <Marker key={p.i} p={p} x={x} y={y} fill="none" opacity={0} ring="var(--muted)" />
+            <ResultMarker key={p.i} shape={resultShape(p.r)} x={x} y={y} fill="none" opacity={0} ring="var(--muted)" />
           ) : (
-            <Marker key={p.i} p={p} x={x} y={y} r={stuffRadius(p.s)} fill={stuffColor(p.s, dark)} opacity={stuffOpacity(p.s)} ring="var(--surface)" />
+            <ResultMarker key={p.i} shape={resultShape(p.r)} x={x} y={y} fill={stuffColor(p.s, dark)} opacity={stuffOpacity(p.s)} ring="var(--surface)" />
           )
         ))}
       </g>
@@ -94,7 +87,7 @@ export default function StrikeZone({ pitches, ghost = [], pitchNames }: Props) {
         viewBox={`0 0 ${W} ${H}`}
         className="w-full h-auto touch-none select-none"
         role="img"
-        aria-label={`포수 시점 투구 위치 ${pts.length}구, 빨갛고 클수록 구위 높음`}
+        aria-label={`포수 시점 투구 위치 ${pts.length}구, 빨갈수록 구위 높음`}
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
         onPointerDown={onMove}
@@ -197,31 +190,9 @@ function Legend({ dark, n }: { dark: boolean; n: number }) {
         <span className="tnum text-muted">≤{STUFF_DOMAIN[0]}</span>
         <span className="h-2.5 w-32 rounded-sm" style={{ background: `linear-gradient(90deg, ${stops.join(",")})` }} />
         <span className="tnum text-muted">{STUFF_DOMAIN[1]}≥</span>
-        <svg width={44} height={12} aria-label="점 크기 : 구위가 높을수록 큼">
-          {[30, 50, 70].map((s, i) => (
-            <circle key={s} cx={5 + i * 16} cy={6} r={stuffRadius(s)} fill={stuffColor(s, dark)} fillOpacity={stuffOpacity(s)} />
-          ))}
-        </svg>
       </div>
-      <div className="flex items-center gap-3" aria-label="마커 모양">
-        <span className="flex items-center gap-1">
-          <svg width={12} height={12}>
-            <circle cx={6} cy={6} r={4.5} fill="var(--muted)" />
-          </svg>
-          볼·스트라이크·파울
-        </span>
-        <span className="flex items-center gap-1">
-          <svg width={12} height={12}>
-            <rect x={2} y={2} width={8} height={8} rx={1} fill="var(--muted)" />
-          </svg>
-          인플레이 아웃
-        </span>
-        <span className="flex items-center gap-1">
-          <svg width={12} height={12}>
-            <path d="M6,0.5 L11.5,10.5 L0.5,10.5 Z" fill="var(--muted)" />
-          </svg>
-          안타
-        </span>
+      <div className="flex flex-wrap items-center gap-3" aria-label="마커 모양">
+        <ResultLegend shapes={["dot", "square", "triangle", "diamond", "star"]} />
         <span className="flex items-center gap-1">
           <svg width={12} height={12}>
             <circle cx={6} cy={6} r={4.5} fill="none" stroke="var(--muted)" strokeWidth={1} />

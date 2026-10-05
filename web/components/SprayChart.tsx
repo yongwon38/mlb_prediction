@@ -1,9 +1,10 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
 import type { Pitch } from "@/lib/types";
-import { type BattedStats, HIT_CLASS_LABELS, battedStats, hitClass } from "@/lib/analysis";
+import { type BattedStats, type ResultShape, battedStats, hitClass, resultShape } from "@/lib/analysis";
 import { hitColor, useDarkMode } from "@/lib/colors";
 import { Tooltip } from "@/components/StrikeZone";
+import { ResultLegend, ResultMarker } from "@/components/ResultMarker";
 import { f1, f3, pct } from "@/components/Panels";
 
 // 필드 좌표 (ft) : 홈 = (0,0), +x = 1루 쪽, +y = 외야. 화면은 포수 시점과 같은 좌우 방향 (왼쪽 = 3루/좌익)
@@ -36,18 +37,11 @@ interface Props {
   pitchNames: Record<string, string>;
 }
 
+const SPRAY_SHAPES: ResultShape[] = ["square", "triangle", "diamond", "star"];
+const SHAPE_CLASS: Record<ResultShape, number> = { dot: 0, square: 0, triangle: 1, diamond: 2, star: 3 };
+
 const inPlay = (p: Pitch) => p.r >= 4 && p.r <= 8;
 const located = (p: Pitch) => inPlay(p) && p.hx !== null && p.hy !== null;
-
-/** 결과별 마커 : 아웃 ■ / 1루타 ● / 2·3루타 ▲ / 홈런 ◆ (색 외에 모양으로도 구분) */
-function HitMarker({ cls, x, y, fill, opacity, ring }: { cls: number; x: number; y: number; fill: string; opacity: number; ring: string }) {
-  const r = 4;
-  const c = { fill, fillOpacity: opacity, stroke: ring, strokeWidth: 0.75 };
-  if (cls === 0) return <rect x={x - r * 0.85} y={y - r * 0.85} width={r * 1.7} height={r * 1.7} rx={1} {...c} />;
-  if (cls === 1) return <circle cx={x} cy={y} r={r} {...c} />;
-  if (cls === 2) return <path d={`M${x},${y - r * 1.25} L${x + r * 1.15},${y + r * 0.85} L${x - r * 1.15},${y + r * 0.85} Z`} {...c} />;
-  return <path d={`M${x},${y - r * 1.3} L${x + r * 1.1},${y} L${x},${y + r * 1.3} L${x - r * 1.1},${y} Z`} {...c} />;
-}
 
 export default function SprayChart({ ps, ghost, all, selecting, pitchNames }: Props) {
   const dark = useDarkMode();
@@ -72,10 +66,10 @@ export default function SprayChart({ ps, ghost, all, selecting, pitchNames }: Pr
     () => (
       <g>
         {ghostPts.map(({ p, x, y }) => (
-          <circle key={p.i} cx={x} cy={y} r={2} fill="var(--muted)" fillOpacity={0.22} />
+          <circle key={p.i} cx={x} cy={y} r={2} fill="var(--muted)" fillOpacity={0.18} />
         ))}
         {pts.map(({ p, cls, x, y }) => (
-          <HitMarker key={p.i} cls={cls} x={x} y={y} fill={hitColor(cls, dark)} opacity={cls === 0 ? 0.55 : 0.9} ring="var(--surface)" />
+          <ResultMarker key={p.i} shape={resultShape(p.r)} x={x} y={y} fill={hitColor(cls, dark)} opacity={cls === 0 ? 0.8 : 0.9} ring="var(--surface)" />
         ))}
       </g>
     ),
@@ -152,14 +146,7 @@ export default function SprayChart({ ps, ghost, all, selecting, pitchNames }: Pr
       {hover && hp && <Tooltip p={hover} left={(hp.x / W) * 100} top={(hp.y / H) * 100} pitchNames={pitchNames} />}
 
       <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-2" aria-label="타구 결과 범례">
-        {HIT_CLASS_LABELS.map((l, cls) => (
-          <span key={l} className="flex items-center gap-1">
-            <svg width={12} height={12}>
-              <HitMarker cls={cls} x={6} y={6.5} fill={hitColor(cls, dark)} opacity={cls === 0 ? 0.55 : 0.9} ring="none" />
-            </svg>
-            {l}
-          </span>
-        ))}
+        <ResultLegend shapes={SPRAY_SHAPES} color={(sh) => hitColor(SHAPE_CLASS[sh], dark)} />
         <span className="ml-auto tnum text-muted">
           타구 {pts.length.toLocaleString()}개{missing ? ` (좌표 없음 ${missing})` : ""}
         </span>

@@ -10,6 +10,11 @@ export const PA_LABELS = ["", "아웃", "삼진", "1루타", "2루타", "3루타
 export type ResultGroup = "noncontact" | "out" | "hit";
 export const resultGroup = (r: number): ResultGroup => (r >= 5 && r <= 8 ? "hit" : r === 4 ? "out" : "noncontact");
 
+/** 투구·타구 분포도 공용 결과 기호 : ● 비타격 / ■ 아웃 / ▲ 1루타 / ◆ 2·3루타 / ★ 홈런 */
+export type ResultShape = "dot" | "square" | "triangle" | "diamond" | "star";
+export const resultShape = (r: number): ResultShape =>
+  r === 4 ? "square" : r === 5 ? "triangle" : r === 6 || r === 7 ? "diamond" : r === 8 ? "star" : "dot";
+
 /** 결과 필터 칩 */
 export const RESULT_FILTERS: { key: string; label: string; codes: number[] }[] = [
   { key: "ball", label: "볼·사구", codes: [0, 9] },
@@ -49,7 +54,6 @@ export function bandOf(s: number | null): string {
 // 타구 (스프레이)
 // ---------------------------------------------------------------------------
 /** 타구 결과 범주 : 0 아웃 / 1 1루타 / 2 2·3루타 / 3 홈런 */
-export const HIT_CLASS_LABELS = ["아웃", "1루타", "2·3루타", "홈런"];
 export const hitClass = (r: number) => (r === 5 ? 1 : r === 6 || r === 7 ? 2 : r === 8 ? 3 : 0);
 
 /** 타구 방향 (deg) : 0 = 센터, 음수 = 3루 쪽, 양수 = 1루 쪽 */
