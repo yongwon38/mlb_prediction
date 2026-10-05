@@ -21,11 +21,11 @@ export function StuffDistribution({ ps, pitchTypes, league }: { ps: Pitch[]; pit
   const dark = useDarkMode();
   const [hover, setHover] = useState<string | null>(null);
   const rows = useMemo(() => {
-    const g = groupBy(ps, (p) => p.pt);
+    const g = groupBy(ps.filter((p) => p.s !== null), (p) => p.pt);
     return pitchTypes
       .filter((pt) => (g.get(pt)?.length ?? 0) >= 5)
       .map((pt) => {
-        const s = g.get(pt)!.map((p) => p.s).sort((a, b) => a - b);
+        const s = g.get(pt)!.map((p) => p.s as number).sort((a, b) => a - b);
         return { pt, n: s.length, q: [0.05, 0.25, 0.5, 0.75, 0.95].map((q) => quantile(s, q)), mean: s.reduce((a, b) => a + b, 0) / s.length, lg: league.pitchTypes[pt]?.pitchQuantiles };
       });
   }, [ps, pitchTypes, league]);
@@ -209,21 +209,22 @@ const BUCKET_METRICS: [BucketMetric, string][] = [
 
 export function BucketChart({ ps, leagueBuckets }: { ps: Pitch[]; leagueBuckets: (Rates & { label: string })[] }) {
   const [metric, setMetric] = useState<BucketMetric>("ba");
+  const scored = useMemo(() => ps.filter((p) => p.s !== null), [ps]);
   const data = useMemo(
     () =>
       STUFF_BUCKETS.map((b, i) => {
-        const g = ps.filter((p) => p.s >= b.lo && p.s < b.hi);
+        const g = scored.filter((p) => (p.s as number) >= b.lo && (p.s as number) < b.hi);
         const st = stats(g);
         const enough = metric === "whiff" ? st.swings >= 10 : metric === "xwobacon" ? g.filter((p) => p.r >= 4 && p.r <= 8).length >= 8 : st.ab >= 10;
         return {
           label: b.label,
-          share: ps.length ? g.length / ps.length : 0,
+          share: scored.length ? g.length / scored.length : 0,
           n: g.length,
           pitcher: enough ? (st[metric] as number | null) : null,
           league: leagueBuckets[i]?.[metric] ?? null,
         };
       }),
-    [ps, leagueBuckets, metric],
+    [scored, leagueBuckets, metric],
   );
   const isPct = metric === "whiff";
   const fmt = (v: number) => (isPct ? pct(v, 0) : f3(v));

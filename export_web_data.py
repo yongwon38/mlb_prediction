@@ -4,21 +4,30 @@
 시즌별 정규시즌 투구에 3·4단계 모델(구위 모델 + 20~80 스케일러)을 적용해 투구별 구위 score 를 만들고,
 투수별 JSON(컬럼형 배열) / 투수 목록 / 리그 기준값을 web/public/data/{season}/ 에 저장한다.
 
-- 2025 : 모델 학습 시즌 (outputs/stuff_scores_2025.parquet 과 동일한 값인지 검증)
+- 2025 : 모델 학습 시즌 (선택한 모델 버전의 stuff_scores_2025.parquet 과 동일한 값인지 검증)
 - 2024, 2026 : 2025 학습 모델을 그대로 적용한 out-of-sample score
+- MODEL_VERSION 으로 사용할 모델 선택 (v1 : models/, outputs/ / v2 : models/v2/, outputs/v2/)
+- v2 : 볼 판정 + Savant Waste 존 투구(sp.is_waste_ball)는 score 없음(null). 행은 유지해 분포도에는 표시
 
 실행 : python export_web_data.py
 """
 import gzip
 import json
 import os
-import shutil
 
 import joblib
 import numpy as np
 import pandas as pd
 
 import stuff_pipeline as sp
+
+MODEL_VERSION = 'v2'
+MODELS = {
+    'v1': {'dir': 'models', 'outputs': 'outputs', 'features': sp.STUFF_FEATURES, 'drop_waste': False},
+    'v2': {'dir': os.path.join('models', 'v2'), 'outputs': os.path.join('outputs', 'v2'),
+           'features': sp.STUFF_FEATURES_V2, 'drop_waste': True},
+}
+CFG = MODELS[MODEL_VERSION]
 
 SEASONS = {2026: 'games_26.pkl', 2025: 'games_25_final.pkl', 2024: 'games_24.pkl'}
 OUT_DIR = os.path.join('web', 'public', 'data')
@@ -78,8 +87,10 @@ def score_season(df, model, scaler):
     for col, cats in zip(sp.STUFF_CAT_FEATURES, model.booster_.pandas_categorical):
         d[col] = pd.Categorical(d[col].astype(str), categories=cats)
     d = d[d['pitch_type'].notna()]    # 학습 시 없던 구종 제외
-    pred = model.predict(d[sp.STUFF_FEATURES])
+    pred = model.predict(d[CFG['features']])
     d['stuff_score'] = scaler.transform(pred)
+    if CFG['drop_waste']:
+        d['stuff_score'] = d['stuff_score'].where(~sp.is_waste_ball(d))    # 터무니없는 위치의 볼 : 점수 없음
     for col in sp.STUFF_CAT_FEATURES:
         d[col] = d[col].astype(str)
     return d
@@ -87,7 +98,7 @@ def score_season(df, model, scaler):
 
 def check_against_parquet(d):
     """2025 score 가 파이프라인 노트북 산출물과 동일한지 확인"""
-    path = os.path.join('outputs', 'stuff_scores_2025.parquet')
+    path = os.path.join(CFG['outputs'], 'stuff_scores_2025.parquet')
     if not os.path.exists(path):
         print('  (parquet 없음 - 검증 생략)')
         return
@@ -95,9 +106,11 @@ def check_against_parquet(d):
     ref = pd.read_parquet(path)[key + ['stuff_score']]
     cur = d[key + ['stuff_score']].astype({k: 'int64' for k in key})
     m = cur.merge(ref.astype({k: 'int64' for k in key}), on=key, suffixes=('', '_ref'))
+    nan_ok = (m['stuff_score'].isna() == m['stuff_score_ref'].isna()).all()
     diff = (m['stuff_score'] - m['stuff_score_ref']).abs()
-    print(f'  parquet 대조 : 매칭 {len(m):,} / 현재 {len(cur):,} / 기준 {len(ref):,}, 최대 오차 {diff.max():.2e}')
-    assert len(m) == len(ref) and diff.max() < 1e-6, 'parquet 과 구위 score 불일치'
+    print(f'  parquet 대조 : 매칭 {len(m):,} / 현재 {len(cur):,} / 기준 {len(ref):,}, 최대 오차 {diff.max():.2e}, '
+          f'점수 없음 {m["stuff_score"].isna().sum():,}구 (위치 일치 {nan_ok})')
+    assert len(m) == len(ref) and nan_ok and diff.max() < 1e-6, 'parquet 과 구위 score 불일치'
 
 
 # ---------------------------------------------------------------------------
@@ -126,9 +139,7 @@ def add_web_columns(raw, d):
     d['is_whiff'] = d['description'].isin(sp.WHIFF_DESC).astype(int)
 
     # 타자 존 높이로 정규화 (표준 존 1.5 ~ 3.5 ft)
-    h = d['sz_top'] - d['sz_bot']
-    zn = 1.5 + (d['plate_z'] - d['sz_bot']) / h * 2.0
-    d['plate_z_norm'] = zn.where(h > 0.5, d['plate_z'])
+    d['plate_z_norm'] = sp.norm_plate_z(d)
 
     # 피 xwOBA : 인플레이 = 추정 wOBA, 그 외 타석 종료 = 실제 wOBA (woba_denom 기준)
     xw = np.where(inplay, d['estimated_woba_using_speedangle'], d['woba_value'])
@@ -218,6 +229,7 @@ def outcome_rates(g):
 
 
 def league_payload(d, valid_start=None):
+    d = d[d['stuff_score'].notna()]    # 리그 기준값은 점수가 있는 투구만
     pct = np.arange(1, 100)
     pitcher_avg = d.groupby('pitcher')['stuff_score'].agg(['mean', 'size'])
     pitcher_avg = pitcher_avg[pitcher_avg['size'] >= MIN_PITCHER_PITCHES]['mean']
@@ -268,15 +280,18 @@ def export_season(season, path, model, scaler):
     print(f'[{season}] {path}')
     raw = sp.load_regular_season(path, year=season)
     d = score_season(raw, model, scaler)
-    print(f'  정규시즌 {len(raw):,}구 -> score {len(d):,}구, 투수 {d["pitcher"].nunique():,}명')
+    print(f'  정규시즌 {len(raw):,}구 -> {len(d):,}구 (점수 없음 {d["stuff_score"].isna().sum():,}), '
+          f'투수 {d["pitcher"].nunique():,}명')
     if season == 2025:
         check_against_parquet(d)
     d = add_web_columns(raw, d)
 
     out = os.path.join(OUT_DIR, str(season))
-    if os.path.exists(out):
-        shutil.rmtree(out)
-    os.makedirs(os.path.join(out, 'p'))
+    # 폴더 자체는 지우지 않고 내용만 비운다 (OneDrive 가 폴더를 잡고 있으면 rmdir 이 거부됨)
+    os.makedirs(os.path.join(out, 'p'), exist_ok=True)
+    for root, _, files in os.walk(out):
+        for f in files:
+            os.remove(os.path.join(root, f))
 
     season_start = d['game_date'].min().strftime('%Y-%m-%d')
     valid_start = sp.split_last_month(raw)[2] if season == 2025 else None
@@ -292,7 +307,7 @@ def export_season(season, path, model, scaler):
             'throws': g['p_throws'].iloc[0],
             'teams': teams,
             'n': int(len(g)),
-            'stuff': round(float(g['stuff_score'].mean()), 2),
+            'stuff': round(float(g['stuff_score'].mean()), 2) if g['stuff_score'].notna().any() else None,
         })
 
     dump({
@@ -311,13 +326,15 @@ def export_season(season, path, model, scaler):
 
 def main():
     np.random.seed(sp.SEED)
-    model = joblib.load(os.path.join('models', 'stage3_stuff_lgbm.joblib'))
-    scaler = joblib.load(os.path.join('models', 'stage4_stuff_scaler.joblib'))
+    print(f'모델 {MODEL_VERSION} : {CFG["dir"]}')
+    model = joblib.load(os.path.join(CFG['dir'], 'stage3_stuff_lgbm.joblib'))
+    scaler = joblib.load(os.path.join(CFG['dir'], 'stage4_stuff_scaler.joblib'))
     os.makedirs(OUT_DIR, exist_ok=True)
     for season, path in SEASONS.items():
         export_season(season, path, model, scaler)
     dump({'seasons': sorted(SEASONS, reverse=True), 'resultLabels': RESULTS, 'paEvents': PA_EVENTS,
-          'pitchNames': PITCH_NAMES, 'trainSeason': 2025},
+          'pitchNames': PITCH_NAMES, 'trainSeason': 2025,
+          'modelVersion': MODEL_VERSION},
          os.path.join(OUT_DIR, 'meta.json'))
 
 

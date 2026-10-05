@@ -213,7 +213,7 @@ function Leaderboard({ index, league, onSelect, missing }: { index: SeasonIndex;
     () =>
       index.pitchers
         .filter((p) => p.n >= minN)
-        .sort((a, b) => b.stuff - a.stuff)
+        .sort((a, b) => (b.stuff ?? -1) - (a.stuff ?? -1))
         .slice(0, 20),
     [index, minN],
   );
@@ -246,7 +246,7 @@ function Leaderboard({ index, league, onSelect, missing }: { index: SeasonIndex;
                 </span>
               </span>
               <span className="text-xs text-muted tnum">{p.n.toLocaleString()}구</span>
-              <span className="w-12 text-right font-semibold tnum text-ink">{p.stuff.toFixed(1)}</span>
+              <span className="w-12 text-right font-semibold tnum text-ink">{p.stuff?.toFixed(1) ?? "-"}</span>
               <span className="w-16 text-right text-xs text-muted tnum">
                 {p.n >= league.minPitcherPitches ? `상위 ${100 - (percentileOf(league.pitcherPercentiles, p.stuff) ?? 0)}%` : ""}
               </span>

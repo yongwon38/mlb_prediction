@@ -53,7 +53,7 @@ export async function loadPitches(season: number, id: number): Promise<{ file: P
       inn: c.inn[i] as number,
       team: file.teams[c.tm[i] as number],
       pt: file.pitchTypes[c.pt[i] as number],
-      s: c.s[i] as number,
+      s: c.s[i],
       x: c.x[i],
       z: c.z[i],
       zone: c.zone[i],

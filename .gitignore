@@ -13,3 +13,7 @@
 /outputs/*
 !/outputs/*.png
 !/outputs/*.csv
+!/outputs/v2/
+/outputs/v2/*
+!/outputs/v2/*.png
+!/outputs/v2/*.csv

@@ -120,6 +120,25 @@ STUFF_NUM_FEATURES = [
 ]
 STUFF_CAT_FEATURES = ['pitch_type', 'p_throws']
 STUFF_FEATURES = STUFF_NUM_FEATURES + STUFF_CAT_FEATURES
+# v2 : 홈플레이트 도달 시점 수직/수평 진입각 추가 (원값, 높이 보정 없음)
+STUFF_FEATURES_V2 = STUFF_NUM_FEATURES + ['vaa', 'haa'] + STUFF_CAT_FEATURES
+
+PLATE_Y = 17 / 12    # 홈플레이트 앞면 (ft)
+RELEASE_Y = 50.0     # Statcast 초기 속도/가속도 기준 위치 (ft)
+
+
+def approach_angles(vx0, vy0, vz0, ax, ay, az):
+    """홈플레이트 앞면 도달 시점의 수직(VAA)/수평(HAA) 진입각 (deg)
+
+    vy_f = -sqrt(vy0^2 - 2*ay*(50 - 17/12)), t = (vy_f - vy0) / ay
+    VAA = -atan(vz_f / vy_f) : 음수 = 내려오며 진입 (패스트볼 약 -5, 커브 약 -9)
+    HAA = -atan(vx_f / vy_f) : 양수 = 포수 시점 오른쪽(3루 쪽)으로 진입
+    """
+    vy_f = -np.sqrt(vy0 ** 2 - 2 * ay * (RELEASE_Y - PLATE_Y))
+    t = (vy_f - vy0) / ay
+    vz_f = vz0 + az * t
+    vx_f = vx0 + ax * t
+    return -np.degrees(np.arctan(vz_f / vy_f)), -np.degrees(np.arctan(vx_f / vy_f))
 
 
 def add_stuff_features(df):
@@ -133,6 +152,8 @@ def add_stuff_features(df):
     for c in ['pfx_x', 'release_pos_x', 'vx0', 'ax']:
         d.loc[lefty, c] = -d.loc[lefty, c]
     d.loc[lefty, 'spin_axis'] = 360 - d.loc[lefty, 'spin_axis']
+    # 좌투 반전 후 계산 -> HAA 도 우투 기준
+    d['vaa'], d['haa'] = approach_angles(d['vx0'], d['vy0'], d['vz0'], d['ax'], d['ay'], d['az'])
     d['pfx_x'] = d['pfx_x'] * 12    # ft -> inch
     d['pfx_z'] = d['pfx_z'] * 12
 
@@ -154,24 +175,48 @@ def add_stuff_features(df):
     return d
 
 
-def stuff_sample_mask(df):
-    """3단계 학습 표본 : 인플레이 타구 + 헛스윙 + 루킹 삼진"""
-    whiff = df['description'].isin(WHIFF_DESC)
-    looking_k = (df['description'] == 'called_strike') & (df['events'] == 'strikeout')
-    return inplay_mask(df) | whiff | looking_k
+def stuff_sample_mask(df, include_looking_k=True):
+    """3단계 학습 표본 : 인플레이 타구 + 헛스윙 (+ 루킹 삼진, v1 기본값)"""
+    mask = inplay_mask(df) | df['description'].isin(WHIFF_DESC)
+    if include_looking_k:
+        mask |= (df['description'] == 'called_strike') & (df['events'] == 'strikeout')
+    return mask
 
 
-def build_stuff_dataset(df_feat, hit_score):
-    """3단계 학습 데이터. 인플레이 타구는 타구질 score, 헛스윙/루킹삼진은 0.
+def build_stuff_dataset(df_feat, hit_score, features=STUFF_FEATURES, include_looking_k=True):
+    """3단계 학습 데이터. 인플레이 타구는 타구질 score, 헛스윙(/루킹삼진)은 0.
 
     hit_score : 1·2단계 산출 타구질 score (index = 원본 df index)
+    v1 = 기본 인자, v2 = features=STUFF_FEATURES_V2, include_looking_k=False
     """
-    d = df_feat[stuff_sample_mask(df_feat)].copy()
+    d = df_feat[stuff_sample_mask(df_feat, include_looking_k)].copy()
     y = pd.Series(0.0, index=d.index)
     inplay = inplay_mask(d)
     y[inplay] = hit_score.reindex(d.index[inplay])
     keep = y.notna()    # 타구 정보 결측으로 score 가 없는 인플레이 타구 제외
-    return d.loc[keep, STUFF_FEATURES], y[keep]
+    return d.loc[keep, features], y[keep]
+
+
+# ---------------------------------------------------------------------------
+# 화면 표시용 : 존에서 크게 벗어난 볼 (점수 산정 제외)
+# ---------------------------------------------------------------------------
+BALL_DESC = ['ball', 'blocked_ball']
+WASTE_X = 20 / 12                                   # Savant Waste : 존 중심에서 좌우 20인치 바깥
+WASTE_Z_LO, WASTE_Z_HI = 1.5 - 10 / 12, 3.5 + 10 / 12    # 정규화 존(1.5~3.5ft) 위아래 10인치 바깥
+
+
+def norm_plate_z(df):
+    """타자 존 높이로 plate_z 정규화 (표준 존 1.5 ~ 3.5 ft). 존 정보가 이상하면 원값"""
+    h = df['sz_top'] - df['sz_bot']
+    zn = 1.5 + (df['plate_z'] - df['sz_bot']) / h * 2.0
+    return zn.where(h > 0.5, df['plate_z'])
+
+
+def is_waste_ball(df):
+    """볼 판정이면서 Savant Waste 존(터무니없는 위치)에 들어온 투구"""
+    zn = norm_plate_z(df)
+    waste = (df['plate_x'].abs() > WASTE_X) | (zn < WASTE_Z_LO) | (zn > WASTE_Z_HI)
+    return df['description'].isin(BALL_DESC) & waste
 
 
 def fit_stuff_model(X_tr, y_tr, X_es, y_es, n_iter=12, seed=SEED, verbose=True):

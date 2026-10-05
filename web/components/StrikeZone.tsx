@@ -35,7 +35,7 @@ export default function StrikeZone({ pitches, pitchNames }: Props) {
     () =>
       pitches
         .filter((p) => p.x !== null && p.z !== null)
-        .sort((a, b) => a.s - b.s)
+        .sort((a, b) => (a.s ?? -1) - (b.s ?? -1)) // 점수 없는 공(null)은 맨 아래
         .map((p) => ({ p, x: sx(p.x as number), y: sz(p.z as number) })),
     [pitches],
   );
@@ -45,7 +45,11 @@ export default function StrikeZone({ pitches, pitchNames }: Props) {
     () => (
       <g>
         {pts.map(({ p, x, y }) => (
-          <Marker key={p.i} p={p} x={x} y={y} fill={stuffColor(p.s, dark)} opacity={stuffOpacity(p.s)} ring="var(--surface)" />
+          p.s === null ? (
+            <Marker key={p.i} p={p} x={x} y={y} fill="none" opacity={0} ring="var(--muted)" />
+          ) : (
+            <Marker key={p.i} p={p} x={x} y={y} fill={stuffColor(p.s, dark)} opacity={stuffOpacity(p.s)} ring="var(--surface)" />
+          )
         ))}
       </g>
     ),
@@ -134,8 +138,9 @@ function Tooltip({ p, left, top, pitchNames }: { p: Pitch; left: number; top: nu
         <span>
           {pitchNames[p.pt] ?? p.pt} ({p.pt})
         </span>
-        <span className="tnum">구위 {p.s.toFixed(1)}</span>
+        <span className="tnum">{p.s === null ? "구위 -" : `구위 ${p.s.toFixed(1)}`}</span>
       </div>
+      {p.s === null && <div className="text-muted mb-1">존에서 크게 벗어난 볼 — 구위 점수 제외</div>}
       <div className="text-muted mb-1">
         {p.date} · {p.inn}회 · {p.b}-{p.k} 카운트 · {p.lhb ? "좌타" : "우타"}
       </div>
@@ -202,6 +207,12 @@ function Legend({ dark, n }: { dark: boolean; n: number }) {
             <path d="M6,0.5 L11.5,10.5 L0.5,10.5 Z" fill="var(--muted)" />
           </svg>
           안타
+        </span>
+        <span className="flex items-center gap-1">
+          <svg width={12} height={12}>
+            <circle cx={6} cy={6} r={4.5} fill="none" stroke="var(--muted)" strokeWidth={1} />
+          </svg>
+          점수 제외(존 밖 볼)
         </span>
         <span className="tnum text-muted">{n.toLocaleString()}구</span>
       </div>

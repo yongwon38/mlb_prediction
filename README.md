@@ -8,12 +8,26 @@
 |---|---|---|
 | 1 | 타구방향·타구속도·발사각·공격각도 → 타구결과 (0 아웃 / 1 1루타 / 2 2·3루타 / 3 홈런) | RandomForest 다중분류 |
 | 2 | 예측확률 기대값(0~3) → **타구질 score (0~1)** | Gamma 적합 → Beta 변환 |
-| 3 | 투구 정보 → 타구질 score (헛스윙·루킹삼진 = 0) | LGBM 베이스라인 |
-| 4 | 3단계 예측 → **구위 score (20~80, 중앙값 50, 대칭)** | ECDF → 정규분위수 |
+| 3 | 투구 정보(+ VAA·HAA) → 타구질 score (헛스윙 = 0, 루킹삼진 제외) | LGBM |
+| 4 | 3단계 예측 → **구위 score (20~80, 중앙값 50, 대칭)**. 존에서 크게 벗어난 볼(Savant Waste)은 점수 제외 | ECDF → 정규분위수 |
 
 - 학습 : 정규시즌 ~ 2025-08-28 / 검증 : 정규시즌 마지막 1개월 (2025-08-29 ~ 09-28)
 
-### 베이스라인 결과 (검증셋)
+### v2 결과 (현재 웹 모델, `stuff_pipeline_261005.ipynb`)
+v1 과 동일 split·동일 표본(검증기간 인플레이 + 헛스윙)·waste 볼 제외 조건에서 비교
+
+| 지표 | v1 | v2 |
+|---|---|---|
+| 검증 RMSE / R² | 0.1630 / 0.082 | **0.1622 / 0.091** |
+| 검증 투수×구종 ρ(구위, whiff%) | 0.674 | **0.738** |
+| 검증 투수×구종 ρ(구위, xwOBAcon) | −0.264 | **−0.286** |
+| 연도 간 안정성 r (2025→2026, 투수×구종) | 0.838 | **0.862** |
+| 다음 시즌 whiff% 예측 ρ (2025→2026) | 0.649 | **0.695** |
+| 2026 구간 Whiff 격차 (60+ − <40) | 0.527 | **0.550** |
+
+- 기존 점수에서 waste 볼은 평균 62.9 로 나머지 투구(48.5)보다 높았음 (로케이션을 보지 않는 모델이라 빠진 공도 물리량만으로 평가) → v2 부터 점수 제외
+
+### 베이스라인(v1) 결과 (검증셋)
 - 1단계 RandomForest : logloss 0.449 (사전확률 0.916), accuracy 0.817
 - 3단계 LGBM : RMSE 0.1609 (평균 baseline 0.1675), R² 0.077
 - 4단계 : 투수×구종(100구+) 구위 score vs whiff% Spearman 0.71, 투수 단위(300구+) 0.59
@@ -33,7 +47,8 @@ npx vercel --prod --archive=tgz    # web/ 에서 배포 (투수별 파일이 많
 ### 실행
 ```bash
 pip install pandas numpy scipy scikit-learn lightgbm shap matplotlib pyarrow pybaseball jupyter
-jupyter nbconvert --to notebook --execute --inplace stuff_pipeline_260929.ipynb
+jupyter nbconvert --to notebook --execute --inplace stuff_pipeline_260929.ipynb   # v1
+jupyter nbconvert --to notebook --execute --inplace stuff_pipeline_261005.ipynb   # v2 (v1 모델과 비교 포함)
 ```
 데이터(`games_25_final.pkl`)는 레포에 포함하지 않는다. 파일이 없으면 `stuff_pipeline.load_regular_season()`이 pybaseball로 2025 시즌을 받아 같은 이름으로 캐시한다.
 

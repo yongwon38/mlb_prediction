@@ -125,7 +125,7 @@ function NameSearch({ pitchers, onSelect }: { pitchers: PitcherEntry[]; onSelect
                 </span>
               </span>
               <span className="text-muted tnum shrink-0">
-                {p.n.toLocaleString()}구 · 구위 {p.stuff.toFixed(1)}
+                {p.n.toLocaleString()}구 · 구위 {p.stuff?.toFixed(1) ?? "-"}
               </span>
             </li>
           ))}
@@ -178,7 +178,7 @@ function TeamSearch({ index, selectedId, onSelect }: { index: SeasonIndex; selec
           <option value="">{team ? `선수 선택 (${roster.length}명, 투구수 순)` : "구단을 먼저 선택"}</option>
           {roster.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.name} — {p.n.toLocaleString()}구, 구위 {p.stuff.toFixed(1)}
+              {p.name} — {p.n.toLocaleString()}구, 구위 {p.stuff?.toFixed(1) ?? "-"}
               {p.teams.length > 1 ? " (이적)" : ""}
             </option>
           ))}
