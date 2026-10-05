@@ -148,6 +148,10 @@ def add_web_columns(raw, d):
     # 원래 부호의 무브먼트 (add_stuff_features 는 좌투 반전 + inch 변환을 하므로 원본에서 다시 가져온다)
     d['hb_in'] = raw.loc[d.index, 'pfx_x'] * 12
     d['ivb_in'] = raw.loc[d.index, 'pfx_z'] * 12
+
+    # 타구 좌표 (ft) : Savant hc_x/hc_y -> 홈플레이트 = (0, 0), +x = 1루 쪽, +y = 외야 방향. 인플레이만
+    d['hit_x'] = (2.5 * (d['hc_x'] - 125.42)).where(inplay)
+    d['hit_y'] = (2.5 * (198.27 - d['hc_y'])).where(inplay)
     return d
 
 
@@ -206,6 +210,8 @@ def pitcher_payload(g, season_start, pitch_types, teams):
             'la': _arr(g['launch_angle'], 0),
             'xba': _arr(g['estimated_ba_using_speedangle'], 3),
             'xw': _arr(g['xwoba'], 3),
+            'hx': _arr(g['hit_x'], 1),
+            'hy': _arr(g['hit_y'], 1),
         },
     }
 

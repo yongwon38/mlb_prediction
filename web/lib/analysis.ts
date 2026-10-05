@@ -38,6 +38,63 @@ export const STUFF_BUCKETS = [
   { label: "60+", lo: 60, hi: Infinity },
 ];
 
+/** 구위 구간 키 : STUFF_BUCKETS 라벨, 점수 없는 공(존 밖 볼)은 "none" */
+export const BAND_NONE = "none";
+export function bandOf(s: number | null): string {
+  if (s === null) return BAND_NONE;
+  return STUFF_BUCKETS.find((b) => s >= b.lo && s < b.hi)!.label;
+}
+
+// ---------------------------------------------------------------------------
+// 타구 (스프레이)
+// ---------------------------------------------------------------------------
+/** 타구 결과 범주 : 0 아웃 / 1 1루타 / 2 2·3루타 / 3 홈런 */
+export const HIT_CLASS_LABELS = ["아웃", "1루타", "2·3루타", "홈런"];
+export const hitClass = (r: number) => (r === 5 ? 1 : r === 6 || r === 7 ? 2 : r === 8 ? 3 : 0);
+
+/** 타구 방향 (deg) : 0 = 센터, 음수 = 3루 쪽, 양수 = 1루 쪽 */
+export const sprayAngle = (p: Pitch) => (p.hx === null || p.hy === null ? null : (Math.atan2(p.hx, p.hy) * 180) / Math.PI);
+
+/** 타자 손 기준 방향 : 우타는 3루 쪽, 좌타는 1루 쪽이 당겨친 타구 */
+export function battedDir(p: Pitch): "pull" | "center" | "oppo" | null {
+  const a = sprayAngle(p);
+  if (a === null) return null;
+  const toPull = p.lhb ? a : -a;
+  return toPull > 15 ? "pull" : toPull < -15 ? "oppo" : "center";
+}
+
+/** 발사각 유형 */
+export function laType(la: number | null): "gb" | "ld" | "fb" | "pu" | null {
+  if (la === null) return null;
+  return la < 10 ? "gb" : la < 25 ? "ld" : la <= 50 ? "fb" : "pu";
+}
+
+export interface BattedStats {
+  n: number;
+  ev: number | null;
+  hardHit: number | null;
+  ba: number | null;
+  dir: Record<"pull" | "center" | "oppo", number | null>;
+  la: Record<"gb" | "ld" | "fb" | "pu", number | null>;
+}
+
+/** 인플레이 타구 요약 (ps 는 인플레이 타구만) */
+export function battedStats(ps: Pitch[]): BattedStats {
+  const n = ps.length;
+  const evs = ps.map((p) => p.ev).filter((v): v is number => v !== null);
+  const dirs = ps.map(battedDir).filter((d) => d !== null);
+  const las = ps.map((p) => laType(p.la)).filter((d) => d !== null);
+  const share = <K extends string>(xs: K[], k: K) => (xs.length ? xs.filter((x) => x === k).length / xs.length : null);
+  return {
+    n,
+    ev: evs.length ? evs.reduce((a, b) => a + b, 0) / evs.length : null,
+    hardHit: evs.length ? evs.filter((v) => v >= 95).length / evs.length : null,
+    ba: n ? ps.filter((p) => p.r >= 5 && p.r <= 8).length / n : null,
+    dir: { pull: share(dirs, "pull"), center: share(dirs, "center"), oppo: share(dirs, "oppo") },
+    la: { gb: share(las, "gb"), ld: share(las, "ld"), fb: share(las, "fb"), pu: share(las, "pu") },
+  };
+}
+
 export const GAME_PITCH_BUCKETS = [
   { label: "1-25", lo: 1, hi: 25 },
   { label: "26-50", lo: 26, hi: 50 },

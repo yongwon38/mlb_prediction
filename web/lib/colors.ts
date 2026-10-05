@@ -59,3 +59,11 @@ export function pitchColor(pitchTypes: string[], pt: string, dark: boolean) {
   const pal = dark ? CATEGORICAL.dark : CATEGORICAL.light;
   return i >= 0 && i < pal.length ? pal[i] : dark ? "#898781" : "#898781";
 }
+
+/** 타구 결과 색 (1루타 / 2·3루타 / 홈런). 아웃은 중립 회색(--muted). validate_palette 라이트·다크 통과
+ *  라이트는 대비 WARN -> 결과마다 모양을 다르게 하고 범례·요약표를 함께 둔다 */
+export const HIT_COLORS = {
+  light: ["#2a78d6", "#eda100", "#e87ba4"],
+  dark: ["#3987e5", "#c98500", "#d55181"],
+};
+export const hitColor = (cls: number, dark: boolean) => (cls === 0 ? "var(--muted)" : (dark ? HIT_COLORS.dark : HIT_COLORS.light)[cls - 1]);

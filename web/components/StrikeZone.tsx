@@ -14,6 +14,7 @@ const sz = (z: number) => (Z_TOP - z - 0.15) * PX;
 
 interface Props {
   pitches: Pitch[];
+  ghost?: Pitch[]; // 구위 구간 선택 시 나머지 공 (회색 배경, hover 제외)
   pitchNames: Record<string, string>;
 }
 
@@ -25,7 +26,7 @@ function Marker({ p, x, y, fill, opacity, r = 3.8, ring }: { p: Pitch; x: number
   return <circle cx={x} cy={y} r={r} {...common} />;
 }
 
-export default function StrikeZone({ pitches, pitchNames }: Props) {
+export default function StrikeZone({ pitches, ghost = [], pitchNames }: Props) {
   const dark = useDarkMode();
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<Pitch | null>(null);
@@ -40,10 +41,18 @@ export default function StrikeZone({ pitches, pitchNames }: Props) {
     [pitches],
   );
 
+  const ghostPts = useMemo(
+    () => ghost.filter((p) => p.x !== null && p.z !== null).map((p) => ({ p, x: sx(p.x as number), y: sz(p.z as number) })),
+    [ghost],
+  );
+
   // 마커 레이어는 데이터가 바뀔 때만 다시 그린다 (hover 시 재렌더 방지)
   const layer = useMemo(
     () => (
       <g>
+        {ghostPts.map(({ p, x, y }) => (
+          <circle key={`g${p.i}`} cx={x} cy={y} r={2} fill="var(--muted)" fillOpacity={0.22} />
+        ))}
         {pts.map(({ p, x, y }) => (
           p.s === null ? (
             <Marker key={p.i} p={p} x={x} y={y} fill="none" opacity={0} ring="var(--muted)" />
@@ -53,7 +62,7 @@ export default function StrikeZone({ pitches, pitchNames }: Props) {
         ))}
       </g>
     ),
-    [pts, dark],
+    [pts, ghostPts, dark],
   );
 
   const onMove = (e: React.PointerEvent<SVGSVGElement>) => {
@@ -126,7 +135,7 @@ export default function StrikeZone({ pitches, pitchNames }: Props) {
   );
 }
 
-function Tooltip({ p, left, top, pitchNames }: { p: Pitch; left: number; top: number; pitchNames: Record<string, string> }) {
+export function Tooltip({ p, left, top, pitchNames }: { p: Pitch; left: number; top: number; pitchNames: Record<string, string> }) {
   const right = left > 55;
   const fmt = (v: number | null, d = 1, unit = "") => (v === null ? "-" : `${v.toFixed(d)}${unit}`);
   return (

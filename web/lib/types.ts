@@ -94,4 +94,6 @@ export interface Pitch {
   la: number | null;
   xba: number | null;
   xw: number | null;
+  hx: number | null; // 타구 좌표 (ft, 홈 = 0,0 / +x = 1루 쪽)
+  hy: number | null;
 }

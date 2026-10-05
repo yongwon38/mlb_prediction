@@ -2,11 +2,13 @@
 import { useEffect, useMemo, useState } from "react";
 import SearchPanel from "@/components/SearchPanel";
 import StrikeZone from "@/components/StrikeZone";
+import SprayChart from "@/components/SprayChart";
+import BandPicker from "@/components/BandPicker";
 import FilterBar, { EMPTY_FILTERS, type Filters, applyFilters } from "@/components/FilterBar";
 import { ArsenalTable, NotesList, Section, SummaryTiles } from "@/components/Panels";
 import { BucketChart, CountMix, PlatoonTable, StuffDistribution, TrendCharts, ZoneHeatmap } from "@/components/Charts";
 import { loadIndex, loadLeague, loadMeta, loadPitches } from "@/lib/data";
-import { percentileOf, scoutingNotes, stats } from "@/lib/analysis";
+import { bandOf, percentileOf, scoutingNotes, stats } from "@/lib/analysis";
 import type { League, Meta, Pitch, PitcherFile, SeasonIndex } from "@/lib/types";
 
 function readUrl() {
@@ -23,6 +25,8 @@ export default function Home() {
   const [data, setData] = useState<{ file: PitcherFile; pitches: Pitch[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [band, setBand] = useState<string[]>([]); // 투구·타구 분포 전용 구위 구간 (빈 배열 = 전체)
+  const [ghost, setGhost] = useState(true);
 
   // 초기 로드 : URL 의 시즌/투수 복원
   useEffect(() => {
@@ -73,12 +77,14 @@ export default function Home() {
   const selectPitcher = (id: number, team?: string) => {
     setPitcherId(id);
     setFilters({ ...EMPTY_FILTERS, teams: team ? [team] : [] });
+    setBand([]);
   };
 
   const changeSeason = (s: number) => {
     setSeason(s);
     setData(null);
     setFilters(EMPTY_FILTERS);
+    setBand([]);
   };
 
   const ready = !!(data && entry && data.file.id === entry.id && index?.season === season && league && meta);
@@ -86,6 +92,12 @@ export default function Home() {
   const validStart = index?.validStart ?? null;
   const ps = useMemo(() => (all ? applyFilters(all, filters, validStart) : []), [all, filters, validStart]);
   const st = useMemo(() => stats(ps), [ps]);
+  const [bandPs, bandRest] = useMemo(() => {
+    if (!band.length) return [ps, [] as Pitch[]];
+    const sel = new Set(band);
+    return [ps.filter((p) => sel.has(bandOf(p.s))), ps.filter((p) => !sel.has(bandOf(p.s)))];
+  }, [ps, band]);
+  const ghostPs = ghost ? bandRest : [];
   const notes = useMemo(
     () => (all && league && meta && data ? scoutingNotes(ps, all, league, data.file.pitchTypes, meta.pitchNames) : []),
     [ps, all, league, meta, data],
@@ -150,18 +162,24 @@ export default function Home() {
             total={all!.length}
           />
 
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
+          <BandPicker ps={ps} band={band} setBand={setBand} ghost={ghost} setGhost={setGhost} />
+
+          <div className="grid gap-4 lg:grid-cols-2">
             <Section title="투구 로케이션 × 구위" sub="포수 시점(존 높이는 타자별 정규화) · 진하고 불투명할수록 구위 높음 · 모양은 결과 · 점에 마우스를 올리면 상세">
-              <StrikeZone pitches={ps} pitchNames={meta!.pitchNames} />
+              <StrikeZone pitches={bandPs} ghost={ghostPs} pitchNames={meta!.pitchNames} />
             </Section>
-            <div className="flex flex-col gap-4 min-w-0">
-              <Section title="요약">
-                <SummaryTiles st={st} league={league} />
-              </Section>
-              <Section title="스카우팅 노트" sub="필터가 적용된 투구 기준, 규칙 기반 자동 생성">
-                <NotesList notes={notes} />
-              </Section>
-            </div>
+            <Section title="타구 분포" sub="인플레이 타구가 떨어진 위치 · 색과 모양은 결과 · 점에 마우스를 올리면 상세">
+              <SprayChart ps={bandPs} ghost={ghostPs} all={ps} selecting={band.length > 0} pitchNames={meta!.pitchNames} />
+            </Section>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+            <Section title="요약">
+              <SummaryTiles st={st} league={league} />
+            </Section>
+            <Section title="스카우팅 노트" sub="필터가 적용된 투구 기준, 규칙 기반 자동 생성">
+              <NotesList notes={notes} />
+            </Section>
           </div>
 
           <Section title="구종 아스널" sub="열 이름을 눌러 정렬">
@@ -264,14 +282,18 @@ function Methodology() {
       <summary className="cursor-pointer font-semibold text-ink text-sm">모델 설명 — 구위(Stuff) 20–80</summary>
       <ol className="list-decimal pl-5 mt-2 flex flex-col gap-1">
         <li>타구방향·타구속도·발사각·공격각도로 타구 결과(아웃/1루타/2·3루타/홈런)를 예측 (RandomForest).</li>
-        <li>예측 기대값을 Gamma → Beta 변환해 0–1 타구질 score 로 만듦. 헛스윙·루킹 삼진은 0.</li>
+        <li>예측 기대값을 Gamma → Beta 변환해 0–1 타구질 score 로 만듦. 헛스윙은 0 (루킹 삼진은 학습에서 제외).</li>
         <li>
-          투구 물리량(구속, 무브먼트, 릴리스, 익스텐션, 회전수·축, 팔각도, 주 패스트볼 대비 차이 등)으로 타구질 score 를 예측 (LGBM).{" "}
+          투구 물리량(구속, 무브먼트, 릴리스, 익스텐션, 회전수·축, 팔각도, 홈플레이트 진입각 VAA·HAA, 주 패스트볼 대비 차이 등)으로 타구질 score 를 예측 (LGBM).{" "}
           <b>로케이션·카운트·타자 정보는 쓰지 않음</b> — 같은 공이면 어디에 던지든 같은 구위.
         </li>
         <li>예측값을 학습기간 분포 기준 정규분위수로 바꿔 50 + 10z (20–80) 스케일로 표시. 50 = 리그 평균 투구.</li>
+        <li>존에서 크게 벗어난 볼(Savant Waste 존)은 구위 점수를 매기지 않고 위치만 표시.</li>
       </ol>
-      <p className="mt-2 text-muted">데이터 : Statcast (pybaseball), 정규시즌. 존 높이는 타자별 존(sz_top/sz_bot)으로 1.5–3.5ft 에 정규화.</p>
+      <p className="mt-2 text-muted">
+        데이터 : Statcast (pybaseball), 정규시즌. 존 높이는 타자별 존(sz_top/sz_bot)으로 1.5–3.5ft 에 정규화. 타구 위치는 Statcast hc_x/hc_y 를 피트로 환산(외야 펜스는 330–400ft 근사).
+        &lsquo;구위 구간&rsquo; 선택은 투구 로케이션·타구 분포에만 적용된다.
+      </p>
     </details>
   );
 }

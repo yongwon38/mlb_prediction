@@ -72,6 +72,8 @@ export async function loadPitches(season: number, id: number): Promise<{ file: P
       la: c.la[i],
       xba: c.xba[i],
       xw: c.xw[i],
+      hx: c.hx?.[i] ?? null,
+      hy: c.hy?.[i] ?? null,
     };
   });
   return { file, pitches };
