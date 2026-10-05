@@ -18,9 +18,10 @@ interface Props {
   ghost?: Pitch[]; // 구위 구간 선택 시 나머지 공 (회색 배경, hover 제외)
   pitchNames: Record<string, string>;
   onPick?: (p: Pitch) => void; // 마우스로 점을 클릭하면 호출 (산출 근거 페이지로 이동)
+  numbered?: boolean; // 타석 보기 : 점 옆에 타석 내 투구 순번
 }
 
-export default function StrikeZone({ pitches, ghost = [], pitchNames, onPick }: Props) {
+export default function StrikeZone({ pitches, ghost = [], pitchNames, onPick, numbered = false }: Props) {
   const dark = useDarkMode();
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<Pitch | null>(null);
@@ -54,9 +55,15 @@ export default function StrikeZone({ pitches, ghost = [], pitchNames, onPick }: 
             <ResultMarker key={p.i} shape={resultShape(p.r)} x={x} y={y} fill={stuffColor(p.s, dark)} opacity={stuffOpacity(p.s)} ring="var(--surface)" />
           )
         ))}
+        {numbered &&
+          pts.map(({ p, x, y }) => (
+            <text key={`n${p.i}`} x={x + 8} y={y - 7} fontSize={13} fontWeight={700} fill="var(--ink)" stroke="var(--surface)" strokeWidth={3} paintOrder="stroke">
+              {p.pn}
+            </text>
+          ))}
       </g>
     ),
-    [pts, ghostPts, dark],
+    [pts, ghostPts, dark, numbered],
   );
 
   const onMove = (e: React.PointerEvent<SVGSVGElement>) => {

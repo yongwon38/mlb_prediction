@@ -1,4 +1,4 @@
-import type { ExplainFile, ExplainPitch, League, Meta, Pitch, PitcherFile, SeasonIndex } from "./types";
+import type { ExplainFile, ExplainPitch, League, Meta, Pitch, PitcherFile, SeasonIndex, SeasonStats, SeasonSummary } from "./types";
 
 const cache = new Map<string, Promise<unknown>>();
 
@@ -17,6 +17,9 @@ function getJSON<T>(url: string): Promise<T> {
 export const loadMeta = () => getJSON<Meta>("/data/meta.json");
 export const loadIndex = (season: number) => getJSON<SeasonIndex>(`/data/${season}/index.json`);
 export const loadLeague = (season: number) => getJSON<League>(`/data/${season}/league.json`);
+export const loadSummary = (season: number) => getJSON<SeasonSummary>(`/data/${season}/summary.json`);
+/** 공식 기록은 네트워크 실패 시 export 에서 생략될 수 있음 -> 없으면 null */
+export const loadStats = (season: number) => getJSON<SeasonStats>(`/data/${season}/stats.json`).catch(() => null);
 
 /** 투수별 파일은 .json.gz. 서버가 Content-Encoding 으로 이미 풀어 준 경우(gzip 매직넘버 없음)는 그대로 파싱 */
 async function getGzipJSON<T>(url: string): Promise<T> {
@@ -49,6 +52,11 @@ export async function loadPitches(season: number, id: number): Promise<{ file: P
       month: d.getUTCMonth() + 1,
       day: c.day[i] as number,
       game: c.game[i] as number,
+      gt: (c.gt?.[i] as number) ?? 0,
+      pai: (c.pai?.[i] as number) ?? -1,
+      pn: (c.pn?.[i] as number) ?? 0,
+      wpa: c.wpa?.[i] ?? null,
+      re: c.re?.[i] ?? null,
       gp: c.gp[i] as number,
       inn: c.inn[i] as number,
       team: file.teams[c.tm[i] as number],

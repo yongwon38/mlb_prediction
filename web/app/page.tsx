@@ -1,217 +1,142 @@
 "use client";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import SearchPanel from "@/components/SearchPanel";
-import StrikeZone from "@/components/StrikeZone";
-import SprayChart from "@/components/SprayChart";
-import BandPicker from "@/components/BandPicker";
-import FilterBar, { EMPTY_FILTERS, type Filters, applyFilters } from "@/components/FilterBar";
-import { ArsenalTable, NotesList, Section, SummaryTiles } from "@/components/Panels";
-import { BucketChart, CountMix, PlatoonTable, StuffDistribution, TrendCharts, ZoneHeatmap } from "@/components/Charts";
-import { loadIndex, loadLeague, loadMeta, loadPitches } from "@/lib/data";
-import { bandOf, percentileOf, scoutingNotes, stats } from "@/lib/analysis";
-import type { League, Meta, Pitch, PitcherFile, SeasonIndex } from "@/lib/types";
+import { Section, f1, f3, pct } from "@/components/Panels";
+import { GameTypePicker, SeasonSelect } from "@/components/PageHeader";
+import Methodology from "@/components/Methodology";
+import SeasonNotice from "@/components/SeasonNotice";
+import { ctxHref, readQuery, usePageState } from "@/lib/appState";
+import { loadSummary } from "@/lib/data";
+import { stuffColor, useDarkMode } from "@/lib/colors";
+import { scoreText, signedPct, ipText } from "@/lib/games";
+import { PA_LABELS } from "@/lib/analysis";
+import type { Meta, SeasonSummary, SeasonSummaryGt } from "@/lib/types";
 
-function readUrl() {
-  const q = new URLSearchParams(window.location.search);
-  return { season: Number(q.get("season")) || null, pitcher: Number(q.get("pitcher")) || null };
-}
+const SECTIONS = [
+  { href: "/pitcher", t: "투수 분석", d: "투구 로케이션·타구 분포·구종 아스널·시즌 공식 기록 등 투수 한 명의 전체 분석" },
+  { href: "/games", t: "경기·타석", d: "승부처·구위 하이라이트로 추천된 경기와 타석, 또는 직접 고른 경기를 투구 단위로" },
+  { href: "/explain", t: "구위 산출 근거", d: "구위 점수가 어떤 요인(구속·무브먼트·진입각…)으로 만들어졌는지 — 개요·구종별·점수대별·투구 1개" },
+];
 
+/** 홈 : 시즌 요약 (리그 지표, 구위 리더, 승부처, 구위 하이라이트) */
 export default function Home() {
-  const [meta, setMeta] = useState<Meta | null>(null);
-  const [season, setSeason] = useState<number | null>(null);
-  const [index, setIndex] = useState<SeasonIndex | null>(null);
-  const [league, setLeague] = useState<League | null>(null);
-  const [pitcherId, setPitcherId] = useState<number | null>(null);
-  const [data, setData] = useState<{ file: PitcherFile; pitches: Pitch[] } | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  const [band, setBand] = useState<string[]>([]); // 투구·타구 분포 전용 구위 구간 (빈 배열 = 전체)
-  const [ghost, setGhost] = useState(true);
   const router = useRouter();
+  const { meta, season, setSeason, gt, setGt, index, error, setError } = usePageState();
+  const [summary, setSummary] = useState<{ season: number; s: SeasonSummary } | null>(null);
+  const dark = useDarkMode();
 
-  // 초기 로드 : URL 의 시즌/투수 복원
+  // 예전 링크(/?season=..&pitcher=..) -> 투수 분석 페이지 (URL 동기화와 겹치지 않게 즉시 전체 이동)
   useEffect(() => {
-    loadMeta()
-      .then((m) => {
-        setMeta(m);
-        const u = readUrl();
-        setSeason(u.season && m.seasons.includes(u.season) ? u.season : m.seasons[0]);
-        setPitcherId(u.pitcher);
-      })
-      .catch((e) => setError(String(e)));
+    if (readQuery().get("pitcher")) window.location.replace(`/pitcher${window.location.search}`);
   }, []);
 
   useEffect(() => {
     if (!season) return;
     let alive = true;
-    Promise.all([loadIndex(season), loadLeague(season)])
-      .then(([i, l]) => alive && (setIndex(i), setLeague(l)))
+    loadSummary(season)
+      .then((s) => alive && setSummary({ season, s }))
       .catch((e) => alive && setError(String(e)));
     return () => {
       alive = false;
     };
-  }, [season]);
+  }, [season, setError]);
 
-  const entry = index?.pitchers.find((p) => p.id === pitcherId) ?? null;
-
-  // 투수 데이터
-  useEffect(() => {
-    if (!season || !entry || index?.season !== season) return;
-    let alive = true;
-    loadPitches(season, entry.id)
-      .then((d) => alive && setData(d))
-      .catch((e) => alive && setError(String(e)));
-    return () => {
-      alive = false;
-    };
-  }, [season, entry, index]);
-
-  // URL 동기화 (공유 가능한 링크)
-  useEffect(() => {
-    if (!season) return;
-    const q = new URLSearchParams();
-    q.set("season", String(season));
-    if (pitcherId) q.set("pitcher", String(pitcherId));
-    window.history.replaceState(null, "", `?${q}`);
-  }, [season, pitcherId]);
-
-  const selectPitcher = (id: number, team?: string) => {
-    setPitcherId(id);
-    setFilters({ ...EMPTY_FILTERS, teams: team ? [team] : [] });
-    setBand([]);
-  };
-
-  const changeSeason = (s: number) => {
-    setSeason(s);
-    setData(null);
-    setFilters(EMPTY_FILTERS);
-    setBand([]);
-  };
-
-  const ready = !!(data && entry && data.file.id === entry.id && index?.season === season && league && meta);
-  const all = ready ? data!.pitches : null;
-  const validStart = index?.validStart ?? null;
-  const ps = useMemo(() => (all ? applyFilters(all, filters, validStart) : []), [all, filters, validStart]);
-  const st = useMemo(() => stats(ps), [ps]);
-  const [bandPs, bandRest] = useMemo(() => {
-    if (!band.length) return [ps, [] as Pitch[]];
-    const sel = new Set(band);
-    return [ps.filter((p) => sel.has(bandOf(p.s))), ps.filter((p) => !sel.has(bandOf(p.s)))];
-  }, [ps, band]);
-  const ghostPs = ghost ? bandRest : [];
-  const notes = useMemo(
-    () => (all && league && meta && data ? scoutingNotes(ps, all, league, data.file.pitchTypes, meta.pitchNames) : []),
-    [ps, all, league, meta, data],
-  );
-  const leagueBuckets = league ? (filters.validOnly && league.bucketsValid ? league.bucketsValid : league.buckets) : [];
+  const g = gt[0] ?? 0;
+  const sm = summary?.season === season ? (summary.s.byGt[String(g)] ?? null) : null;
+  const go = (path: string, pitcher: number, extra: Record<string, number> = {}) => ctxHref(path, { season, pitcher, gt: [g] }, extra);
 
   return (
     <main className="mx-auto w-full max-w-[1280px] px-4 py-6 flex flex-col gap-4">
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-ink">Stuff Lab</h1>
-          <p className="text-sm text-ink-2">투구 물리량만으로 평가한 MLB 투수 구위(Stuff, 20–80) 분석</p>
+          <p className="text-sm text-ink-2">투구 물리량만으로 평가한 MLB 투수 구위(Stuff, 20–80) — 시즌 요약</p>
         </div>
-        <label className="flex items-center gap-2 text-sm text-ink-2">
-          시즌
-          <select value={season ?? ""} onChange={(e) => changeSeason(Number(e.target.value))} aria-label="시즌 선택">
-            {meta?.seasons.map((s) => (
-              <option key={s} value={s}>
-                {s} 정규시즌{s !== meta.trainSeason ? " (out-of-sample)" : ""}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SeasonSelect meta={meta} season={season} onChange={setSeason} />
       </header>
 
       {error && <div className="card p-3 text-sm text-bad">데이터를 불러오지 못했습니다 : {error}</div>}
 
-      <SearchPanel key={season ?? 0} index={index?.season === season ? index : null} selectedId={pitcherId} onSelect={selectPitcher} />
+      <SearchPanel key={season ?? 0} index={index} selectedId={null} onSelect={(id) => router.push(ctxHref("/pitcher", { season, pitcher: id, gt: [g] }))} />
+      {index && <SeasonNotice index={index} trainSeason={meta?.trainSeason ?? 2025} />}
 
-      {index && index.season === season && <SeasonNotice index={index} trainSeason={meta?.trainSeason ?? 2025} />}
+      <div className="grid gap-3 sm:grid-cols-3">
+        {SECTIONS.map((x) => (
+          <Link key={x.href} href={ctxHref(x.href, { season, gt: [g] })} className="card p-4 hover:bg-surface-2 flex flex-col gap-1">
+            <span className="text-sm font-semibold text-ink">{x.t} →</span>
+            <span className="text-xs text-muted">{x.d}</span>
+          </Link>
+        ))}
+      </div>
 
-      {!index || !league || index.season !== season ? (
-        <div className="card p-10 text-center text-sm text-muted">시즌 데이터 불러오는 중…</div>
-      ) : !entry ? (
-        <Leaderboard index={index} league={league} onSelect={selectPitcher} missing={!!pitcherId} />
-      ) : !ready ? (
-        <div className="card p-10 text-center text-sm text-muted">{`${entry.name} 투구 데이터 불러오는 중…`}</div>
+      {meta && index && (
+        <div className="card p-3">
+          <GameTypePicker labels={meta.gameTypes} value={[g]} onChange={setGt} counts={index.gameTypes} single />
+        </div>
+      )}
+
+      {!sm || !meta ? (
+        <div className="card p-10 text-center text-sm text-muted">시즌 요약 불러오는 중…</div>
       ) : (
         <>
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-            <h2 className="text-xl font-bold text-ink">{data!.file.name}</h2>
-            <span className="text-sm text-ink-2">
-              {data!.file.throws === "R" ? "우투" : "좌투"} · {data!.file.teams.join(" → ")} · {season} 시즌 {all!.length.toLocaleString()}구
-            </span>
-            <span className="ml-auto flex gap-4 text-xs">
-              <Link className="text-accent-ink underline underline-offset-2 font-medium" href={`/explain?season=${season}&pitcher=${data!.file.id}`}>
-                구위 산출 근거 →
-              </Link>
-              <button className="text-accent-ink underline underline-offset-2" onClick={() => setPitcherId(null)}>
-                리더보드로
-              </button>
-              <a className="text-accent-ink underline underline-offset-2" href={`https://baseballsavant.mlb.com/savant-player/${data!.file.id}`} target="_blank" rel="noreferrer">
-                Baseball Savant ↗
-              </a>
-            </span>
-          </div>
-
-          <FilterBar
-            filters={filters}
-            setFilters={setFilters}
-            pitchTypes={data!.file.pitchTypes}
-            teams={data!.file.teams}
-            validStart={validStart}
-            shown={ps.length}
-            total={all!.length}
-          />
-
-          <BandPicker ps={ps} band={band} setBand={setBand} ghost={ghost} setGhost={setGhost} />
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Section title="투구 로케이션 × 구위" sub="포수 시점(존 높이는 타자별 정규화) · 빨갈수록 구위 높음 · 모양은 결과 · 점에 마우스를 올리면 상세">
-              <StrikeZone pitches={bandPs} ghost={ghostPs} pitchNames={meta!.pitchNames} onPick={(p) => router.push(`/explain?season=${season}&pitcher=${data!.file.id}&pitch=${p.i}`)} />
+          <LeagueTiles sm={sm} label={meta.gameTypes[g]} />
+          <div className="grid gap-4 lg:grid-cols-2 items-start">
+            <Section title={`구위 리더 TOP 10 — ${meta.gameTypes[g]}`} sub={`평균 구위 · ${sm.minPitches}구 이상 · 이름을 누르면 투수 분석`}>
+              <ol className="text-sm">
+                {sm.leaders.map((p, i) => (
+                  <li key={p.id}>
+                    <Link href={go("/pitcher", p.id)} className="flex items-center gap-3 py-1.5 border-b border-grid hover:bg-surface-2 rounded px-1">
+                      <span className="w-5 text-muted tnum text-right">{i + 1}</span>
+                      <span className="flex-1 min-w-0 truncate">
+                        <span className="font-medium text-ink">{p.name}</span>
+                        <span className="text-muted ml-2 text-xs">{p.teams.join("/")}</span>
+                      </span>
+                      <span className="text-xs text-muted tnum">{p.n.toLocaleString()}구</span>
+                      <span className="w-12 text-right font-semibold tnum" style={{ color: stuffColor(p.stuff, dark) }}>
+                        {p.stuff.toFixed(1)}
+                      </span>
+                    </Link>
+                  </li>
+                ))}
+              </ol>
             </Section>
-            <Section title="타구 분포" sub="인플레이 타구가 떨어진 위치 · 색과 모양은 결과 · 점에 마우스를 올리면 상세">
-              <SprayChart ps={bandPs} ghost={ghostPs} all={ps} selecting={band.length > 0} pitchNames={meta!.pitchNames} />
+            <Section title="구위 구간별 실제 결과" sub="구위 점수가 높을수록 헛스윙↑ 피안타율↓ — 모델이 실제 결과와 맞는지">
+              <BucketTable sm={sm} />
             </Section>
           </div>
 
-          <div className="grid gap-4 items-start lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-            <Section title="요약">
-              <SummaryTiles st={st} league={league} />
+          <div className="grid gap-4 lg:grid-cols-2 items-start">
+            <Section title="승부처 경기 TOP 10" sub="투수 한 명의 등판 기준 · 타석별 |WPA| 합 × 경기 유형 가중치 · 누르면 경기·타석 페이지">
+              <GameList rows={sm.impGames} meta={meta} metric="imp" href={(r) => go("/games", r.pid, { game: r.gi })} />
             </Section>
-            <Section title="스카우팅 노트" sub="필터가 적용된 투구 기준, 규칙 기반 자동 생성">
-              <NotesList notes={notes} />
+            <Section title="구위 하이라이트 경기 TOP 10" sub="평균 구위가 가장 높았던 등판 (40구 이상)">
+              <GameList rows={sm.stuffGames} meta={meta} metric="s" href={(r) => go("/games", r.pid, { game: r.gi })} />
             </Section>
           </div>
 
-          <Section title="구종 아스널" sub="열 이름을 눌러 정렬">
-            <ArsenalTable ps={ps} pitchTypes={data!.file.pitchTypes} league={league} pitchNames={meta!.pitchNames} />
+          <Section title="승부처 타석 TOP 10" sub="승리확률을 가장 크게 바꾼 타석 (투수 관점 : + 막아냄 / − 허용) · 누르면 그 타석">
+            <ul className="text-sm">
+              {sm.impPas.map((r) => (
+                <li key={`${r.pid}-${r.pai}`}>
+                  <Link href={go("/games", r.pid, { game: r.g, pa: r.pai })} className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 py-1.5 border-b border-grid hover:bg-surface-2 rounded px-1">
+                    <span className="text-xs text-muted tnum w-20">{r.date}</span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-ink">
+                        <b>{r.name}</b> vs {r.batName} — {r.ev === 0 ? "교체" : PA_LABELS[r.ev]}
+                        <span className="text-muted text-xs ml-2">
+                          {r.team} vs {r.opp} · {r.inn}회 {r.o ?? "-"}사
+                        </span>
+                      </span>
+                      {r.des && <span className="block truncate text-xs text-muted">{r.des}</span>}
+                    </span>
+                    <span className={`tnum font-semibold ${(r.wpa ?? 0) >= 0 ? "text-good" : "text-bad"}`}>{signedPct(r.wpa)}</span>
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </Section>
-
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Section title="구종별 구위 분포" sub="리그 동일 구종 분포(회색) 대비 위치">
-              <StuffDistribution ps={ps} pitchTypes={data!.file.pitchTypes} league={league} />
-            </Section>
-            <Section title="코스별 분석" sub="Statcast 존 1–9 + 존 밖 4개 영역">
-              <ZoneHeatmap ps={ps} />
-            </Section>
-            <Section title="구위 구간별 결과" sub="모델 점수가 실제 결과로 이어지는지 — 리그 기준과 비교">
-              <BucketChart ps={ps} leagueBuckets={leagueBuckets} />
-            </Section>
-            <Section title="카운트별 구종 선택" sub="상황별 피치 믹스와 평균 구위">
-              <CountMix ps={ps} pitchTypes={data!.file.pitchTypes} />
-            </Section>
-            <Section title="구위 추이" sub="시즌 흐름과 경기 내 체력 저하">
-              <TrendCharts ps={ps} pitchTypes={data!.file.pitchTypes} />
-            </Section>
-            <Section title="좌우 스플릿" sub="타자 손 방향별 구종 운용과 결과">
-              <PlatoonTable ps={ps} pitchTypes={data!.file.pitchTypes} />
-            </Section>
-          </div>
         </>
       )}
 
@@ -220,86 +145,93 @@ export default function Home() {
   );
 }
 
-function SeasonNotice({ index, trainSeason }: { index: SeasonIndex; trainSeason: number }) {
+function LeagueTiles({ sm, label }: { sm: SeasonSummaryGt; label: string }) {
+  const cells: [string, string][] = [
+    [`${label} 투구 (점수 있는)`, sm.pitches.toLocaleString()],
+    ["투수 / 경기", `${sm.pitchers.toLocaleString()} / ${sm.games.toLocaleString()}`],
+    ["평균 구위", f1(sm.stuff)],
+    ["Whiff%", pct(sm.rates.whiff)],
+    ["CSW%", pct(sm.rates.csw)],
+    ["피안타율", f3(sm.rates.ba)],
+    ["피장타율", f3(sm.rates.slg)],
+    ["xwOBA", f3(sm.rates.xwoba)],
+  ];
   return (
-    <p className="text-xs text-muted -mt-1">
-      {index.seasonStart} ~ {index.seasonEnd} · 투수 {index.pitchers.length.toLocaleString()}명 · {index.pitches.toLocaleString()}구.{" "}
-      {index.outOfSample
-        ? `${trainSeason} 시즌으로 학습한 모델을 그대로 적용한 out-of-sample 점수입니다.`
-        : `모델 학습 시즌입니다. ${index.validStart} 이후는 학습에 쓰지 않은 검증기간이므로, 결과 지표를 엄밀히 보려면 '검증기간만' 필터를 사용하세요.`}
-    </p>
+    <dl className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2">
+      {cells.map(([l, v]) => (
+        <div key={l} className="card px-3 py-2.5">
+          <dt className="text-xs text-muted">{l}</dt>
+          <dd className="text-lg font-semibold text-ink tnum mt-0.5">{v}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
-function Leaderboard({ index, league, onSelect, missing }: { index: SeasonIndex; league: League; onSelect: (id: number) => void; missing: boolean }) {
-  const [minN, setMinN] = useState(league.minPitcherPitches);
-  const top = useMemo(
-    () =>
-      index.pitchers
-        .filter((p) => p.n >= minN)
-        .sort((a, b) => (b.stuff ?? -1) - (a.stuff ?? -1))
-        .slice(0, 20),
-    [index, minN],
-  );
+function BucketTable({ sm }: { sm: SeasonSummaryGt }) {
+  const maxW = Math.max(...sm.buckets.map((b) => b.whiff ?? 0), 0.01);
   return (
-    <Section
-      title={`${index.season} 구위 리더보드`}
-      sub={missing ? "선택한 투수는 이 시즌 기록이 없습니다. 다른 투수를 골라 보세요." : "투수를 검색하거나 아래에서 바로 선택하세요"}
-      right={
-        <label className="text-xs text-ink-2 flex items-center gap-1.5">
-          최소 투구
-          <select value={minN} onChange={(e) => setMinN(Number(e.target.value))} className="!py-1 !min-h-0 text-xs">
-            {[100, 300, 1000, 2000].map((n) => (
-              <option key={n} value={n}>
-                {n}구
-              </option>
-            ))}
-          </select>
-        </label>
-      }
-    >
-      <ol className="grid sm:grid-cols-2 gap-x-6 text-sm">
-        {top.map((p, i) => (
-          <li key={p.id}>
-            <button onClick={() => onSelect(p.id)} className="w-full flex items-center gap-3 py-1.5 border-b border-grid hover:bg-surface-2 rounded px-1 text-left">
-              <span className="w-5 text-muted tnum text-right">{i + 1}</span>
-              <span className="flex-1 min-w-0 truncate">
-                <span className="font-medium text-ink">{p.name}</span>
-                <span className="text-muted ml-2 text-xs">
-                  {p.throws}HP · {p.teams.join("/")}
-                </span>
+    <table className="w-full text-xs tnum">
+      <thead>
+        <tr className="text-muted border-b border-grid">
+          <th className="text-left font-normal py-1.5">구위</th>
+          <th className="text-right font-normal py-1.5">투구</th>
+          <th className="text-left font-normal py-1.5 pl-3">Whiff%</th>
+          <th className="text-right font-normal py-1.5">피안타율</th>
+          <th className="text-right font-normal py-1.5">xwOBAcon</th>
+        </tr>
+      </thead>
+      <tbody>
+        {sm.buckets.map((b) => (
+          <tr key={b.label} className="border-b border-grid last:border-0">
+            <td className="py-1.5 font-medium text-ink">{b.label}</td>
+            <td className="py-1.5 text-right text-ink-2">{b.n.toLocaleString()}</td>
+            <td className="py-1.5 pl-3">
+              <span className="flex items-center gap-2">
+                <span className="h-2 rounded-sm bg-accent" style={{ width: `${((b.whiff ?? 0) / maxW) * 80}px` }} />
+                <span className="text-ink-2">{pct(b.whiff)}</span>
               </span>
-              <span className="text-xs text-muted tnum">{p.n.toLocaleString()}구</span>
-              <span className="w-12 text-right font-semibold tnum text-ink">{p.stuff?.toFixed(1) ?? "-"}</span>
-              <span className="w-16 text-right text-xs text-muted tnum">
-                {p.n >= league.minPitcherPitches ? `상위 ${100 - (percentileOf(league.pitcherPercentiles, p.stuff) ?? 0)}%` : ""}
-              </span>
-            </button>
-          </li>
+            </td>
+            <td className="py-1.5 text-right text-ink-2">{f3(b.ba)}</td>
+            <td className="py-1.5 text-right text-ink-2">{f3(b.xwobacon)}</td>
+          </tr>
         ))}
-      </ol>
-    </Section>
+      </tbody>
+    </table>
   );
 }
 
-function Methodology() {
+function GameList({ rows, meta, metric, href }: { rows: SeasonSummaryGt["impGames"]; meta: Meta; metric: "imp" | "s"; href: (r: SeasonSummaryGt["impGames"][number]) => string }) {
+  const dark = useDarkMode();
   return (
-    <details className="card p-4 text-xs text-ink-2 leading-relaxed">
-      <summary className="cursor-pointer font-semibold text-ink text-sm">모델 설명 — 구위(Stuff) 20–80</summary>
-      <ol className="list-decimal pl-5 mt-2 flex flex-col gap-1">
-        <li>타구방향·타구속도·발사각·공격각도로 타구 결과(아웃/1루타/2·3루타/홈런)를 예측 (RandomForest).</li>
-        <li>예측 기대값을 Gamma → Beta 변환해 0–1 타구질 score 로 만듦. 헛스윙은 0 (루킹 삼진은 학습에서 제외).</li>
-        <li>
-          투구 물리량(구속, 무브먼트, 릴리스, 익스텐션, 회전수·축, 팔각도, 홈플레이트 진입각 VAA·HAA, 주 패스트볼 대비 차이 등)으로 타구질 score 를 예측 (LGBM).{" "}
-          <b>로케이션·카운트·타자 정보는 쓰지 않음</b> — 같은 공이면 어디에 던지든 같은 구위.
+    <ul className="text-sm">
+      {rows.map((r) => (
+        <li key={`${r.pid}-${r.gi}`}>
+          <Link href={href(r)} className="grid grid-cols-[auto_1fr_auto] items-center gap-x-3 py-1.5 border-b border-grid hover:bg-surface-2 rounded px-1">
+            <span className="text-xs text-muted tnum w-20">{r.date}</span>
+            <span className="min-w-0 truncate">
+              <b className="text-ink">{r.name}</b>
+              <span className="text-ink-2">
+                {" "}
+                {r.team} {r.home ? "vs" : "@"} {r.opp}
+              </span>
+              <span className="text-muted text-xs ml-2">
+                {r.rd !== "R" ? `${meta.rounds[r.rd]} · ` : ""}
+                {scoreText(r)} · {ipText(r.outs)}이닝 {r.n}구
+              </span>
+            </span>
+            {metric === "imp" ? (
+              <span className="tnum font-semibold text-ink" title="중요도">
+                {r.imp.toFixed(2)}
+              </span>
+            ) : (
+              <span className="tnum font-semibold" style={{ color: r.s !== null ? stuffColor(r.s, dark) : undefined }}>
+                {r.s?.toFixed(1) ?? "-"}
+              </span>
+            )}
+          </Link>
         </li>
-        <li>예측값을 학습기간 분포 기준 정규분위수로 바꿔 50 + 10z (20–80) 스케일로 표시. 50 = 리그 평균 투구.</li>
-        <li>존에서 크게 벗어난 볼(Savant Waste 존)과 사구는 구위 점수를 매기지 않고 위치만 표시.</li>
-      </ol>
-      <p className="mt-2 text-muted">
-        데이터 : Statcast (pybaseball), 정규시즌. 존 높이는 타자별 존(sz_top/sz_bot)으로 1.5–3.5ft 에 정규화. 타구 위치는 Statcast hc_x/hc_y 를 피트로 환산(외야 펜스는 330–400ft 근사).
-        &lsquo;구위 구간&rsquo; 선택은 투구 로케이션·타구 분포에만 적용된다.
-      </p>
-    </details>
+      ))}
+    </ul>
   );
 }

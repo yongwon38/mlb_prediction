@@ -39,7 +39,6 @@
 - 3단계 예측값(낮을수록 좋은 구위)을 부호 반전 → 학습기간 투구의 ECDF → 표준정규 분위수 z → `50 + 10z`, [20, 80] clip
 - 중앙값 50, 50 을 기준으로 대칭
 - **Waste 볼 점수 제외 (v2)** : 볼 판정(`ball`/`blocked_ball`)이면서 Savant Waste 존(|plate_x| > 20in, 또는 정규화 존 1.5~3.5ft 위아래 10in 바깥)인 투구는 점수 NaN (`sp.is_waste_ball`). 스케일러도 waste 볼 제외 투구로 적합. 웹 분포도에는 표시하되 점수·집계에서 제외
-- **사구도 점수 제외 (웹)** : `sp.is_unscored` = waste 볼 + `hit_by_pitch`. 시즌당 약 2,000구(0.3%)라 스케일러는 다시 적합하지 않음
 
 ### 모델 버전
 | 버전 | 노트북 | 모델 / 산출물 | 비고 |
@@ -49,7 +48,8 @@
 - 새 버전은 기존 산출물을 덮어쓰지 않고 `models/vN/`, `outputs/vN/` 에 저장
 
 ## 3. 데이터 규칙
-- **정규시즌만 사용** (`game_type == 'R'`). 포스트시즌(F/D/L/W)·시범경기(S) 제외
+- **모델 학습·검증·리그 기준값은 정규시즌만** (`game_type == 'R'`, `load_regular_season`). 포스트시즌(F/D/L/W)·시범경기(S) 제외
+  - 웹 표시는 전체 경기 유형(`load_season`) : 같은 모델로 점수를 매기고 `gt`(0 정규 / 1 포스트 / 2 시범)로 구분. 비정규 투구의 '주 패스트볼 대비 차이'는 그 투수의 정규시즌 주 패스트볼 기준
 - **검증셋 = 정규시즌 마지막 1개월, 학습셋 = 그 이전** (2025 : 검증 2025-08-29 ~ 09-28)
 - 구종 결측, `FA`/`CS`/`PO`/`UN` 구종은 3단계에서 제외
 
@@ -60,9 +60,9 @@ stuff_pipeline_YYMMDD.ipynb    파이프라인 실행 노트북 (날짜 접미�
 models/                        학습된 모델 (joblib)
 outputs/                       예측 결과, 지표, 그림
 업무일지/업무일지_YYYYMMDD.md    일일 업무일지
-export_web_data.py             웹용 데이터 export (시즌별 구위 score -> web/public/data/*.json, 투수별 p/*.json.gz, 산출 근거 e/*.json.gz)
-compute_shap.py                정확한 SHAP 캐시 계산 (outputs/v2/shap/, 약 12시간). 없으면 export 가 Saabas 기여 사용
-web/                           Next.js 분석 페이지 (static export, Vercel 배포)
+export_web_data.py             웹용 데이터 export (시즌별 구위 score -> web/public/data/{season}/ : index·league·summary·stats(MLB 공식 기록).json, p/ e/ 투수별 .json.gz(경기·타석 표 포함))
+compute_shap.py                정확한 SHAP 캐시 계산 (outputs/v2/shap/, 약 12시간 : 정규 shap_{season}.npz + 시범·포스트 shap_{season}_extra.npz). 없으면 export 가 Saabas 기여 사용
+web/                           Next.js 분석 페이지 (static export, Vercel 배포) : / 홈, /pitcher, /games, /explain(/pitch-types, /bands, /pitch)
 ```
 - 웹 데이터 갱신 : 모델(models/stage3·4)을 바꾼 뒤 `python export_web_data.py` -> `web/` 에서 재배포. `web/public/data/` 는 커밋하지 않는다
 - **절대경로 금지** — 프로젝트 루트 기준 상대경로만 사용 (OneDrive 동기화, 다른 PC 대응)

@@ -7,13 +7,14 @@
 - 2025 : 모델 학습 시즌 (선택한 모델 버전의 stuff_scores_2025.parquet 과 동일한 값인지 검증)
 - 2024, 2026 : 2025 학습 모델을 그대로 적용한 out-of-sample score
 - MODEL_VERSION 으로 사용할 모델 선택 (v1 : models/, outputs/ / v2 : models/v2/, outputs/v2/)
-- v2 : 볼 판정 + Savant Waste 존 투구(sp.is_waste_ball)는 score 없음(null). 행은 유지해 분포도에는 표시
+- v2 : 볼 판정 + Savant Waste 존 투구(sp.is_waste_ball)와 사구(sp.is_unscored)는 score 없음(null). 행은 유지해 분포도에는 표시
 
 실행 : python export_web_data.py
 """
 import gzip
 import json
 import os
+import urllib.request
 
 import joblib
 import numpy as np
@@ -77,6 +78,23 @@ EVENT_TO_PA = {'strikeout': 2, 'strikeout_double_play': 2, 'single': 3, 'double'
 SWING_DESC = ['swinging_strike', 'swinging_strike_blocked', 'foul', 'foul_tip', 'hit_into_play',
               'foul_bunt', 'missed_bunt', 'bunt_foul_tip']
 
+# 경기 유형 : 0 정규시즌 / 1 포스트시즌 / 2 시범경기. 모델 학습·리그 기준값은 정규시즌만
+GAME_TYPE_CODE = {'R': 0, 'F': 1, 'D': 1, 'L': 1, 'W': 1, 'S': 2}
+GAME_TYPE_LABELS = ['정규시즌', '포스트시즌', '시범경기']
+ROUND_LABELS = {'R': '정규시즌', 'S': '시범경기', 'F': '와일드카드', 'D': '디비전시리즈', 'L': '챔피언십시리즈', 'W': '월드시리즈'}
+# 경기 중요도 = 타석 |WPA| 합 x 경기 유형 가중치
+IMPORTANCE_WEIGHT = {'R': 1.0, 'S': 0.5, 'F': 1.5, 'D': 1.5, 'L': 1.5, 'W': 2.0}
+# 리그 요약(메인 페이지) 리더보드 최소 투구 수 (유형별)
+SUMMARY_MIN_PITCHES = {0: 300, 1: 40, 2: 100}
+HIGHLIGHT_MIN_GAME_PITCHES = 15    # 투수 경기 구위 하이라이트 최소 투구
+HIGHLIGHT_MIN_LEAGUE_GAME_PITCHES = 40    # 리그 전체 구위 하이라이트 경기 최소 투구
+# 타석 종료 이벤트별 아웃 수 (경기 IP 추정용)
+OUTS_BY_EVENT = {'field_out': 1, 'strikeout': 1, 'force_out': 1, 'sac_fly': 1, 'sac_bunt': 1, 'fielders_choice_out': 1,
+                 'grounded_into_double_play': 2, 'double_play': 2, 'strikeout_double_play': 2, 'sac_fly_double_play': 2,
+                 'sac_bunt_double_play': 2, 'triple_play': 3, 'other_out': 1}
+STATSAPI = 'https://statsapi.mlb.com/api/v1'
+CACHE_DIR = 'web_cache'    # 선수 이름 캐시 (커밋하지 않음)
+
 
 # ---------------------------------------------------------------------------
 # 구위 산출 근거 : SHAP 기여도 -> 구위 점수 단위 (요인 그룹별 합)
@@ -135,18 +153,20 @@ def saabas_contrib(booster, X):
 
 
 def load_shap_cache(season, keys):
-    """compute_shap.py 의 정확한 SHAP 캐시 (모든 투구가 있을 때만 사용). 반환 (contrib, base) 또는 None"""
-    path = os.path.join(SHAP_DIR, f'shap_{season}.npz')
-    if not os.path.exists(path):
+    """compute_shap.py 의 정확한 SHAP 캐시 (모든 투구가 있을 때만 사용). 반환 (contrib, base) 또는 None
+
+    shap_{season}.npz = 정규시즌, shap_{season}_extra.npz = 시범경기·포스트시즌 (있으면 합친다)"""
+    zs = [np.load(p) for p in (os.path.join(SHAP_DIR, f'shap_{season}{s}.npz') for s in ('', '_extra')) if os.path.exists(p)]
+    if not zs:
         return None
-    z = np.load(path)
-    ref = pd.DataFrame(z['keys'], columns=KEY)
+    ref = pd.DataFrame(np.concatenate([z['keys'] for z in zs]), columns=KEY)
     ref['row'] = np.arange(len(ref))
     m = keys.astype('int64').merge(ref, on=KEY, how='left')
     if m['row'].isna().any():
         print(f'  SHAP 캐시 불완전 ({m["row"].isna().sum():,}구 없음) -> Saabas 사용')
         return None
-    return z['contrib'][m['row'].astype(int).to_numpy()], float(z['base'])
+    contrib = np.concatenate([z['contrib'] for z in zs])
+    return contrib[m['row'].astype(int).to_numpy()], float(zs[0]['base'])
 
 
 def explain_contrib(model, scaler, X, pred, score, season, keys):
@@ -179,12 +199,32 @@ def explain_contrib(model, scaler, X, pred, score, season, keys):
 # ---------------------------------------------------------------------------
 # 구위 score 산출
 # ---------------------------------------------------------------------------
-def score_season(df, model, scaler, season):
-    """정규시즌 투구 -> 구위 피처 -> 3단계 예측 -> 20~80 score + 요인 기여 (구종 제외 대상은 행 제외). 반환 (d, 기준 점수 S0, 기여 방법)"""
-    d = sp.add_stuff_features(df)
+def stuff_frame(raw, model):
+    """전체 경기 유형 투구 -> 구위 피처 (모델 범주 정렬, 학습 시 없던 구종 제외)
+
+    정규시즌 행은 정규시즌만으로 add_stuff_features (= 학습·parquet 과 동일 값).
+    시범·포스트시즌 행의 '주 패스트볼 대비 차이'는 그 투수의 정규시즌 주 패스트볼 기준 (정규시즌 기록이 없으면 자체 기준)"""
+    is_r = raw['game_type'] == 'R'
+    parts = [sp.add_stuff_features(raw[is_r])]
+    if (~is_r).any():
+        x = sp.add_stuff_features(raw[~is_r])
+        ref = parts[0].groupby('pitcher')[['fb_velo', 'fb_hb', 'fb_ivb']].first()
+        has = x['pitcher'].isin(ref.index)
+        for c in ref.columns:
+            x.loc[has, c] = x.loc[has, 'pitcher'].map(ref[c])
+        x['velo_diff'] = x['release_speed'] - x['fb_velo']
+        x['hb_diff'] = x['pfx_x'] - x['fb_hb']
+        x['ivb_diff'] = x['pfx_z'] - x['fb_ivb']
+        parts.append(x)
+    d = pd.concat(parts)
     for col, cats in zip(sp.STUFF_CAT_FEATURES, model.booster_.pandas_categorical):
         d[col] = pd.Categorical(d[col].astype(str), categories=cats)
-    d = d[d['pitch_type'].notna()]    # 학습 시 없던 구종 제외
+    return d[d['pitch_type'].notna()]    # 학습 시 없던 구종 제외
+
+
+def score_season(df, model, scaler, season):
+    """전체 경기 유형 투구 -> 구위 피처 -> 3단계 예측 -> 20~80 score + 요인 기여 (구종 제외 대상은 행 제외). 반환 (d, 기준 점수 S0, 기여 방법)"""
+    d = stuff_frame(df, model)
     pred = model.predict(d[CFG['features']])
     d['stuff_score'] = scaler.transform(pred)
     c, S0, method = explain_contrib(model, scaler, d[CFG['features']], pred, d['stuff_score'].to_numpy(), season, d[KEY])
@@ -210,7 +250,7 @@ def check_against_parquet(d):
     if CFG['drop_waste']:    # 기준 parquet 은 waste 볼만 NaN -> 사구 제외 규칙을 같게 맞춘 뒤 대조
         ref.loc[ref['description'] == 'hit_by_pitch', 'stuff_score'] = np.nan
     ref = ref.drop(columns='description')
-    cur = d[key + ['stuff_score']].astype({k: 'int64' for k in key})
+    cur = d.loc[d['game_type'] == 'R', key + ['stuff_score']].astype({k: 'int64' for k in key})
     m = cur.merge(ref.astype({k: 'int64' for k in key}), on=key, suffixes=('', '_ref'))
     nan_ok = (m['stuff_score'].isna() == m['stuff_score_ref'].isna()).all()
     diff = (m['stuff_score'] - m['stuff_score_ref']).abs()
@@ -258,6 +298,25 @@ def add_web_columns(raw, d):
     # 타구 좌표 (ft) : Savant hc_x/hc_y -> 홈플레이트 = (0, 0), +x = 1루 쪽, +y = 외야 방향. 인플레이만
     d['hit_x'] = (2.5 * (d['hc_x'] - 125.42)).where(inplay)
     d['hit_y'] = (2.5 * (198.27 - d['hc_y'])).where(inplay)
+
+    # 경기 유형·상황 (투수 관점) : 홈팀 투수 = 초 공격 수비
+    d['gt'] = d['game_type'].map(GAME_TYPE_CODE)
+    assert d['gt'].notna().all(), f"경기 유형 매핑 없음 : {d.loc[d['gt'].isna(), 'game_type'].unique()}"
+    sign = np.where(d['inning_topbot'] == 'Top', 1.0, -1.0)
+    d['wpa_p'] = d['delta_home_win_exp'].fillna(0) * sign
+    d['re_p'] = -d['delta_run_exp']
+    d['opp'] = np.where(d['inning_topbot'] == 'Top', d['away_team'], d['home_team'])
+    d['is_home'] = (d['inning_topbot'] == 'Top').astype(int)
+    d['score_diff'] = d['fld_score'] - d['bat_score']
+    d['runners'] = d['on_1b'].notna().astype(int) + 2 * d['on_2b'].notna().astype(int) + 4 * d['on_3b'].notna().astype(int)
+    d['runs_on'] = (d['post_bat_score'] - d['bat_score']).clip(lower=0)
+    fin = raw.groupby('game_pk')[['post_home_score', 'post_away_score']].max()
+    d['final_home'] = d['game_pk'].map(fin['post_home_score'])
+    d['final_away'] = d['game_pk'].map(fin['post_away_score'])
+    # 선발 : 그 경기에서 해당 팀 수비의 첫 투구를 던진 투수
+    first = raw.sort_values(['game_pk', 'at_bat_number', 'pitch_number']).drop_duplicates(['game_pk', 'inning_topbot'])
+    starters = set(zip(first['game_pk'], first['pitcher']))
+    d['is_start'] = [int((g, p) in starters) for g, p in zip(d['game_pk'], d['pitcher'])]
     return d
 
 
@@ -278,21 +337,136 @@ def display_name(player_name):
     return f'{first} {last}'.strip()
 
 
-def pitcher_payload(g, season_start, pitch_types, teams):
-    g = g.sort_values(['game_date', 'game_pk', 'at_bat_number', 'pitch_number'])
+SORT_KEY = ['game_date', 'game_pk', 'at_bat_number', 'pitch_number']
+
+
+def _num(x, nd=None):
+    """스칼라 -> JSON 값 (결측 null)"""
+    if x is None or x != x:
+        return None
+    return int(round(x)) if nd == 0 else (round(float(x), nd) if nd is not None else float(x))
+
+
+def game_pa_tables(g):
+    """투수 1명의 투구(SORT_KEY 정렬) -> (경기 인덱스, 타석 인덱스, 경기 표, 타석 표). 표는 DataFrame, 투구 위치 기준 i0"""
+    g = g.reset_index(drop=True)
+    gi = pd.Series(pd.factorize(g['game_pk'])[0])
+    pai = pd.Series(pd.factorize(g['game_pk'].astype('int64') * 1000 + g['at_bat_number'].astype('int64'))[0])
+    pos = pd.Series(np.arange(len(g)))
+
+    by = g.groupby(pai, sort=True)
+    last = by.tail(1).set_index(pai[by.tail(1).index])
+    pas = pd.DataFrame({
+        'g': gi.groupby(pai).first(),
+        'ab': by['at_bat_number'].first(),
+        'inn': by['inning'].first(),
+        'o': by['outs_when_up'].first(),
+        'on': by['runners'].first(),
+        'sc': by['score_diff'].first(),
+        'bat': by['batter'].first().astype('int64'),
+        'lhb': (by['stand'].first() == 'L').astype(int),
+        'ev': last['pa_event'],
+        'event': last['events'],
+        'des': last['des'].where(last['events'].notna()),
+        'wpa': by['wpa_p'].sum(),
+        're': by['re_p'].sum(min_count=1),
+        'runs': by['runs_on'].sum(),
+        'n': by.size(),
+        'i0': pos.groupby(pai).first(),
+        's': by['stuff_score'].mean(),
+        'smax': by['stuff_score'].max(),
+    })
+    pas['outs'] = pas['event'].map(OUTS_BY_EVENT).fillna(0).astype(int)
+
+    byg = g.groupby(gi, sort=True)
+    pg = pas.groupby('g')
+    first = byg.head(1).set_index(gi[byg.head(1).index])
+    home = first['is_home'] == 1
+    rd = first['game_type']
+    scored = g['stuff_score'].notna()
+    games = pd.DataFrame({
+        'pk': first['game_pk'].astype('int64'),
+        'date': first['game_date'].dt.strftime('%Y-%m-%d'),
+        'gt': first['gt'].astype(int),
+        'rd': rd,
+        'team': first['team'],
+        'opp': first['opp'],
+        'home': home.astype(int),
+        'rs': np.where(home, first['final_home'], first['final_away']),
+        'ra': np.where(home, first['final_away'], first['final_home']),
+        'st': first['is_start'],
+        'n': byg.size(),
+        'outs': pg['outs'].sum(),
+        'h': pg['ev'].apply(lambda e: int(e.between(3, 6).sum())),
+        'bb': pg['ev'].apply(lambda e: int((e == 7).sum())),
+        'k': pg['ev'].apply(lambda e: int((e == 2).sum())),
+        'hr': pg['ev'].apply(lambda e: int((e == 6).sum())),
+        'r': pg['runs'].sum(),
+        's': byg['stuff_score'].mean(),
+        's60': (g['stuff_score'] >= 60).groupby(gi).sum() / scored.groupby(gi).sum().replace(0, np.nan),
+        'wpa': pg['wpa'].sum(),
+        'imp': pg['wpa'].apply(lambda w: w.abs().sum()) * rd.map(IMPORTANCE_WEIGHT).to_numpy(),
+        'i0': pos.groupby(gi).first(),
+        'pa0': pas.reset_index().groupby('g')['index'].first(),
+        'npa': pg.size(),
+    })
+    return gi, pai, games, pas
+
+
+def records_json(df, nd):
+    """DataFrame -> JSON 레코드 (숫자는 nd 자리, 기본 정수 / 결측 null / 문자 그대로)"""
+    out = []
+    for row in df.to_dict('records'):
+        out.append({k: (_num(v, nd.get(k, 0)) if isinstance(v, (int, float, np.integer, np.floating)) else
+                        (v if isinstance(v, str) else None)) for k, v in row.items()})
+    return out
+
+
+GAME_ND = {'s': 1, 's60': 3, 'wpa': 3, 'imp': 3}
+PA_ND = {'wpa': 3, 're': 3, 's': 1, 'smax': 1}
+
+
+def games_json(games):
+    return records_json(games, GAME_ND)
+
+
+def pas_json(pas, bat_idx):
+    out = []
+    for r in pas.itertuples(index=False):
+        out.append({'g': int(r.g), 'ab': int(r.ab), 'inn': int(r.inn), 'o': _num(r.o, 0), 'on': int(r.on), 'sc': _num(r.sc, 0),
+                    'bat': bat_idx[int(r.bat)], 'lhb': int(r.lhb), 'ev': int(r.ev), 'des': r.des if isinstance(r.des, str) else None,
+                    'wpa': _num(r.wpa, 3), 're': _num(r.re, 3), 'runs': int(r.runs), 'n': int(r.n), 'i0': int(r.i0),
+                    's': _num(r.s, 1), 'smax': _num(r.smax, 1)})
+    return out
+
+
+def pitcher_payload(g, season_start, pitch_types, teams, names):
+    """투수 파일 : 투구 컬럼 + 경기 표 + 타석 표 + 타자 이름. 반환 (payload, 경기 표, 타석 표)"""
+    g = g.sort_values(SORT_KEY).reset_index(drop=True)
+    gi, pai, games, pas = game_pa_tables(g)
+    bat_ids = list(dict.fromkeys(pas['bat'].tolist()))
+    bat_idx = {b: i for i, b in enumerate(bat_ids)}
     pt_idx = {p: i for i, p in enumerate(pitch_types)}
     tm_idx = {t: i for i, t in enumerate(teams)}
     first = g.iloc[0]
-    return {
+    payload = {
         'id': int(first['pitcher']),
         'name': display_name(first['player_name']),
         'throws': first['p_throws'],
         'teams': teams,
         'pitchTypes': pitch_types,
         'd0': season_start,
+        'batters': [[int(b), names.get(int(b), str(b))] for b in bat_ids],
+        'games': games_json(games),
+        'pas': pas_json(pas, bat_idx),
         'cols': {
             'day': _arr((g['game_date'] - pd.Timestamp(season_start)).dt.days, 0),
-            'game': _arr(g['game_pk'].astype('int64').rank(method='dense') - 1, 0),
+            'game': gi.tolist(),
+            'gt': g['gt'].astype(int).tolist(),
+            'pai': pai.tolist(),
+            'pn': _arr(g['pitch_number'], 0),
+            'wpa': _arr(g['wpa_p'], 4),
+            're': _arr(g['re_p'], 3),
             'gp': _arr(g['game_pitch_no'], 0),
             'inn': _arr(g['inning'], 0),
             'tm': [tm_idx[t] for t in g['team']],
@@ -320,11 +494,12 @@ def pitcher_payload(g, season_start, pitch_types, teams):
             'hy': _arr(g['hit_y'], 1),
         },
     }
+    return payload, games, pas
 
 
 def explain_payload(g):
     """설명 페이지 전용 투수 파일 (투수 파일과 같은 투구 순서). 기여는 0.1점 단위 정수"""
-    g = g.sort_values(['game_date', 'game_pk', 'at_bat_number', 'pitch_number'])
+    g = g.sort_values(SORT_KEY)
     cols = {f'c{j}': _arr(g[col] * 10, 0) for j, col in enumerate(EXPLAIN_COLS)}
     cols.update({k: _arr(g[src], nd) for k, (src, nd) in EXPLAIN_FEATS.items()})
     return {'id': int(g['pitcher'].iloc[0]), 'n': int(len(g)), 'cols': cols}
@@ -409,15 +584,126 @@ def dump_gz(obj, path):
         f.write(gzip.compress(raw, compresslevel=9, mtime=0))
 
 
+# ---------------------------------------------------------------------------
+# 외부 데이터 : 선수 이름, MLB 공식 시즌 기록 (MLB Stats API)
+# ---------------------------------------------------------------------------
+def _get_json(url):
+    req = urllib.request.Request(url, headers={'User-Agent': 'stuff-lab-export'})
+    with urllib.request.urlopen(req, timeout=60) as r:
+        return json.load(r)
+
+
+def player_names(ids):
+    """MLBAM id -> 'First Last'. web_cache/people.json 에 캐시, 없는 id 만 Stats API 로 일괄 조회"""
+    os.makedirs(CACHE_DIR, exist_ok=True)
+    path = os.path.join(CACHE_DIR, 'people.json')
+    cache = {}
+    if os.path.exists(path):
+        with open(path, encoding='utf-8') as f:
+            cache = {int(k): v for k, v in json.load(f).items()}
+    missing = sorted({int(i) for i in ids} - set(cache))
+    try:
+        for k in range(0, len(missing), 300):
+            chunk = missing[k:k + 300]
+            data = _get_json(f"{STATSAPI}/people?personIds={','.join(map(str, chunk))}")
+            for p in data.get('people', []):
+                cache[int(p['id'])] = p.get('fullName', str(p['id']))
+    except Exception as e:    # 네트워크 실패 : 이름 대신 id 표시
+        print(f'  선수 이름 조회 실패 ({e}) -> id 로 표시')
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(cache, f, ensure_ascii=False)
+    return cache
+
+
+STAT_FIELDS = {'G': 'gamesPlayed', 'GS': 'gamesStarted', 'W': 'wins', 'L': 'losses', 'SV': 'saves', 'HLD': 'holds',
+               'BS': 'blownSaves', 'outs': 'outs', 'R': 'runs', 'ER': 'earnedRuns', 'H': 'hits', 'HR': 'homeRuns',
+               'BB': 'baseOnBalls', 'IBB': 'intentionalWalks', 'HBP': 'hitBatsmen', 'K': 'strikeOuts', 'BF': 'battersFaced',
+               'AB': 'atBats', 'NP': 'numberOfPitches'}
+STAT_GAME_TYPES = {'R': ['R'], 'P': ['F', 'D', 'L', 'W'], 'S': ['S']}
+
+
+def official_stats(season, start, end, ids):
+    """MLB Stats API byDateRange : 데이터 기준일(end)까지 유형별 공식 투수 기록 (카운팅 스탯만 저장, 비율은 웹에서 계산)
+
+    반환 {'asOf', 'fip': {유형: FIP 상수}, 'players': {id: {유형: {...}}}} 또는 None(네트워크 실패)"""
+    ids = set(ids)
+    players, fip = {}, {}
+    try:
+        for key, gtypes in STAT_GAME_TYPES.items():
+            tot = {}
+            for gt in gtypes:
+                url = (f'{STATSAPI}/stats?stats=byDateRange&group=pitching&sportId=1&season={season}&gameType={gt}'
+                       f'&startDate={start}&endDate={end}&playerPool=ALL&limit=5000')
+                best = {}
+                for sp_ in _get_json(url)['stats'][0]['splits']:
+                    pid = int(sp_['player']['id'])
+                    row = {k: int(sp_['stat'].get(v, 0) or 0) for k, v in STAT_FIELDS.items()}
+                    if pid not in best or row['outs'] > best[pid]['outs']:    # 팀별 분할 + 합계가 섞이면 합계(최대) 사용
+                        best[pid] = row
+                for pid, row in best.items():
+                    acc = tot.setdefault(pid, dict.fromkeys(STAT_FIELDS, 0))
+                    for k in STAT_FIELDS:
+                        acc[k] += row[k]
+            if not tot:
+                continue
+            lg = {k: sum(r[k] for r in tot.values()) for k in STAT_FIELDS}
+            ip = lg['outs'] / 3
+            if ip > 0:
+                fip[key] = round(9 * lg['ER'] / ip - (13 * lg['HR'] + 3 * (lg['BB'] + lg['HBP']) - 2 * lg['K']) / ip, 3)
+            for pid, row in tot.items():
+                if pid in ids:
+                    players.setdefault(pid, {})[key] = row
+            print(f'  공식 기록 {key} : {len(tot):,}명 (FIP 상수 {fip.get(key)})')
+    except Exception as e:
+        print(f'  공식 기록 조회 실패 ({e}) -> stats.json 생략')
+        return None
+    return {'asOf': end, 'fip': fip, 'players': players}
+
+
+def summary_payload(d, pitchers, games, pas):
+    """메인 페이지용 시즌 요약 : 유형별 리그 지표·구간별 결과, 구위 리더, 승부처 경기/타석, 구위 하이라이트 경기"""
+    d = d[d['stuff_score'].notna()]
+    bins = pd.cut(d['stuff_score'], STUFF_BINS, labels=STUFF_BIN_LABELS, right=False)
+    by_gt = {}
+    for gt in range(len(GAME_TYPE_LABELS)):
+        m = d['gt'] == gt
+        if not m.any():
+            continue
+        x = d[m]
+        pm = x.groupby('pitcher')['stuff_score'].agg(['mean', 'size'])
+        leaders = pm[pm['size'] >= SUMMARY_MIN_PITCHES[gt]].sort_values('mean', ascending=False).head(10)
+        info = {p['id']: p for p in pitchers}
+        g_ = games[games['gt'] == gt]
+        p_ = pas[pas['gt'] == gt]
+        by_gt[gt] = {
+            'pitches': int(m.sum()),
+            'pitchers': int(x['pitcher'].nunique()),
+            'games': int(x['game_pk'].nunique()),
+            'stuff': round(float(x['stuff_score'].mean()), 2),
+            'rates': {k: (round(v, 4) if v is not None else None) for k, v in outcome_rates(x).items()},
+            'buckets': [{'label': lab, **{k: (round(v, 4) if v is not None else None)
+                                          for k, v in outcome_rates(x[bins[m] == lab]).items()}} for lab in STUFF_BIN_LABELS],
+            'minPitches': SUMMARY_MIN_PITCHES[gt],
+            'leaders': [{'id': int(pid), 'name': info[pid]['name'], 'teams': info[pid]['teams'], 'n': int(r['size']),
+                         'stuff': round(float(r['mean']), 2)} for pid, r in leaders.iterrows()],
+            'impGames': games_json(g_.sort_values('imp', ascending=False).head(10)),
+            'stuffGames': games_json(g_[g_['n'] >= HIGHLIGHT_MIN_LEAGUE_GAME_PITCHES].sort_values('s', ascending=False).head(10)),
+            'impPas': records_json(p_.reindex(p_['wpa'].abs().sort_values(ascending=False).index).head(10), PA_ND),
+        }
+    return by_gt
+
+
 def export_season(season, path, model, scaler):
     print(f'[{season}] {path}')
-    raw = sp.load_regular_season(path, year=season)
+    raw = sp.load_season(path, year=season)
     d, S0, method = score_season(raw, model, scaler, season)
-    print(f'  정규시즌 {len(raw):,}구 -> {len(d):,}구 (점수 없음 {d["stuff_score"].isna().sum():,}), '
-          f'투수 {d["pitcher"].nunique():,}명')
+    print(f'  전체 {len(raw):,}구 -> {len(d):,}구 (점수 없음 {d["stuff_score"].isna().sum():,}), '
+          f'투수 {d["pitcher"].nunique():,}명, 유형별 ' +
+          ', '.join(f'{k} {v:,}' for k, v in d['game_type'].value_counts().items()))
     if season == 2025:
         check_against_parquet(d)
     d = add_web_columns(raw, d)
+    reg = d[d['gt'] == 0]    # 리그 기준값·검증기간은 정규시즌 기준
 
     out = os.path.join(OUT_DIR, str(season))
     # 폴더 자체는 지우지 않고 내용만 비운다 (OneDrive 가 폴더를 잡고 있으면 rmdir 이 거부됨)
@@ -427,47 +713,71 @@ def export_season(season, path, model, scaler):
         for f in files:
             os.remove(os.path.join(root, f))
 
+    names = player_names(d['batter'].dropna().unique())
     season_start = d['game_date'].min().strftime('%Y-%m-%d')
-    valid_start = sp.split_last_month(raw)[2] if season == 2025 else None
-    pitchers = []
+    valid_start = sp.split_last_month(raw[raw['game_type'] == 'R'])[2] if season == 2025 else None
+    pitchers, all_games, all_pas = [], [], []
     for pid, g in d.groupby('pitcher'):
         team_counts = g['team'].value_counts()
         teams = team_counts.index.tolist()    # 투구수 많은 팀 순
         pitch_types = g['pitch_type'].value_counts().index.tolist()
-        dump_gz(pitcher_payload(g, season_start, pitch_types, teams), os.path.join(out, 'p', f'{int(pid)}.json.gz'))
+        name = display_name(g['player_name'].iloc[0])
+        payload, games, pas = pitcher_payload(g, season_start, pitch_types, teams, names)
+        dump_gz(payload, os.path.join(out, 'p', f'{int(pid)}.json.gz'))
         dump_gz(explain_payload(g), os.path.join(out, 'e', f'{int(pid)}.json.gz'))
+        by_gt = []
+        for gt in range(len(GAME_TYPE_LABELS)):
+            s_ = g.loc[g['gt'] == gt, 'stuff_score']
+            by_gt.append([int(len(s_)), round(float(s_.mean()), 2) if s_.notna().any() else None] if len(s_) else None)
         pitchers.append({
             'id': int(pid),
-            'name': display_name(g['player_name'].iloc[0]),
+            'name': name,
             'throws': g['p_throws'].iloc[0],
             'teams': teams,
-            'n': int(len(g)),
-            'stuff': round(float(g['stuff_score'].mean()), 2) if g['stuff_score'].notna().any() else None,
+            'n': by_gt[0][0] if by_gt[0] else 0,          # 정규시즌 투구 수 / 평균 구위 (기존 의미 유지)
+            'stuff': by_gt[0][1] if by_gt[0] else None,
+            'byGt': by_gt,                                 # [정규, 포스트, 시범] 별 [투구 수, 평균 구위] 또는 null
         })
+        games = games.assign(pid=int(pid), name=name, gi=np.arange(len(games)))
+        pas = pas.assign(pid=int(pid), name=name, pai=np.arange(len(pas)), gt=pas['g'].map(games['gt']),
+                         date=pas['g'].map(games['date']), opp=pas['g'].map(games['opp']), team=pas['g'].map(games['team']),
+                         batName=pas['bat'].map(lambda b: names.get(int(b), str(b))))
+        all_games.append(games)
+        all_pas.append(pas.drop(columns=['event']))
+    all_games = pd.concat(all_games, ignore_index=True)
+    all_pas = pd.concat(all_pas, ignore_index=True)
 
+    gt_counts = d['gt'].value_counts()
     dump({
         'season': season,
         'outOfSample': season != 2025,
         'validStart': valid_start.strftime('%Y-%m-%d') if valid_start is not None else None,
         'seasonStart': season_start,
         'seasonEnd': d['game_date'].max().strftime('%Y-%m-%d'),
-        'pitches': int(len(d)),
+        'regularStart': reg['game_date'].min().strftime('%Y-%m-%d'),
+        'regularEnd': reg['game_date'].max().strftime('%Y-%m-%d'),
+        'pitches': int(len(reg)),
+        'gameTypes': [int(gt_counts.get(gt, 0)) for gt in range(len(GAME_TYPE_LABELS))],
         'teams': {lg: {t: n for t, n in ts.items() if t in set(d['team'])} for lg, ts in TEAMS.items()},
         'pitchers': sorted(pitchers, key=lambda p: p['name']),
     }, os.path.join(out, 'index.json'))
-    lg = league_payload(d, valid_start)
-    lg['explain'] = explain_league(d, S0)
+    lg = league_payload(reg, valid_start)
+    lg['explain'] = explain_league(reg, S0)
     lg['explain']['method'] = method
     dump(lg, os.path.join(out, 'league.json'))
+    dump({'byGt': summary_payload(d, pitchers, all_games, all_pas)}, os.path.join(out, 'summary.json'))
+    stats = official_stats(season, f'{season}-02-01', d['game_date'].max().strftime('%Y-%m-%d'), [p['id'] for p in pitchers])
+    if stats is not None:
+        dump(stats, os.path.join(out, 'stats.json'))
     ex = lg['explain']
     print(f"  설명 ({method}) : 기준 S0 {ex['base']:.2f}, 리그 평균 기여 " +
           ', '.join(f'{n} {v:+.2f}' for n, v in zip(ex['groups'], ex['overall'])))
     for pt in ['FF', 'SI', 'CH', 'FS', 'SL', 'CU', 'EP']:
         if pt in ex['pitchTypes']:
             print(f'    {pt} : ' + ', '.join(f'{n} {v:+.1f}' for n, v in zip(ex['groups'], ex['pitchTypes'][pt]['contrib'])))
-    size = sum(os.path.getsize(os.path.join(out, 'e', f)) for f in os.listdir(os.path.join(out, 'e')))
-    print(f'  설명 파일 {size / 1e6:.1f}MB')
-    print(f'  저장 : {out} (투수 {len(pitchers):,}명)')
+    size = {k: sum(os.path.getsize(os.path.join(out, k, f)) for f in os.listdir(os.path.join(out, k))) for k in ('p', 'e')}
+    print(f"  투수 파일 {size['p'] / 1e6:.1f}MB, 설명 파일 {size['e'] / 1e6:.1f}MB")
+    print(f'  저장 : {out} (투수 {len(pitchers):,}명, 경기 {len(all_games):,}, 타석 {len(all_pas):,})')
 
 
 def main():
@@ -479,7 +789,8 @@ def main():
     for season, path in SEASONS.items():
         export_season(season, path, model, scaler)
     dump({'seasons': sorted(SEASONS, reverse=True), 'resultLabels': RESULTS, 'paEvents': PA_EVENTS,
-          'pitchNames': PITCH_NAMES, 'trainSeason': 2025,
+          'pitchNames': PITCH_NAMES, 'trainSeason': 2025, 'gameTypes': GAME_TYPE_LABELS, 'rounds': ROUND_LABELS,
+          'importanceWeight': IMPORTANCE_WEIGHT,
           'modelVersion': MODEL_VERSION},
          os.path.join(OUT_DIR, 'meta.json'))
 

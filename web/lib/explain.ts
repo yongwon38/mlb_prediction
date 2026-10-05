@@ -101,4 +101,13 @@ export function pitchOneLiner(p: ExplainPitch, groups: string[]): string {
   return parts.join(" · ") || "평균 수준";
 }
 
+/** 같은 구종 구성일 때 리그 평균 기여 (각 공을 자기 구종 리그 평균 기여로 바꿔 평균) */
+export function mixReference(ps: ExplainPitch[], lg: LeagueExplain): number[] | null {
+  const xs = scored(ps).filter((p) => lg.pitchTypes[p.pt]);
+  if (!xs.length) return null;
+  const m = new Array(lg.groups.length).fill(0);
+  for (const p of xs) lg.pitchTypes[p.pt].contrib.forEach((v, j) => (m[j] += v));
+  return m.map((v) => v / xs.length);
+}
+
 export { signed as fmtSigned };

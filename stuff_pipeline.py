@@ -32,6 +32,15 @@ def load_regular_season(path='games_25_final.pkl', year=2025):
     return df.reset_index(drop=True)
 
 
+def load_season(path='games_25_final.pkl', year=2025):
+    """시범경기·정규시즌·포스트시즌 전체 투구 (웹 표시용). 모델 학습·검증은 load_regular_season 만 사용한다."""
+    if not os.path.exists(path):
+        load_regular_season(path, year)    # 캐시 생성
+    df = pd.read_pickle(path)
+    df['game_date'] = pd.to_datetime(df['game_date'])
+    return df.reset_index(drop=True)
+
+
 def split_last_month(df, months=1):
     """정규시즌 마지막 N개월 = 검증셋, 그 이전 = 학습셋"""
     valid_start = df['game_date'].max() - pd.DateOffset(months=months) + pd.Timedelta(days=1)
