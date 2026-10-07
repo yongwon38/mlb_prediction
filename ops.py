@@ -131,7 +131,9 @@ def cmd_push_shap(args):
 def cmd_shap_todo(args):
     ew = _ew()
     have = set(ds.store().list(f'shap/{model_id()}/'))
-    todo = [s for s in ew.SEASONS if ds.season_finished(s) and f'shap/{model_id()}/shap_{s}.npz' not in have]
+    data = {f.split('/')[1] for f in ds.store().list('statcast/')}    # 적재된 시즌만
+    todo = [s for s in ew.SEASONS if ds.season_finished(s) and str(s) in data
+            and f'shap/{model_id()}/shap_{s}.npz' not in have]
     _out(seasons=json.dumps(todo))
 
 

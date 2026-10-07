@@ -26,6 +26,8 @@ def _read_raw(path, year):
     df = data_store.load_raw(year)
     if df is not None:
         return df
+    if os.getenv('MLB_DATA') == 'store':    # 클라우드 : Savant 전체 수집으로 빠지지 않고 바로 중단
+        raise RuntimeError(f'온라인 저장소에 {year} 시즌 데이터가 없음 -> bootstrap 워크플로를 먼저 실행')
     import pybaseball as pyb
     pyb.cache.enable()
     df = pyb.statcast(start_dt=f'{year}-03-01', end_dt=f'{year}-11-30')
