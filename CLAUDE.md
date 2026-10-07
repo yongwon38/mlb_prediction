@@ -99,7 +99,7 @@ data_status.json               데이터 기준일 (daily 가 커밋)
 - 새 세션을 시작하면 가장 최근 업무일지를 먼저 읽고 이어서 작업한다.
 
 ## 7. 클라우드 운영 (무료, 로컬 PC 없이 동작)
-- 구성 : GitHub Actions(공개 레포 무료) + Hugging Face 데이터셋 `yongwon38/mlb-statcast`(공개) + Vercel Hobby(`stuff-lab`)
+- 구성 : GitHub Actions(공개 레포 무료) + Hugging Face 데이터셋 `elcax1/mlb-statcast`(공개) + Vercel Hobby(`stuff-lab`)
 - **daily** (매일 15:00 KST) : 현재 시즌 최근 3일 Statcast 재수집 -> 경기 단위 교체 -> 바뀌었으면 현재 시즌 export -> 배포 -> `data_status.json` 커밋
 - **deploy** (main push) : HF 의 웹 데이터 스냅샷(`web_data/{web_id}/`)으로 빌드·배포. `web_id` = 3·4단계 모델 + `export_web_data.py` + `stuff_pipeline.py` 해시 -> 모델·export 코드가 바뀌면 스냅샷이 없으므로 전 시즌 자동 재생성
 - **shap** (models push / 매월 / 수동) : 끝난 시즌(12월 이후)만 8조각 병렬 SHAP -> 해당 시즌 재생성. 진행 중 시즌은 투수별 주 패스트볼 평균이 매일 바뀌어 캐시가 맞지 않으므로 Saabas

@@ -10,7 +10,7 @@ on:
 
 env:
   HF_TOKEN: ${{ secrets.HF_TOKEN }}
-  HF_DATASET: ${{ vars.HF_DATASET || 'yongwon38/mlb-statcast' }}
+  HF_DATASET: ${{ vars.HF_DATASET || 'elcax1/mlb-statcast' }}
 
 jobs:
   season:

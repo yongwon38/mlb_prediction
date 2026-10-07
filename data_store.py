@@ -18,7 +18,7 @@ import time
 
 import pandas as pd
 
-HF_DATASET = os.getenv('HF_DATASET', 'yongwon38/mlb-statcast')
+HF_DATASET = os.getenv('HF_DATASET', 'elcax1/mlb-statcast')
 CACHE_DIR = os.getenv('MLB_CACHE', 'data_cache')    # OneDrive 동기화를 피하려면 MLB_CACHE 로 다른 위치 지정
 SEASON_START, SEASON_END = '03-01', '11-30'    # stuff_pipeline.load_regular_season 과 같은 수집 구간
 KEY = ['game_pk', 'at_bat_number', 'pitch_number']

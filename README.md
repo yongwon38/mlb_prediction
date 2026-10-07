@@ -63,7 +63,7 @@ npx vercel --prod --archive=tgz    # web/ 에서 배포 (투수별 파일이 많
 | `shap` | 모델 push · 매월 · 수동 | 끝난 시즌 정확한 SHAP (8조각 병렬) → 해당 시즌 재생성·배포 |
 | `bootstrap` | 수동 (처음 1회) | 시즌 전체 Statcast 를 HF 데이터셋에 적재 |
 
-- 데이터 : [HF 데이터셋](https://huggingface.co/datasets/yongwon38/mlb-statcast) `statcast/{season}/{YYYY-MM}.parquet`
+- 데이터 : [HF 데이터셋](https://huggingface.co/datasets/elcax1/mlb-statcast) `statcast/{season}/{YYYY-MM}.parquet`
 - 처음 설정 : Secrets `HF_TOKEN`(write) · `VERCEL_TOKEN` · `VERCEL_ORG_ID` · `VERCEL_PROJECT_ID` 등록 → `bootstrap` 실행 → `deploy` 실행
 
 ### 실행
