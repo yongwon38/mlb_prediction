@@ -44,8 +44,12 @@ jobs:
       - name: 구위 점수 + 웹 데이터 생성
         if: steps.update.outputs.changed == 'true'
         run: |
-          S="${{ steps.update.outputs.season }} ${{ steps.web.outputs.missing }}"
-          python ops.py pull-shap
+          C="${{ steps.update.outputs.season }}"
+          S="$C ${{ steps.web.outputs.missing }}"
+          python ops.py pull-shap $S
+          # 현재 시즌 SHAP 증분 계산 (새 투구 + 피처가 바뀐 투구, 하루 약 13만 구). 너무 많으면 건너뛰고 Saabas
+          python compute_shap.py $C --incremental --max-rows 250000
+          python ops.py push-shap $C
           python export_web_data.py --seasons $S
           python ops.py push-web $S
 

@@ -1,5 +1,5 @@
-# 끝난 시즌의 정확한 SHAP 캐시 (시즌당 약 12시간 -> 8조각 병렬) -> 그 시즌 웹 데이터 재생성 -> 배포
-# 진행 중인 시즌은 매일 피처(투수별 주 패스트볼 평균)가 바뀌므로 Saabas 기여를 쓴다
+# 정확한 SHAP 캐시 대량 계산 (처음 계산, 모델 변경 후) : 시즌별 8조각 병렬 -> 합치기 -> 해당 시즌 웹 데이터 재생성 -> 배포
+# 진행 중인 시즌의 매일 증분(새 투구 + 피처가 바뀐 투구)은 daily 가 계산한다. 같은 캐시 형식(키 + 피처 해시)이라 이어서 쓴다
 name: shap
 
 on:
@@ -7,11 +7,11 @@ on:
     branches: [main]
     paths: ['models/**']
   schedule:
-    - cron: '0 18 1 * *'    # 매월 2일 03:00 KST : 새로 끝난 시즌 확인
+    - cron: '0 18 1 * *'    # 매월 2일 03:00 KST : 캐시 없는 시즌 확인 (daily 가 건너뛴 경우 보완)
   workflow_dispatch:
     inputs:
       seasons:
-        description: '계산할 시즌 JSON (예 [2025]) — 비우면 끝난 시즌 중 캐시 없는 시즌'
+        description: '계산할 시즌 JSON (예 [2025]) — 비우면 캐시 없는 시즌'
         default: ''
 
 env:
@@ -51,11 +51,10 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-python
       - run: |
-          python compute_shap.py ${{ matrix.season }} --shard ${{ matrix.shard }} --n-shards $N_SHARDS
+          python ops.py pull-shap ${{ matrix.season }}
+          python compute_shap.py ${{ matrix.season }} --incremental --shard ${{ matrix.shard }} --n-shards $N_SHARDS
           D=$(python -c "import export_web_data as e; print(e.SHAP_DIR)")
-          mkdir -p shap_out
-          cp "$D"/shard_*.npz shap_out/
-          if ls "$D"/shap_*_extra.npz >/dev/null 2>&1; then cp "$D"/shap_*_extra.npz shap_out/; fi
+          mkdir -p shap_out && cp "$D"/shard_*.npz shap_out/
       - uses: actions/upload-artifact@v4
         with:
           name: shap-${{ matrix.season }}-${{ matrix.shard }}
@@ -72,22 +71,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-python
+      - name: 시즌 목록
+        env:
+          SEASONS_JSON: ${{ needs.plan.outputs.seasons }}
+        run: echo "S=$(python -c "import json, os; print(*json.loads(os.environ['SEASONS_JSON']))")" >> "$GITHUB_ENV"
       - name: SHAP 폴더
         id: dir
-        run: echo "path=$(python -c "import export_web_data as e; print(e.SHAP_DIR)")" >> "$GITHUB_OUTPUT"
+        run: |
+          python ops.py pull-shap $S
+          echo "path=$(python -c "import export_web_data as e; print(e.SHAP_DIR)")" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
         with:
           pattern: shap-*
           merge-multiple: true
           path: ${{ steps.dir.outputs.path }}
-      - name: 조각 합치기 + 업로드
-        env:
-          SEASONS_JSON: ${{ needs.plan.outputs.seasons }}
+      - name: 조각 합치기 (그사이 daily 로 바뀐 투구는 여기서 계산) + 업로드
         run: |
-          S=$(python -c "import json, os; print(*json.loads(os.environ['SEASONS_JSON']))")
-          python compute_shap.py $S --merge --n-shards $N_SHARDS
+          python compute_shap.py $S --incremental
           python ops.py push-shap $S
-          echo "S=$S" >> "$GITHUB_ENV"
       - name: 지난 시즌 웹 데이터 스냅샷
         id: web
         run: python ops.py pull-web --skip $S

@@ -5,8 +5,8 @@
     python ops.py bootstrap 2025 [--pkl games_25_final.pkl]   시즌 전체 적재 (pkl 없으면 Savant 에서 수집)
     python ops.py pull-web [--skip 2026]     웹 데이터 스냅샷 -> web/public/data (없는 시즌은 missing 으로 출력)
     python ops.py push-web 2026 ...          web/public/data/{season} -> 스냅샷 업로드
-    python ops.py pull-shap / push-shap 2025 ...   SHAP 캐시 (outputs/{ver}/shap) 내려받기 / 올리기
-    python ops.py shap-todo                  끝난 시즌 중 현재 모델 SHAP 이 없는 시즌 (JSON 목록)
+    python ops.py pull-shap [2026] / push-shap 2025 ...   SHAP 캐시 (outputs/{ver}/shap) 내려받기 / 올리기
+    python ops.py shap-todo                  적재된 시즌 중 현재 모델 SHAP 캐시가 없는 시즌 (JSON 목록)
 
 결과값은 GITHUB_OUTPUT 이 있으면 거기에 key=value 로도 쓴다.
 """
@@ -111,8 +111,16 @@ def cmd_push_web(args):
 
 
 def cmd_pull_shap(args):
+    """현재 모델의 SHAP 캐시 (시즌을 주면 그 시즌만)"""
     ew = _ew()
-    got = ds.pull_prefix(f'shap/{model_id()}/', ew.SHAP_DIR)
+    prefix = f'shap/{model_id()}/'
+    os.makedirs(ew.SHAP_DIR, exist_ok=True)
+    got = []
+    for r in ds.store().list(prefix):
+        tag = r[len(prefix):].removeprefix('shap_').removesuffix('.npz').removesuffix('_extra')
+        if not args.seasons or int(tag) in args.seasons:
+            ds.shutil.copyfile(ds.store().download(r), os.path.join(ew.SHAP_DIR, r[len(prefix):]))
+            got.append(r)
     print(f'SHAP 캐시 {len(got)}개 -> {ew.SHAP_DIR}')
 
 
@@ -125,6 +133,9 @@ def cmd_push_shap(args):
             p = os.path.join(ew.SHAP_DIR, f'shap_{tag}.npz')
             if os.path.exists(p):
                 files.append((p, f'shap/{mid}/shap_{tag}.npz'))
+    if not files:
+        print('올릴 SHAP 캐시 없음')
+        return
     ds.store().upload(files, f'shap {mid} : {" ".join(map(str, args.seasons))}')
 
 
@@ -132,8 +143,7 @@ def cmd_shap_todo(args):
     ew = _ew()
     have = set(ds.store().list(f'shap/{model_id()}/'))
     data = {f.split('/')[1] for f in ds.store().list('statcast/')}    # 적재된 시즌만
-    todo = [s for s in ew.SEASONS if ds.season_finished(s) and str(s) in data
-            and f'shap/{model_id()}/shap_{s}.npz' not in have]
+    todo = [s for s in ew.SEASONS if str(s) in data and f'shap/{model_id()}/shap_{s}.npz' not in have]
     _out(seasons=json.dumps(todo))
 
 
@@ -149,7 +159,7 @@ def main():
     p.add_argument('--skip', type=int, nargs='*', default=[])
     for name in ('push-web', 'push-shap'):
         sub.add_parser(name).add_argument('seasons', type=int, nargs='+')
-    sub.add_parser('pull-shap')
+    sub.add_parser('pull-shap').add_argument('seasons', type=int, nargs='*')
     sub.add_parser('shap-todo')
     args = ap.parse_args()
     globals()['cmd_' + args.cmd.replace('-', '_')](args)

@@ -100,9 +100,11 @@ data_status.json               데이터 기준일 (daily 가 커밋)
 
 ## 7. 클라우드 운영 (무료, 로컬 PC 없이 동작)
 - 구성 : GitHub Actions(공개 레포 무료) + Hugging Face 데이터셋 `elcax1/mlb-statcast`(공개) + Vercel Hobby(`stuff-lab`)
-- **daily** (매일 15:00 KST) : 현재 시즌 최근 3일 Statcast 재수집 -> 경기 단위 교체 -> 바뀌었으면 현재 시즌 export -> 배포 -> `data_status.json` 커밋
+- **daily** (매일 15:00 KST) : 현재 시즌 최근 3일 Statcast 재수집 -> 경기 단위 교체 -> 바뀌었으면 현재 시즌 SHAP 증분 계산 -> export -> 배포 -> `data_status.json` 커밋
 - **deploy** (main push) : HF 의 웹 데이터 스냅샷(`web_data/{web_id}/`)으로 빌드·배포. `web_id` = 3·4단계 모델 + `export_web_data.py` + `stuff_pipeline.py` 해시 -> 모델·export 코드가 바뀌면 스냅샷이 없으므로 전 시즌 자동 재생성
-- **shap** (models push / 매월 / 수동) : 끝난 시즌(12월 이후)만 8조각 병렬 SHAP -> 해당 시즌 재생성. 진행 중 시즌은 투수별 주 패스트볼 평균이 매일 바뀌어 캐시가 맞지 않으므로 Saabas
+- **SHAP 캐시** = 투구 키 + 피처 해시(`compute_shap.feature_hash`). 키·해시가 같은 투구는 재사용, 새 투구와 피처가 바뀐 투구만 계산 (`--incremental`)
+  - 진행 중 시즌은 새 투구가 들어오면 그 투수의 주 패스트볼 평균이 바뀌어 시즌 전체 피처가 바뀜 -> 하루 약 12~14만 구 재계산 (daily, 25만 구 초과면 건너뛰고 그날은 Saabas)
+  - **shap** (models push / 매월 / 수동) : 캐시 없는 시즌을 8조각 병렬 계산 -> 합치기 -> 해당 시즌 재생성. 처음 계산·모델 변경 후용
 - Secrets : `HF_TOKEN`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` (`web/.vercel/project.json`)
 - 로컬에서 HF 데이터로 작업 : `MLB_DATA=store`, 캐시 위치 `MLB_CACHE`(기본 `data_cache/`), 테스트 저장소 `MLB_STORE=<폴더>`
 - `requirements.txt` 버전은 모델을 학습한 로컬 환경과 같게 유지한다 (joblib 호환)
