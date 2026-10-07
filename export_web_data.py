@@ -9,8 +9,10 @@
 - MODEL_VERSION 으로 사용할 모델 선택 (v1 : models/, outputs/ / v2 : models/v2/, outputs/v2/)
 - v2 : 볼 판정 + Savant Waste 존 투구(sp.is_waste_ball)와 사구(sp.is_unscored)는 score 없음(null). 행은 유지해 분포도에는 표시
 
-실행 : python export_web_data.py
+실행 : python export_web_data.py                       (전체 시즌)
+       python export_web_data.py --seasons 2026         (특정 시즌만, meta.json 은 항상 전체 시즌 목록)
 """
+import argparse
 import gzip
 import json
 import os
@@ -20,6 +22,7 @@ import joblib
 import numpy as np
 import pandas as pd
 
+import data_store
 import stuff_pipeline as sp
 
 MODEL_VERSION = 'v2'
@@ -30,7 +33,9 @@ MODELS = {
 }
 CFG = MODELS[MODEL_VERSION]
 
-SEASONS = {2026: 'games_26.pkl', 2025: 'games_25_final.pkl', 2024: 'games_24.pkl'}
+# 2024 ~ 현재 시즌 (3월 1일에 새 시즌 자동 추가). 로컬 pkl 이 없으면 온라인 저장소(data_store)에서 읽는다
+SEASONS = {y: 'games_25_final.pkl' if y == 2025 else f'games_{y % 100}.pkl'
+           for y in range(max(data_store.current_season(), 2026), 2023, -1)}
 OUT_DIR = os.path.join('web', 'public', 'data')
 MIN_PITCHER_PITCHES = 300     # 리그 퍼센타일 기준 표본 (투수 전체)
 MIN_PITCHTYPE_PITCHES = 50    # 리그 퍼센타일 기준 표본 (투수×구종)
@@ -177,6 +182,9 @@ def explain_contrib(model, scaler, X, pred, score, season, keys):
     """
     feats = list(X.columns)
     cached = load_shap_cache(season, keys)
+    if cached is not None and np.abs(cached[1] + cached[0].sum(axis=1) - pred).max() >= 1e-6:
+        print('  SHAP 캐시가 현재 모델·데이터와 맞지 않음 -> Saabas 사용')
+        cached = None
     if cached is not None:
         contrib, base = cached
         method = 'shap'
@@ -781,13 +789,24 @@ def export_season(season, path, model, scaler):
 
 
 def main():
+    global OUT_DIR
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--seasons', type=int, nargs='*', help='내보낼 시즌 (기본 : 전체)')
+    ap.add_argument('--out', default=OUT_DIR, help='출력 폴더 (기본 : web/public/data)')
+    args = ap.parse_args()
+    OUT_DIR = args.out
     np.random.seed(sp.SEED)
     print(f'모델 {MODEL_VERSION} : {CFG["dir"]}')
     model = joblib.load(os.path.join(CFG['dir'], 'stage3_stuff_lgbm.joblib'))
     scaler = joblib.load(os.path.join(CFG['dir'], 'stage4_stuff_scaler.joblib'))
     os.makedirs(OUT_DIR, exist_ok=True)
-    for season, path in SEASONS.items():
-        export_season(season, path, model, scaler)
+    for season in args.seasons or SEASONS:
+        export_season(season, SEASONS[season], model, scaler)
+    write_meta()
+
+
+def write_meta():
+    """web/public/data/meta.json (전체 시즌 목록, 표시 상수)"""
     dump({'seasons': sorted(SEASONS, reverse=True), 'resultLabels': RESULTS, 'paEvents': PA_EVENTS,
           'pitchNames': PITCH_NAMES, 'trainSeason': 2025, 'gameTypes': GAME_TYPE_LABELS, 'rounds': ROUND_LABELS,
           'importanceWeight': IMPORTANCE_WEIGHT,

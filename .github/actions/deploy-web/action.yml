@@ -1,0 +1,25 @@
+name: deploy-web
+description: web/ 빌드 (web/public/data 포함) -> Vercel production 배포
+inputs:
+  vercel-token:
+    required: true
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22'
+        cache: npm
+        cache-dependency-path: web/package-lock.json
+    - shell: bash
+      working-directory: web
+      env:
+        VERCEL_TOKEN: ${{ inputs.vercel-token }}
+      run: |
+        test -f public/data/meta.json || { echo "web/public/data 가 비어 있음"; exit 1; }
+        npm ci
+        npm i -g vercel@latest
+        vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+        vercel build --prod --token="$VERCEL_TOKEN"
+        vercel deploy --prebuilt --prod --archive=tgz --token="$VERCEL_TOKEN" | tee deploy_url.txt
+        echo "### 배포 : $(tail -n1 deploy_url.txt)" >> "$GITHUB_STEP_SUMMARY"

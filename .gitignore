@@ -18,3 +18,16 @@
 /outputs/v2/*
 !/outputs/v2/*.png
 !/outputs/v2/*.csv
+
+# 클라우드 운영 (GitHub Actions + HF 데이터셋 + Vercel)
+!/.github/
+!/data_store.py
+!/ops.py
+!/requirements.txt
+!/data_status.json
+# 모델 : 현재 웹 모델(v2)만 추적 (클라우드 배치가 git 의 모델로 점수 계산)
+!/models/
+/models/*
+!/models/v2/
+/models/v2/*
+!/models/v2/*.joblib

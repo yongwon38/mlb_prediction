@@ -1,0 +1,61 @@
+# main 에 push : 웹만 바뀌면 스냅샷으로 재배포, 모델·export 코드가 바뀌면 (web_id 가 바뀌어) 전 시즌 재생성 후 배포
+name: deploy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'web/**'
+      - 'models/**'
+      - 'stuff_pipeline.py'
+      - 'export_web_data.py'
+      - 'data_store.py'
+      - 'ops.py'
+      - 'requirements.txt'
+      - '.github/**'
+  workflow_dispatch:
+    inputs:
+      full:
+        description: 모든 시즌 웹 데이터 다시 생성
+        type: boolean
+        default: false
+
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+env:
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
+  HF_DATASET: ${{ vars.HF_DATASET || 'yongwon38/mlb-statcast' }}
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  MLB_DATA: store
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 340
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python
+
+      - name: 웹 데이터 스냅샷
+        id: web
+        run: python ops.py pull-web
+
+      - name: 없는 시즌 웹 데이터 생성
+        if: steps.web.outputs.missing != '' || inputs.full
+        run: |
+          if [ "${{ inputs.full }}" = "true" ]; then
+            S=$(python -c "import export_web_data as e; print(*e.SEASONS)")
+          else
+            S="${{ steps.web.outputs.missing }}"
+          fi
+          python ops.py pull-shap
+          python export_web_data.py --seasons $S
+          python ops.py push-web $S
+
+      - name: 배포
+        uses: ./.github/actions/deploy-web
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}

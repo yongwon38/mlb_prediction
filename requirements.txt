@@ -1,0 +1,10 @@
+# 클라우드 배치(GitHub Actions)용 — 모델 joblib 호환을 위해 로컬 학습 환경과 같은 버전으로 고정
+pandas==2.2.2
+numpy==1.26.4
+scipy==1.16.3
+scikit-learn==1.7.1
+lightgbm==4.6.0
+joblib==1.4.2
+pyarrow==14.0.2
+pybaseball==2.2.7
+huggingface_hub>=0.30

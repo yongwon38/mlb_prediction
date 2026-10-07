@@ -18,15 +18,24 @@ SEED = 42
 # ---------------------------------------------------------------------------
 # 0. 데이터 로드 / 분할
 # ---------------------------------------------------------------------------
+def _read_raw(path, year):
+    """로컬 pkl -> 없거나 MLB_DATA=store 이면 온라인 저장소(data_store, HF) -> 둘 다 없으면 pybaseball 로 받아 pkl 캐시"""
+    if os.path.exists(path) and os.getenv('MLB_DATA') != 'store':
+        return pd.read_pickle(path)
+    import data_store
+    df = data_store.load_raw(year)
+    if df is not None:
+        return df
+    import pybaseball as pyb
+    pyb.cache.enable()
+    df = pyb.statcast(start_dt=f'{year}-03-01', end_dt=f'{year}-11-30')
+    df.to_pickle(path)
+    return df
+
+
 def load_regular_season(path='games_25_final.pkl', year=2025):
-    """정규시즌(game_type == 'R') 투구 데이터 로드. 파일이 없으면 pybaseball로 받아 캐시한다."""
-    if os.path.exists(path):
-        df = pd.read_pickle(path)
-    else:
-        import pybaseball as pyb
-        pyb.cache.enable()
-        df = pyb.statcast(start_dt=f'{year}-03-01', end_dt=f'{year}-11-30')
-        df.to_pickle(path)
+    """정규시즌(game_type == 'R') 투구 데이터 로드. 파일이 없으면 온라인 저장소 / pybaseball 에서 받는다."""
+    df = _read_raw(path, year)
     df = df[df['game_type'] == 'R'].copy()
     df['game_date'] = pd.to_datetime(df['game_date'])
     return df.reset_index(drop=True)
@@ -34,9 +43,7 @@ def load_regular_season(path='games_25_final.pkl', year=2025):
 
 def load_season(path='games_25_final.pkl', year=2025):
     """시범경기·정규시즌·포스트시즌 전체 투구 (웹 표시용). 모델 학습·검증은 load_regular_season 만 사용한다."""
-    if not os.path.exists(path):
-        load_regular_season(path, year)    # 캐시 생성
-    df = pd.read_pickle(path)
+    df = _read_raw(path, year)
     df['game_date'] = pd.to_datetime(df['game_date'])
     return df.reset_index(drop=True)
 

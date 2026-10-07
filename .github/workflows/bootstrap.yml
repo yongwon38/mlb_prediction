@@ -1,0 +1,27 @@
+# 처음 1회 (또는 데이터 재구축) : 시즌 전체 Statcast 를 Savant 에서 받아 HF 데이터셋에 적재. 시즌별 병렬
+name: bootstrap
+
+on:
+  workflow_dispatch:
+    inputs:
+      seasons:
+        description: '적재할 시즌 JSON'
+        default: '[2024, 2025, 2026]'
+
+env:
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
+  HF_DATASET: ${{ vars.HF_DATASET || 'yongwon38/mlb-statcast' }}
+
+jobs:
+  season:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    strategy:
+      fail-fast: false
+      max-parallel: 1    # HF 커밋 충돌 방지 + Savant 부하 분산
+      matrix:
+        season: ${{ fromJSON(inputs.seasons) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python
+      - run: python ops.py bootstrap ${{ matrix.season }}

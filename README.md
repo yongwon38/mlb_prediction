@@ -55,6 +55,17 @@ cd web && npm install && npm run dev
 npx vercel --prod --archive=tgz    # web/ 에서 배포 (투수별 파일이 많아 아카이브 업로드 필수)
 ```
 
+### 자동 운영 (무료 · PC 없이 동작)
+| 워크플로 | 언제 | 하는 일 |
+|---|---|---|
+| `daily` | 매일 15:00 KST | 최근 3일 Statcast 재수집 → HF 데이터셋 갱신 → 현재 시즌 구위 점수·웹 데이터 생성 → Vercel 배포 |
+| `deploy` | `main` push | 웹만 바뀌면 스냅샷으로 재배포, 모델·export 코드가 바뀌면 전 시즌 재생성 후 배포 |
+| `shap` | 모델 push · 매월 · 수동 | 끝난 시즌 정확한 SHAP (8조각 병렬) → 해당 시즌 재생성·배포 |
+| `bootstrap` | 수동 (처음 1회) | 시즌 전체 Statcast 를 HF 데이터셋에 적재 |
+
+- 데이터 : [HF 데이터셋](https://huggingface.co/datasets/yongwon38/mlb-statcast) `statcast/{season}/{YYYY-MM}.parquet`
+- 처음 설정 : Secrets `HF_TOKEN`(write) · `VERCEL_TOKEN` · `VERCEL_ORG_ID` · `VERCEL_PROJECT_ID` 등록 → `bootstrap` 실행 → `deploy` 실행
+
 ### 실행
 ```bash
 pip install pandas numpy scipy scikit-learn lightgbm shap matplotlib pyarrow pybaseball jupyter

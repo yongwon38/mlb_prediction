@@ -1,0 +1,67 @@
+# 매일 : 최근 Statcast 갱신 -> (바뀌었으면) 현재 시즌 점수·웹 데이터 재생성 -> Vercel 배포
+name: daily
+
+on:
+  schedule:
+    - cron: '0 6 * * *'    # 매일 15:00 KST (미국 경기 종료 후 Savant 반영 시간 고려)
+  workflow_dispatch:
+    inputs:
+      days:
+        description: 다시 받을 최근 일수
+        default: '3'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+env:
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
+  HF_DATASET: ${{ vars.HF_DATASET || 'yongwon38/mlb-statcast' }}
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+  MLB_DATA: store
+
+jobs:
+  daily:
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python
+
+      - name: Statcast 갱신
+        id: update
+        run: python ops.py update --days ${{ inputs.days || 3 }}
+
+      - name: 지난 시즌 웹 데이터 스냅샷
+        id: web
+        if: steps.update.outputs.changed == 'true'
+        run: python ops.py pull-web --skip ${{ steps.update.outputs.season }}
+
+      - name: 구위 점수 + 웹 데이터 생성
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          S="${{ steps.update.outputs.season }} ${{ steps.web.outputs.missing }}"
+          python ops.py pull-shap
+          python export_web_data.py --seasons $S
+          python ops.py push-web $S
+
+      - name: 배포
+        if: steps.update.outputs.changed == 'true'
+        uses: ./.github/actions/deploy-web
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+
+      - name: 데이터 기준일 커밋 (cron 60일 비활성 정지 방지)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data_status.json
+          if ! git diff --cached --quiet; then
+            git commit -m "data: status $(date -u +%F)"
+            git pull --rebase
+            git push
+          fi

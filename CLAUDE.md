@@ -63,8 +63,13 @@ outputs/                       예측 결과, 지표, 그림
 export_web_data.py             웹용 데이터 export (시즌별 구위 score -> web/public/data/{season}/ : index·league·summary·stats(MLB 공식 기록).json, p/ e/ 투수별 .json.gz(경기·타석 표 포함))
 compute_shap.py                정확한 SHAP 캐시 계산 (outputs/v2/shap/, 약 12시간 : 정규 shap_{season}.npz + 시범·포스트 shap_{season}_extra.npz). 없으면 export 가 Saabas 기여 사용
 web/                           Next.js 분석 페이지 (static export, Vercel 배포) : / 홈, /pitcher, /games, /explain(/pitch-types, /bands, /pitch)
+data_store.py                  온라인 데이터 저장소 (HF Datasets : statcast 월별 parquet, SHAP 캐시, 웹 데이터 스냅샷)
+ops.py                         클라우드 운영 명령 (update / bootstrap / pull-web / push-web / pull-shap / push-shap / shap-todo)
+.github/workflows/             daily(매일 갱신·배포) / deploy(push 시 배포) / shap(끝난 시즌 SHAP) / bootstrap(처음 적재)
+data_status.json               데이터 기준일 (daily 가 커밋)
 ```
-- 웹 데이터 갱신 : 모델(models/stage3·4)을 바꾼 뒤 `python export_web_data.py` -> `web/` 에서 재배포. `web/public/data/` 는 커밋하지 않는다
+- 웹 데이터 갱신 : **`git push` 하면 자동** (7절). `web/public/data/` 는 커밋하지 않는다
+- 데이터 로드 순서 : 로컬 pkl -> 없거나 `MLB_DATA=store` 면 HF 데이터셋 -> 둘 다 없으면 pybaseball (`stuff_pipeline._read_raw`)
 - **절대경로 금지** — 프로젝트 루트 기준 상대경로만 사용 (OneDrive 동기화, 다른 PC 대응)
 - 난수 seed = 42 고정
 - 기존 파일(`modelling*.ipynb`, `preprocess_hits.py` 등 이전 작업물)은 사용자 요청 없이 수정하지 않는다.
@@ -74,7 +79,8 @@ web/                           Next.js 분석 페이지 (static export, Vercel �
 ## 5. Git 규칙
 - 원격 레포 : https://github.com/yongwon38/mlb_prediction (공개 레포, 브랜치 `main`)
 - 다른 PC 에서는 `git clone` 후 작업하고, 작업 시작 전 `git pull` 로 최신화한다.
-- `.gitignore` 는 **화이트리스트 방식**이다. 데이터(`*.pkl`), `.env`, 모델(`models/*.joblib`), `outputs/*.parquet`, 개인 PDF·기존 작업물은 절대 커밋하지 않는다.
+- `.gitignore` 는 **화이트리스트 방식**이다. 데이터(`*.pkl`), `.env`, `outputs/*.parquet`, 개인 PDF·기존 작업물은 절대 커밋하지 않는다.
+  - 모델은 **현재 웹 모델 폴더(`models/v2/*.joblib`)만 커밋**한다 (클라우드 배치가 git 의 모델로 점수를 매김). 웹 모델 버전을 바꾸면 `.gitignore` 의 `models/v2` 줄도 함께 바꾼다
   - 새로 추적할 파일(새 노트북, 모듈 등)은 `.gitignore` 에 `!/파일명` 을 추가해 허용한다.
   - 커밋 전 `git status` 로 스테이징 목록을 반드시 확인한다.
 - 노트북 커밋 전 로컬 절대경로가 찍힌 stderr 출력이 있으면 제거한다 (공개 레포).
@@ -91,3 +97,12 @@ web/                           Next.js 분석 페이지 (static export, Vercel �
   5. 이슈 / 미해결 사항
   6. 다음 작업 계획
 - 새 세션을 시작하면 가장 최근 업무일지를 먼저 읽고 이어서 작업한다.
+
+## 7. 클라우드 운영 (무료, 로컬 PC 없이 동작)
+- 구성 : GitHub Actions(공개 레포 무료) + Hugging Face 데이터셋 `yongwon38/mlb-statcast`(공개) + Vercel Hobby(`stuff-lab`)
+- **daily** (매일 15:00 KST) : 현재 시즌 최근 3일 Statcast 재수집 -> 경기 단위 교체 -> 바뀌었으면 현재 시즌 export -> 배포 -> `data_status.json` 커밋
+- **deploy** (main push) : HF 의 웹 데이터 스냅샷(`web_data/{web_id}/`)으로 빌드·배포. `web_id` = 3·4단계 모델 + `export_web_data.py` + `stuff_pipeline.py` 해시 -> 모델·export 코드가 바뀌면 스냅샷이 없으므로 전 시즌 자동 재생성
+- **shap** (models push / 매월 / 수동) : 끝난 시즌(12월 이후)만 8조각 병렬 SHAP -> 해당 시즌 재생성. 진행 중 시즌은 투수별 주 패스트볼 평균이 매일 바뀌어 캐시가 맞지 않으므로 Saabas
+- Secrets : `HF_TOKEN`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` (`web/.vercel/project.json`)
+- 로컬에서 HF 데이터로 작업 : `MLB_DATA=store`, 캐시 위치 `MLB_CACHE`(기본 `data_cache/`), 테스트 저장소 `MLB_STORE=<폴더>`
+- `requirements.txt` 버전은 모델을 학습한 로컬 환경과 같게 유지한다 (joblib 호환)
