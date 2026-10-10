@@ -5,6 +5,7 @@
 !/README.md
 !/CLAUDE.md
 !/stuff_pipeline.py
+!/stuff_model.py
 !/stuff_pipeline_*.ipynb
 !/export_web_data.py
 !/compute_shap.py

@@ -8,6 +8,7 @@ on:
       - 'web/**'
       - 'models/**'
       - 'stuff_pipeline.py'
+      - 'stuff_model.py'
       - 'export_web_data.py'
       - 'data_store.py'
       - 'ops.py'

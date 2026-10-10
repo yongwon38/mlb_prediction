@@ -32,6 +32,7 @@
   - v1 은 루킹 삼진도 y = 0 으로 포함했으나 **v2 부터 루킹 삼진은 제외** (`build_stuff_dataset(..., include_looking_k=False)`)
 - 모델 : **베이스라인은 LGBM**. 사용자가 추후 3단계 모델을 직접 만들어 교체할 예정이다.
   - 교체 지점은 `stuff_pipeline.fit_stuff_model(X_tr, y_tr, X_es, y_es) -> model(.predict)` 하나로 유지한다.
+  - 웹·SHAP 캐시에 쓰려면 모델이 `stuff_model.py` 인터페이스(`predict`, `categories`, `explain(X, exact) -> (기여, 기준값)`, `method`)를 갖춰야 한다. `기준값 + 기여 합 = 예측`이 정확히 성립해야 구위 산출 근거가 표시된다. LGBM 은 불러올 때 `LGBMStuffModel` 로 감싸고(TreeSHAP / Saabas), 커스텀 모델(예 : HOF-Net)은 이 메서드를 갖춘 객체를 `stage3_stuff_lgbm.joblib` 로 저장하면 그대로 쓰인다
   - 새 모델과 비교할 때는 반드시 동일 split, 동일 표본, 동일 지표(RMSE/MAE/R², 분위별 실제값, 검증기간 whiff% 상관)를 사용한다.
   - 튜닝은 학습셋 내부 홀드아웃(학습셋 마지막 2주)으로만 수행하고 검증셋은 최종 평가에만 사용한다.
 
@@ -56,6 +57,7 @@
 ## 4. 코드/폴더 규칙
 ```
 stuff_pipeline.py              단계별 공통 함수 (로드·분할·피처·캘리브레이션·모델)
+stuff_model.py                 3단계 모델 인터페이스 (predict / categories / explain / method) + LGBM 어댑터 (TreeSHAP·Saabas)
 stuff_pipeline_YYMMDD.ipynb    파이프라인 실행 노트북 (날짜 접미사 YYMMDD)
 models/                        학습된 모델 (joblib)
 outputs/                       예측 결과, 지표, 그림
@@ -101,7 +103,7 @@ data_status.json               데이터 기준일 (daily 가 커밋)
 ## 7. 클라우드 운영 (무료, 로컬 PC 없이 동작)
 - 구성 : GitHub Actions(공개 레포 무료) + Hugging Face 데이터셋 `elcax1/mlb-statcast`(공개) + Vercel Hobby(`stuff-lab`)
 - **daily** (매일 15:00 KST) : 현재 시즌 최근 3일 Statcast 재수집 -> 경기 단위 교체 -> 바뀌었으면 현재 시즌 SHAP 증분 계산 -> export -> 배포 -> `data_status.json` 커밋
-- **deploy** (main push) : HF 의 웹 데이터 스냅샷(`web_data/{web_id}/`)으로 빌드·배포. `web_id` = 3·4단계 모델 + `export_web_data.py` + `stuff_pipeline.py` 해시 -> 모델·export 코드가 바뀌면 스냅샷이 없으므로 전 시즌 자동 재생성
+- **deploy** (main push) : HF 의 웹 데이터 스냅샷(`web_data/{web_id}/`)으로 빌드·배포. `web_id` = 3·4단계 모델 + `export_web_data.py` + `stuff_pipeline.py` + `stuff_model.py` 해시 -> 모델·export 코드가 바뀌면 스냅샷이 없으므로 전 시즌 자동 재생성
 - **SHAP 캐시** = 투구 키 + 피처 해시(`compute_shap.feature_hash`). 키·해시가 같은 투구는 재사용, 새 투구와 피처가 바뀐 투구만 계산 (`--incremental`)
   - 진행 중 시즌은 새 투구가 들어오면 그 투수의 주 패스트볼 평균이 바뀌어 시즌 전체 피처가 바뀜 -> 하루 약 12~14만 구 재계산 (daily, 25만 구 초과면 건너뛰고 그날은 Saabas)
   - **shap** (models push / 매월 / 수동) : 캐시 없는 시즌을 8조각 병렬 계산 -> 합치기 -> 해당 시즌 재생성. 처음 계산·모델 변경 후용

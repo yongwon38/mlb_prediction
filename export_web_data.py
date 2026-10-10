@@ -23,6 +23,7 @@ import numpy as np
 import pandas as pd
 
 import data_store
+import stuff_model as sm
 import stuff_pipeline as sp
 
 MODEL_VERSION = 'v2'
@@ -126,37 +127,6 @@ SHAP_DIR = os.path.join(CFG['outputs'], 'shap')    # compute_shap.py 가 만드�
 KEY = ['game_pk', 'at_bat_number', 'pitch_number', 'pitcher']
 
 
-def saabas_contrib(booster, X):
-    """Saabas(경로 기반) 기여 : 트리마다 루트 -> 리프 경로에서 분기 변수에 노드값 변화를 귀속.
-    리프별 기여 벡터를 미리 만들어 두고 pred_leaf 로 조회 -> 수 분 안에 전체 시즌 계산. bias + 합 = 예측 (정확)"""
-    F = X.shape[1]
-    trees = booster.dump_model()['tree_info']
-    table = np.zeros((len(trees), max(t['num_leaves'] for t in trees), F))
-    bias = 0.0
-    for ti, tr in enumerate(trees):
-        root = tr['tree_structure']
-        if 'leaf_value' in root:
-            bias += root['leaf_value']
-            continue
-        bias += root['internal_value']
-        stack = [(root, np.zeros(F))]
-        while stack:
-            node, acc = stack.pop()
-            for ch in (node['left_child'], node['right_child']):
-                val = ch['leaf_value'] if 'leaf_index' in ch else ch['internal_value']
-                a = acc.copy()
-                a[node['split_feature']] += val - node['internal_value']
-                if 'leaf_index' in ch:
-                    table[ti, ch['leaf_index']] = a
-                else:
-                    stack.append((ch, a))
-    leaves = booster.predict(X, pred_leaf=True)
-    contrib = np.zeros((len(X), F))
-    for ti in range(len(trees)):
-        contrib += table[ti, leaves[:, ti]]
-    return contrib, bias
-
-
 def load_shap_cache(season, keys):
     """compute_shap.py 의 정확한 SHAP 캐시 (모든 투구가 있을 때만 사용). 반환 (contrib, base) 또는 None
 
@@ -175,7 +145,9 @@ def load_shap_cache(season, keys):
 
 
 def explain_contrib(model, scaler, X, pred, score, season, keys):
-    """투구별 요인 그룹 기여 (구위 점수 단위). 반환 : (n, 그룹 수) 배열, 기준 점수 S0, 방법('shap'|'saabas')
+    """투구별 요인 그룹 기여 (구위 점수 단위). 반환 : (n, 그룹 수) 배열, 기준 점수 S0, 방법(model.method)
+
+    정확한 기여 캐시(compute_shap.py)가 있으면 그것을, 없으면 model.explain(X, exact=False) 근사를 쓴다 (stuff_model.py)
 
     기여 phi_ij 는 예측(타구질, 낮을수록 좋음) 단위 -> k_i = (s_i - S0) / (pred_i - base) 로 비례 배분해
     S0 + sum_j c_ij = s_i 가 정확히 성립하게 한다. pred 가 base 와 거의 같으면 스케일러 수치 미분을 쓴다
@@ -187,10 +159,10 @@ def explain_contrib(model, scaler, X, pred, score, season, keys):
         cached = None
     if cached is not None:
         contrib, base = cached
-        method = 'shap'
+        method = model.method(exact=True)
     else:
-        contrib, base = saabas_contrib(model.booster_, X)
-        method = 'saabas'
+        contrib, base = model.explain(X, exact=False)
+        method = model.method(exact=False)
     assert np.abs(base + contrib.sum(axis=1) - pred).max() < 1e-6, '기여 합 != 예측'
     S0 = float(scaler.transform([base])[0])
     diff = pred - base
@@ -225,7 +197,7 @@ def stuff_frame(raw, model):
         x['ivb_diff'] = x['pfx_z'] - x['fb_ivb']
         parts.append(x)
     d = pd.concat(parts)
-    for col, cats in zip(sp.STUFF_CAT_FEATURES, model.booster_.pandas_categorical):
+    for col, cats in zip(sp.STUFF_CAT_FEATURES, model.categories):
         d[col] = pd.Categorical(d[col].astype(str), categories=cats)
     return d[d['pitch_type'].notna()]    # 학습 시 없던 구종 제외
 
@@ -797,7 +769,7 @@ def main():
     OUT_DIR = args.out
     np.random.seed(sp.SEED)
     print(f'모델 {MODEL_VERSION} : {CFG["dir"]}')
-    model = joblib.load(os.path.join(CFG['dir'], 'stage3_stuff_lgbm.joblib'))
+    model = sm.load_model(CFG['dir'])
     scaler = joblib.load(os.path.join(CFG['dir'], 'stage4_stuff_scaler.joblib'))
     os.makedirs(OUT_DIR, exist_ok=True)
     for season in args.seasons or SEASONS:

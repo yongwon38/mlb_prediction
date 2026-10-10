@@ -18,10 +18,10 @@ import argparse
 import os
 import time
 
-import joblib
 import numpy as np
 import pandas as pd
 
+import stuff_model as sm
 import stuff_pipeline as sp
 import export_web_data as ew
 
@@ -32,7 +32,7 @@ def season_frame(season, path, model):
     """export_web_data.score_season 과 같은 행·같은 피처 (구종 범주 정렬 포함)"""
     raw = sp.load_regular_season(path, year=season)
     d = sp.add_stuff_features(raw)
-    for col, cats in zip(sp.STUFF_CAT_FEATURES, model.booster_.pandas_categorical):
+    for col, cats in zip(sp.STUFF_CAT_FEATURES, model.categories):
         d[col] = pd.Categorical(d[col].astype(str), categories=cats)
     d = d[d['pitch_type'].notna()]
     return d[ew.CFG['features']], d[ew.KEY].astype('int64').to_numpy()
@@ -62,7 +62,8 @@ def compute(season, path, model, extra=False):
         part = os.path.join(part_dir, f'{k:04d}.npy')
         if os.path.exists(part):
             continue
-        c = model.booster_.predict(X.iloc[k * CHUNK:(k + 1) * CHUNK], pred_contrib=True, num_threads=os.cpu_count())
+        cc, b = model.explain(X.iloc[k * CHUNK:(k + 1) * CHUNK], exact=True)
+        c = np.column_stack([cc, np.full(len(cc), b)])    # 마지막 열 = 기준값
         np.save(part, c.astype(np.float64))
         done = k + 1
         el = time.time() - t0
@@ -125,9 +126,7 @@ def update(season, path, model, extra=False, shard=None, n_shards=1, max_rows=No
     t0 = time.time()
     for a in range(0, len(idx), CHUNK):
         rows = idx[a:a + CHUNK]
-        c = model.booster_.predict(X.iloc[rows], pred_contrib=True, num_threads=os.cpu_count())
-        contrib[rows] = c[:, :-1]
-        base = float(c[0, -1])
+        contrib[rows], base = model.explain(X.iloc[rows], exact=True)
         print(f'  {a + len(rows):,}/{len(idx):,} ({(time.time() - t0) / 60:.1f}분 경과)', flush=True)
     if shard is not None:
         np.savez(shard_path(tag, shard, n_shards), contrib=contrib[idx], base=base if base is not None else np.nan,
@@ -149,7 +148,7 @@ def main():
     ap.add_argument('--n-shards', type=int, default=1)
     ap.add_argument('--max-rows', type=int, help='(증분) 계산할 투구가 이보다 많으면 건너뜀')
     args = ap.parse_args()
-    model = joblib.load(os.path.join(ew.CFG['dir'], 'stage3_stuff_lgbm.joblib'))
+    model = sm.load_model(ew.CFG['dir'])
     os.makedirs(ew.SHAP_DIR, exist_ok=True)
     kw = dict(shard=args.shard, n_shards=args.n_shards, max_rows=args.max_rows)
     for season in args.seasons or list(ew.SEASONS):

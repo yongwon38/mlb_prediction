@@ -19,7 +19,7 @@ import tarfile
 import data_store as ds
 
 STATUS_FILE = 'data_status.json'
-WEB_CODE = ['export_web_data.py', 'stuff_pipeline.py']    # 웹 산출물에 영향을 주는 코드
+WEB_CODE = ['export_web_data.py', 'stuff_pipeline.py', 'stuff_model.py']    # 웹 산출물에 영향을 주는 코드
 
 
 def _out(**kv):
@@ -38,14 +38,19 @@ def _ew():
 
 
 def model_id():
-    ew = _ew()
-    return ds.file_id(os.path.join(ew.CFG['dir'], 'stage3_stuff_lgbm.joblib'))
+    """3단계 모델 파일 해시 (SHAP 캐시 경로). 파일이 하나면 그 파일 해시 그대로"""
+    import stuff_model as sm
+    files = sm.model_files(_ew().CFG['dir'])
+    if len(files) == 1:
+        return ds.file_id(files[0])
+    return ds.hashlib.sha256(''.join(ds.file_id(f) for f in files).encode()).hexdigest()[:12]
 
 
 def web_id():
     """모델(3·4단계) + export 코드가 같으면 같은 id -> 바뀌면 지난 시즌 스냅샷이 자동으로 missing 이 되어 재생성된다"""
+    import stuff_model as sm
     ew = _ew()
-    files = [os.path.join(ew.CFG['dir'], f) for f in ('stage3_stuff_lgbm.joblib', 'stage4_stuff_scaler.joblib')] + WEB_CODE
+    files = sm.model_files(ew.CFG['dir']) + [os.path.join(ew.CFG['dir'], 'stage4_stuff_scaler.joblib')] + WEB_CODE
     h = ''.join(ds.file_id(f) for f in files)
     return ds.hashlib.sha256(h.encode()).hexdigest()[:12]
 
