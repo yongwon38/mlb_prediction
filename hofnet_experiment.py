@@ -1,7 +1,9 @@
 """
 HOF-Net vs LGBM(운영 v3) 비교 실험 — 같은 변수·표본·split·지표 (stuff_pipeline_261010_hofnet.ipynb 와 같은 코드)
 
-실행 : python hofnet_experiment.py [--smoke]      (--smoke : 표본 2만 구, 2 epoch 로 코드 점검)
+실행 : python hofnet_experiment.py [--smoke] [--no-pitch-type]
+       --smoke : 표본 2만 구, 2 epoch 로 코드 점검
+       --no-pitch-type : 구종(pitch_type) 변수를 빼고 HOF-Net·비교용 LGBM 학습 (출력 outputs/hofnet_nopt/)
 입력 : outputs/vaa_exp/cache/ (3차 실험 캐시), models/v3 (운영 LGBM)
 출력 : outputs/hofnet/ (비교표 csv, 학습 기록, 요약 json, 모델 state_dict(.pt, git 제외))
 """
@@ -24,7 +26,8 @@ SMOKE = '--smoke' in sys.argv
 SEED = 42
 torch.manual_seed(SEED); np.random.seed(SEED)
 torch.set_num_threads(min(12, os.cpu_count()))
-OUT = os.path.join('outputs', 'hofnet')
+NOPT = '--no-pitch-type' in sys.argv
+OUT = os.path.join('outputs', 'hofnet_nopt' if NOPT else 'hofnet')
 CACHE = os.path.join('outputs', 'vaa_exp', 'cache')
 os.makedirs(OUT, exist_ok=True)
 T0 = time.time()
@@ -36,9 +39,9 @@ num = lambda s: s.to_numpy('float64', na_value=np.nan)
 # ---------------------------------------------------------------------------
 v3 = sm.load_model(os.path.join('models', 'v3'))
 v3_scaler = joblib_load = __import__('joblib').load(os.path.join('models', 'v3', 'stage4_stuff_scaler.joblib'))
-FEATS = v3.features
+FEATS = [f for f in v3.features if not (NOPT and f == 'pitch_type')]   # 구종 제외 실험 : 14개
 NUM = [f for f in FEATS if f not in sp.STUFF_CAT_FEATURES]
-CAT = sp.STUFF_CAT_FEATURES
+CAT = [c for c in sp.STUFF_CAT_FEATURES if c in FEATS]
 WEB = ['pa_event', 'is_swing', 'is_whiff', 'result', 'xwoba', 'plate_z_norm']
 cols = sorted(set(v3.input_features) | {'pitcher', 'game_date', 'description', 'type', 'estimated_woba_using_speedangle', 'zone',
                                         'plate_x', 'waste'} | set(WEB))
@@ -117,6 +120,12 @@ q = {a: lgb.LGBMRegressor(objective='quantile', alpha=a, **params).fit(Xfit, fit
 qr = {'RMSE': np.sqrt(mean_squared_error(y_va, q[0.5])), 'MAE': mean_absolute_error(y_va, q[0.5]), 'R2': r2_score(y_va, q[0.5]),
       '커버리지 90%': float(np.mean((y_va >= q[0.05]) & (y_va <= q[0.95]))), '90% 구간 평균 폭': float(np.mean(q[0.95] - q[0.05]))}
 res['LGBM 분위 회귀 (5·50·95%)'] = qr
+LGB_NOPT = None
+if NOPT:    # 사과 대 사과 : 같은 14개 변수 + v3 와 같은 하이퍼파라미터의 LGBM (HAVAA 계수도 v3 그대로)
+    lgbm_np = lgb.LGBMRegressor(**v3.lgbm.get_params()).fit(Xfit[FEATS], fit_rows['y3'])
+    LGB_NOPT = sm.AngleAdjustedStuffModel(lgbm_np, FEATS, v3.vaa_coef, vaa_default=getattr(v3, 'vaa_default', None))
+    lgn_fit, lgn_va = LGB_NOPT.predict(fit_rows[v3.input_features]), LGB_NOPT.predict(va_rows[v3.input_features])
+    res['LGBM 구종 제외 + 상수 분산'] = prob_metrics(lgn_va, np.full(len(lgn_va), float(np.std(fit_rows['y3'].to_numpy() - lgn_fit)) ** 2))
 hof_va = {}
 for k, net in nets.items():
     p = hn.predict(net, va_t)
@@ -138,6 +147,8 @@ def season_pred(k):
     for y in fr:
         if k == 'LGBM v3':
             out[y] = v3.predict(fr[y][v3.input_features])
+        elif k == 'LGBM 구종 제외':
+            out[y] = LGB_NOPT.predict(fr[y][v3.input_features])
         else:
             out[y] = hn.predict(nets[k], T(fr[y]))['mean']
     return out
@@ -174,7 +185,7 @@ def buckets(d, col):
     return pd.DataFrame({lab: ew.outcome_rates(d[bins == lab]) for lab in ew.STUFF_BIN_LABELS}).T
 
 scalers, stuff_cols, rows = {}, {}, {}
-for k in ['LGBM v3'] + list(nets):
+for k in ['LGBM v3'] + (['LGBM 구종 제외'] if NOPT else []) + list(nets):
     pred = season_pred(k)
     sc = v3_scaler if k == 'LGBM v3' else sp.StuffScaler().fit(pred[2025][is_tr & ~d25['waste'].to_numpy()])
     scalers[k] = sc
@@ -228,26 +239,44 @@ log('근거 비교 대상', EK, best_rmse)
 s26 = fr[2026].sample(20000 if not SMOKE else 3000, random_state=SEED)
 X26 = s26[v3.input_features]
 hof = hn.HOFNetStuffModel(nets[EK], prep, v3)
+groups = [g for g, _ in ew.EXPLAIN_GROUPS]
+targets = [('LGBM v3', TreeShapV3(v3), v3, scalers['LGBM v3'])]
+if NOPT:
+    targets.append(('LGBM 구종 제외', TreeShapV3(LGB_NOPT), LGB_NOPT, scalers['LGBM 구종 제외']))
+for k in dict.fromkeys([EK, 'A0-βNLL', 'A5', 'A5-βNLL']):
+    if k in nets:
+        m_ = hn.HOFNetStuffModel(nets[k], prep, v3)
+        targets.append((f'HOF-Net {k}', m_, m_, scalers[k]))
 expl = {}
-for k, model, sc in [('LGBM v3', TreeShapV3(v3), scalers['LGBM v3']), (HK, hof, scalers[EK])]:
-    pred = (v3 if k == 'LGBM v3' else hof).predict(X26)
+for k, model, pm, sc in targets:
+    pred = pm.predict(X26)
     score = sc.transform(pred)
     c, S0, method = ew.explain_contrib(model, sc, X26, pred, score, 2026, None)
-    err = float(np.abs(S0 + c.sum(1) - score).max())
-    expl[k] = {'c': c, 'S0': S0, 'method': method, 'score': score, 'additivity_err_points': err}
-    log(f'근거 {k} : method {method}, S0 {S0:.2f}, 가법성 오차 {err:.2e}')
-groups = [g for g, _ in ew.EXPLAIN_GROUPS]
-agree = {}
-for j, g in enumerate(groups):
-    a, b = expl['LGBM v3']['c'][:, j], expl[HK]['c'][:, j]
-    agree[g] = {'LGBM 평균 |기여| (점)': float(np.abs(a).mean()), 'HOF 평균 |기여| (점)': float(np.abs(b).mean()),
-                '투구별 상관': float(np.corrcoef(a, b)[0, 1]) if a.std() > 0 and b.std() > 0 else np.nan}
-agree = pd.DataFrame(agree).T
+    err = np.abs(S0 + c.sum(1) - score)
+    expl[k] = {'c': c, 'S0': S0, 'method': method, 'score': score, 'additivity_err_points': float(err.max())}
+    log(f'근거 {k} : method {method}, S0 {S0:.2f}, 가법성 오차 최대 {err.max():.2e} · 99% {np.quantile(err, 0.99):.2e}')
+rows_e = {}
+for k, e in expl.items():
+    c = e['c']
+    share = np.abs(c).mean(0) / np.abs(c).mean(0).sum()
+    r = {'method': e['method'], '기준 점수 S0': e['S0'], '가법성 오차 최대 (점)': e['additivity_err_points'],
+         **{f'{g} 비중': float(share[j]) for j, g in enumerate(groups)}}
+    for ref in [t[0] for t in targets if t[0].startswith('LGBM')]:
+        if ref == k:
+            continue
+        cr = expl[ref]['c']
+        r[f'[{ref}] 구위 상관'] = float(np.corrcoef(e['score'], expl[ref]['score'])[0, 1])
+        r[f'[{ref}] 최대 + 요인 일치율'] = float(np.mean(cr.argmax(1) == c.argmax(1)))
+        r[f'[{ref}] 최대 − 요인 일치율'] = float(np.mean(cr.argmin(1) == c.argmin(1)))
+        for j, g in enumerate(groups):
+            r[f'[{ref}] {g} 투구별 상관'] = float(np.corrcoef(cr[:, j], c[:, j])[0, 1]) if cr[:, j].std() > 0 and c[:, j].std() > 0 else np.nan
+    rows_e[k] = r
+agree = pd.DataFrame(rows_e)
+agree.to_csv(os.path.join(OUT, 'explain_agreement_variants.csv'), encoding='utf-8-sig')
 ca, cb = expl['LGBM v3']['c'], expl[HK]['c']
 top_up = float(np.mean(ca.argmax(1) == cb.argmax(1)))
 top_dn = float(np.mean(ca.argmin(1) == cb.argmin(1)))
-agree.to_csv(os.path.join(OUT, 'explain_agreement.csv'), encoding='utf-8-sig')
-log('근거 일치도\n' + agree.round(3).to_string() + f'\n  최대 + 요인 일치 {top_up:.1%}, 최대 − 요인 일치 {top_dn:.1%}')
+log('근거 일치도 (버전별)' + chr(10) + agree.round(3).to_string())
 
 ex_rows = []
 pick = {'HOF 고득점 FF': s26.assign(sc=expl[HK]['score'])[s26['pitch_type'].astype(str) == 'FF']['sc'].idxmax(),

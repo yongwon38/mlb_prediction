@@ -32,6 +32,11 @@
 !/outputs/hofnet/*.csv
 !/outputs/hofnet/*.json
 !/outputs/hofnet/*_log.txt
+!/outputs/hofnet_nopt/
+/outputs/hofnet_nopt/*
+!/outputs/hofnet_nopt/*.csv
+!/outputs/hofnet_nopt/*.json
+!/outputs/hofnet_nopt/*_log.txt
 
 # 클라우드 운영 (GitHub Actions + HF 데이터셋 + Vercel)
 !/.github/

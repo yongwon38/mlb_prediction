@@ -1,0 +1,247 @@
+﻿[     4s] 표본 train 151051 holdout 15845 valid 35291
+[     4s] --- HOF-Net A0 {'cov': 'full', 'latent': True} β=1.0 β-NLL=0.0
+[    17s]    epoch 1 train_nll 0.45980 train_kl 8.80525 holdout_nll -0.35038 holdout_rmse 0.17048 nan_batches 0 chol_fail 0 tau_max 1.85659
+[    29s]    epoch 2 train_nll -0.35493 train_kl 0.62855 holdout_nll -0.35393 holdout_rmse 0.17054 nan_batches 0 chol_fail 0 tau_max 1.86485
+[    42s]    epoch 3 train_nll -0.35660 train_kl 0.34111 holdout_nll -0.35246 holdout_rmse 0.17049 nan_batches 0 chol_fail 0 tau_max 1.85976
+[    55s]    epoch 4 train_nll -0.35810 train_kl 0.23204 holdout_nll -0.35359 holdout_rmse 0.17049 nan_batches 0 chol_fail 0 tau_max 1.82815
+[    68s]    epoch 5 train_nll -0.35731 train_kl 0.18861 holdout_nll -0.35473 holdout_rmse 0.17047 nan_batches 0 chol_fail 0 tau_max 1.89596
+[    81s]    epoch 6 train_nll -0.35845 train_kl 0.16083 holdout_nll -0.35597 holdout_rmse 0.17051 nan_batches 0 chol_fail 0 tau_max 1.90535
+[    94s]    epoch 7 train_nll -0.35910 train_kl 0.14643 holdout_nll -0.35405 holdout_rmse 0.17052 nan_batches 0 chol_fail 0 tau_max 1.82466
+[   107s]    epoch 8 train_nll -0.35910 train_kl 0.13346 holdout_nll -0.35391 holdout_rmse 0.17049 nan_batches 0 chol_fail 0 tau_max 1.85147
+[   120s]    epoch 9 train_nll -0.35923 train_kl 0.12100 holdout_nll -0.35556 holdout_rmse 0.17053 nan_batches 0 chol_fail 0 tau_max 1.94080
+[   132s]    epoch 10 train_nll -0.36032 train_kl 0.10953 holdout_nll -0.35656 holdout_rmse 0.17055 nan_batches 0 chol_fail 0 tau_max 1.92601
+[   144s]    epoch 11 train_nll -0.35962 train_kl 0.10186 holdout_nll -0.35642 holdout_rmse 0.17051 nan_batches 0 chol_fail 0 tau_max 1.77906
+[   157s]    epoch 12 train_nll -0.36005 train_kl 0.09648 holdout_nll -0.35550 holdout_rmse 0.17050 nan_batches 0 chol_fail 0 tau_max 1.83945
+[   169s]    epoch 13 train_nll -0.36048 train_kl 0.09485 holdout_nll -0.35645 holdout_rmse 0.17057 nan_batches 0 chol_fail 0 tau_max 1.84108
+[   181s]    epoch 14 train_nll -0.36076 train_kl 0.09923 holdout_nll -0.35703 holdout_rmse 0.17048 nan_batches 0 chol_fail 0 tau_max 1.84465
+[   194s]    epoch 15 train_nll -0.36057 train_kl 0.09441 holdout_nll -0.35710 holdout_rmse 0.17048 nan_batches 0 chol_fail 0 tau_max 1.92519
+[   206s]    epoch 16 train_nll -0.35956 train_kl 0.07948 holdout_nll -0.35631 holdout_rmse 0.17053 nan_batches 0 chol_fail 0 tau_max 1.77701
+[   218s]    epoch 17 train_nll -0.36104 train_kl 0.07560 holdout_nll -0.35552 holdout_rmse 0.17056 nan_batches 0 chol_fail 0 tau_max 1.73940
+[   231s]    epoch 18 train_nll -0.36099 train_kl 0.07966 holdout_nll -0.35462 holdout_rmse 0.17052 nan_batches 0 chol_fail 0 tau_max 1.84567
+[   246s]    epoch 19 train_nll -0.36224 train_kl 0.07261 holdout_nll -0.35544 holdout_rmse 0.17057 nan_batches 0 chol_fail 0 tau_max 1.80330
+[   246s]   A0 학습 242초, 19 epoch
+[   246s] --- HOF-Net A0-β0.1 {'cov': 'full', 'latent': True} β=0.1 β-NLL=0.0
+[   260s]    epoch 1 train_nll -0.05597 train_kl 11.81108 holdout_nll -0.34557 holdout_rmse 0.17043 nan_batches 0 chol_fail 0 tau_max 2.23674
+[   273s]    epoch 2 train_nll -0.35273 train_kl 1.39493 holdout_nll -0.35031 holdout_rmse 0.17050 nan_batches 0 chol_fail 0 tau_max 1.97354
+[   285s]    epoch 3 train_nll -0.35499 train_kl 0.69594 holdout_nll -0.35298 holdout_rmse 0.17046 nan_batches 0 chol_fail 0 tau_max 1.99775
+[   297s]    epoch 4 train_nll -0.35761 train_kl 0.43704 holdout_nll -0.35457 holdout_rmse 0.17047 nan_batches 0 chol_fail 0 tau_max 1.81402
+[   310s]    epoch 5 train_nll -0.35673 train_kl 0.32753 holdout_nll -0.35685 holdout_rmse 0.17045 nan_batches 0 chol_fail 0 tau_max 1.79775
+[   323s]    epoch 6 train_nll -0.35817 train_kl 0.27000 holdout_nll -0.35628 holdout_rmse 0.17047 nan_batches 0 chol_fail 0 tau_max 1.88967
+[   335s]    epoch 7 train_nll -0.35863 train_kl 0.23699 holdout_nll -0.35567 holdout_rmse 0.17049 nan_batches 0 chol_fail 0 tau_max 1.83343
+[   348s]    epoch 8 train_nll -0.35924 train_kl 0.21717 holdout_nll -0.35582 holdout_rmse 0.17050 nan_batches 0 chol_fail 0 tau_max 1.90270
+[   360s]    epoch 9 train_nll -0.35946 train_kl 0.20424 holdout_nll -0.35591 holdout_rmse 0.17050 nan_batches 0 chol_fail 0 tau_max 1.90622
+[   360s]   A0-β0.1 학습 115초, 9 epoch
+[   360s] --- HOF-Net A0-β0.01 {'cov': 'full', 'latent': True} β=0.01 β-NLL=0.0
+[   374s]    epoch 1 train_nll -0.28942 train_kl 17.80621 holdout_nll -0.33260 holdout_rmse 0.17062 nan_batches 0 chol_fail 0 tau_max 1.88481
+[   387s]    epoch 2 train_nll -0.35264 train_kl 3.63332 holdout_nll -0.35152 holdout_rmse 0.17036 nan_batches 0 chol_fail 0 tau_max 1.92081
+[   401s]    epoch 3 train_nll -0.35433 train_kl 1.92600 holdout_nll -0.35219 holdout_rmse 0.17014 nan_batches 0 chol_fail 0 tau_max 1.92720
+[   414s]    epoch 4 train_nll -0.35628 train_kl 1.34818 holdout_nll -0.35230 holdout_rmse 0.17002 nan_batches 0 chol_fail 0 tau_max 1.85344
+[   427s]    epoch 5 train_nll -0.35766 train_kl 1.08531 holdout_nll -0.35593 holdout_rmse 0.17017 nan_batches 0 chol_fail 0 tau_max 1.85661
+[   439s]    epoch 6 train_nll -0.35949 train_kl 0.94360 holdout_nll -0.35854 holdout_rmse 0.17004 nan_batches 0 chol_fail 0 tau_max 1.90231
+[   451s]    epoch 7 train_nll -0.35875 train_kl 0.87428 holdout_nll -0.35436 holdout_rmse 0.17028 nan_batches 0 chol_fail 0 tau_max 1.80963
+[   464s]    epoch 8 train_nll -0.35985 train_kl 0.79043 holdout_nll -0.35680 holdout_rmse 0.17044 nan_batches 0 chol_fail 0 tau_max 1.85728
+[   476s]    epoch 9 train_nll -0.36164 train_kl 0.76321 holdout_nll -0.35950 holdout_rmse 0.16988 nan_batches 0 chol_fail 0 tau_max 1.83997
+[   489s]    epoch 10 train_nll -0.36153 train_kl 0.74390 holdout_nll -0.35370 holdout_rmse 0.17011 nan_batches 0 chol_fail 0 tau_max 1.84190
+[   501s]    epoch 11 train_nll -0.36278 train_kl 0.71356 holdout_nll -0.35929 holdout_rmse 0.17002 nan_batches 0 chol_fail 0 tau_max 1.83260
+[   514s]    epoch 12 train_nll -0.36216 train_kl 0.71375 holdout_nll -0.35840 holdout_rmse 0.17011 nan_batches 0 chol_fail 0 tau_max 1.88956
+[   526s]    epoch 13 train_nll -0.36242 train_kl 0.67724 holdout_nll -0.35922 holdout_rmse 0.16995 nan_batches 0 chol_fail 0 tau_max 1.77067
+[   526s]   A0-β0.01 학습 166초, 13 epoch
+[   526s] --- HOF-Net A1 {'cov': 'diag', 'latent': True} β=1.0 β-NLL=0.0
+[   539s]    epoch 1 train_nll 0.13069 train_kl 2.05414 holdout_nll -0.34802 holdout_rmse 0.17046 nan_batches 0 chol_fail 0 tau_max 1.55727
+[   550s]    epoch 2 train_nll -0.35569 train_kl 0.04625 holdout_nll -0.35419 holdout_rmse 0.17048 nan_batches 0 chol_fail 0 tau_max 1.54057
+[   562s]    epoch 3 train_nll -0.35598 train_kl 0.02803 holdout_nll -0.34981 holdout_rmse 0.17048 nan_batches 0 chol_fail 0 tau_max 1.53142
+[   573s]    epoch 4 train_nll -0.35826 train_kl 0.01934 holdout_nll -0.35306 holdout_rmse 0.17050 nan_batches 0 chol_fail 0 tau_max 1.52790
+[   585s]    epoch 5 train_nll -0.35728 train_kl 0.01497 holdout_nll -0.35663 holdout_rmse 0.17048 nan_batches 0 chol_fail 0 tau_max 1.50783
+[   596s]    epoch 6 train_nll -0.35919 train_kl 0.01254 holdout_nll -0.35688 holdout_rmse 0.17050 nan_batches 0 chol_fail 0 tau_max 1.51555
+[   607s]    epoch 7 train_nll -0.35966 train_kl 0.01051 holdout_nll -0.35735 holdout_rmse 0.17051 nan_batches 0 chol_fail 0 tau_max 1.50586
+[   618s]    epoch 8 train_nll -0.35970 train_kl 0.01000 holdout_nll -0.35761 holdout_rmse 0.17049 nan_batches 0 chol_fail 0 tau_max 1.50239
+[   630s]    epoch 9 train_nll -0.35996 train_kl 0.00812 holdout_nll -0.35780 holdout_rmse 0.17053 nan_batches 0 chol_fail 0 tau_max 1.49974
+[   641s]    epoch 10 train_nll -0.36145 train_kl 0.00813 holdout_nll -0.35781 holdout_rmse 0.17052 nan_batches 0 chol_fail 0 tau_max 1.49888
+[   652s]    epoch 11 train_nll -0.36108 train_kl 0.00663 holdout_nll -0.35846 holdout_rmse 0.17051 nan_batches 0 chol_fail 0 tau_max 1.50013
+[   663s]    epoch 12 train_nll -0.36059 train_kl 0.00669 holdout_nll -0.35158 holdout_rmse 0.17049 nan_batches 0 chol_fail 0 tau_max 1.50061
+[   675s]    epoch 13 train_nll -0.36049 train_kl 0.00652 holdout_nll -0.35457 holdout_rmse 0.17050 nan_batches 0 chol_fail 0 tau_max 1.49610
+[   686s]    epoch 14 train_nll -0.36154 train_kl 0.00552 holdout_nll -0.35914 holdout_rmse 0.17047 nan_batches 0 chol_fail 0 tau_max 1.50366
+[   697s]    epoch 15 train_nll -0.36199 train_kl 0.00563 holdout_nll -0.35751 holdout_rmse 0.17049 nan_batches 0 chol_fail 0 tau_max 1.50367
+[   708s]    epoch 16 train_nll -0.36168 train_kl 0.00515 holdout_nll -0.35246 holdout_rmse 0.17053 nan_batches 0 chol_fail 0 tau_max 1.50267
+[   720s]    epoch 17 train_nll -0.36181 train_kl 0.00538 holdout_nll -0.35790 holdout_rmse 0.17058 nan_batches 0 chol_fail 0 tau_max 1.50158
+[   731s]    epoch 18 train_nll -0.36245 train_kl 0.00490 holdout_nll -0.35817 holdout_rmse 0.17052 nan_batches 0 chol_fail 0 tau_max 1.49679
+[   731s]   A1 학습 205초, 18 epoch
+[   731s] --- HOF-Net A5 {'cov': 'full', 'latent': False} β=1.0 β-NLL=0.0
+[   742s]    epoch 1 train_nll -0.29995 train_kl 0.00000 holdout_nll -0.35240 holdout_rmse 0.17005 nan_batches 0 chol_fail 0 tau_max 1.88138
+[   751s]    epoch 2 train_nll -0.36195 train_kl 0.00000 holdout_nll -0.35315 holdout_rmse 0.17026 nan_batches 0 chol_fail 0 tau_max 1.95976
+[   761s]    epoch 3 train_nll -0.36426 train_kl 0.00000 holdout_nll -0.35660 holdout_rmse 0.16971 nan_batches 0 chol_fail 0 tau_max 2.06135
+[   770s]    epoch 4 train_nll -0.36531 train_kl 0.00000 holdout_nll -0.35725 holdout_rmse 0.16920 nan_batches 0 chol_fail 0 tau_max 2.07302
+[   779s]    epoch 5 train_nll -0.36678 train_kl 0.00000 holdout_nll -0.35590 holdout_rmse 0.17015 nan_batches 0 chol_fail 0 tau_max 2.12272
+[   788s]    epoch 6 train_nll -0.36880 train_kl 0.00000 holdout_nll -0.36616 holdout_rmse 0.16899 nan_batches 0 chol_fail 0 tau_max 2.15814
+[   797s]    epoch 7 train_nll -0.37107 train_kl 0.00000 holdout_nll -0.36409 holdout_rmse 0.16965 nan_batches 0 chol_fail 0 tau_max 2.16977
+[   807s]    epoch 8 train_nll -0.37106 train_kl 0.00000 holdout_nll -0.36260 holdout_rmse 0.16942 nan_batches 0 chol_fail 0 tau_max 2.25173
+[   816s]    epoch 9 train_nll -0.37237 train_kl 0.00000 holdout_nll -0.36378 holdout_rmse 0.16919 nan_batches 0 chol_fail 0 tau_max 2.34259
+[   825s]    epoch 10 train_nll -0.37296 train_kl 0.00000 holdout_nll -0.36095 holdout_rmse 0.16913 nan_batches 0 chol_fail 0 tau_max 2.33528
+[   825s]   A5 학습 94초, 10 epoch
+[   825s] --- HOF-Net A0-βNLL {'cov': 'full', 'latent': True} β=0.01 β-NLL=0.5
+[   839s]    epoch 1 train_nll -0.28847 train_kl 17.21429 holdout_nll -0.34363 holdout_rmse 0.17029 nan_batches 0 chol_fail 0 tau_max 1.95017
+[   852s]    epoch 2 train_nll -0.35216 train_kl 5.36524 holdout_nll -0.35044 holdout_rmse 0.17010 nan_batches 0 chol_fail 0 tau_max 1.93904
+[   866s]    epoch 3 train_nll -0.35439 train_kl 3.61983 holdout_nll -0.35259 holdout_rmse 0.17018 nan_batches 0 chol_fail 0 tau_max 1.98676
+[   880s]    epoch 4 train_nll -0.35696 train_kl 2.87993 holdout_nll -0.35241 holdout_rmse 0.17009 nan_batches 0 chol_fail 0 tau_max 2.14238
+[   894s]    epoch 5 train_nll -0.35822 train_kl 2.50918 holdout_nll -0.35376 holdout_rmse 0.17015 nan_batches 0 chol_fail 0 tau_max 2.03585
+[   909s]    epoch 6 train_nll -0.35939 train_kl 2.24268 holdout_nll -0.35702 holdout_rmse 0.17018 nan_batches 0 chol_fail 0 tau_max 2.00777
+[   922s]    epoch 7 train_nll -0.35849 train_kl 2.05244 holdout_nll -0.35616 holdout_rmse 0.17019 nan_batches 0 chol_fail 0 tau_max 2.04902
+[   935s]    epoch 8 train_nll -0.35981 train_kl 1.89643 holdout_nll -0.35845 holdout_rmse 0.17020 nan_batches 0 chol_fail 0 tau_max 2.12210
+[   948s]    epoch 9 train_nll -0.36075 train_kl 1.77541 holdout_nll -0.35539 holdout_rmse 0.17028 nan_batches 0 chol_fail 0 tau_max 2.03026
+[   961s]    epoch 10 train_nll -0.36118 train_kl 1.69080 holdout_nll -0.35217 holdout_rmse 0.17012 nan_batches 0 chol_fail 0 tau_max 1.93824
+[   974s]    epoch 11 train_nll -0.36163 train_kl 1.61346 holdout_nll -0.35890 holdout_rmse 0.17008 nan_batches 0 chol_fail 0 tau_max 1.97694
+[   986s]    epoch 12 train_nll -0.36214 train_kl 1.57653 holdout_nll -0.35694 holdout_rmse 0.17019 nan_batches 0 chol_fail 0 tau_max 2.01050
+[  1000s]    epoch 13 train_nll -0.36187 train_kl 1.53404 holdout_nll -0.35844 holdout_rmse 0.17018 nan_batches 0 chol_fail 0 tau_max 2.00931
+[  1014s]    epoch 14 train_nll -0.36360 train_kl 1.48113 holdout_nll -0.35807 holdout_rmse 0.17014 nan_batches 0 chol_fail 0 tau_max 2.04288
+[  1027s]    epoch 15 train_nll -0.36353 train_kl 1.44947 holdout_nll -0.35928 holdout_rmse 0.17004 nan_batches 0 chol_fail 0 tau_max 2.00350
+[  1039s]    epoch 16 train_nll -0.36409 train_kl 1.39836 holdout_nll -0.34726 holdout_rmse 0.17002 nan_batches 0 chol_fail 0 tau_max 2.01123
+[  1052s]    epoch 17 train_nll -0.36406 train_kl 1.38395 holdout_nll -0.35962 holdout_rmse 0.17005 nan_batches 0 chol_fail 0 tau_max 2.02391
+[  1064s]    epoch 18 train_nll -0.36554 train_kl 1.39938 holdout_nll -0.35661 holdout_rmse 0.17003 nan_batches 0 chol_fail 0 tau_max 1.97083
+[  1077s]    epoch 19 train_nll -0.36663 train_kl 1.33931 holdout_nll -0.35830 holdout_rmse 0.17005 nan_batches 0 chol_fail 0 tau_max 2.06377
+[  1090s]    epoch 20 train_nll -0.36660 train_kl 1.33330 holdout_nll -0.35493 holdout_rmse 0.16996 nan_batches 0 chol_fail 0 tau_max 1.92704
+[  1103s]    epoch 21 train_nll -0.36849 train_kl 1.33372 holdout_nll -0.35915 holdout_rmse 0.16998 nan_batches 0 chol_fail 0 tau_max 1.98619
+[  1103s]   A0-βNLL 학습 278초, 21 epoch
+[  1103s] --- HOF-Net A5-βNLL {'cov': 'full', 'latent': False} β=1.0 β-NLL=0.5
+[  1114s]    epoch 1 train_nll -0.27024 train_kl 0.00000 holdout_nll -0.34629 holdout_rmse 0.17087 nan_batches 0 chol_fail 0 tau_max 1.66749
+[  1123s]    epoch 2 train_nll -0.36101 train_kl 0.00000 holdout_nll -0.35570 holdout_rmse 0.16936 nan_batches 0 chol_fail 0 tau_max 1.73448
+[  1133s]    epoch 3 train_nll -0.36314 train_kl 0.00000 holdout_nll -0.35550 holdout_rmse 0.16952 nan_batches 0 chol_fail 0 tau_max 1.81828
+[  1142s]    epoch 4 train_nll -0.36440 train_kl 0.00000 holdout_nll -0.35822 holdout_rmse 0.16928 nan_batches 0 chol_fail 0 tau_max 1.95624
+[  1151s]    epoch 5 train_nll -0.36721 train_kl 0.00000 holdout_nll -0.35640 holdout_rmse 0.16981 nan_batches 0 chol_fail 0 tau_max 2.09075
+[  1161s]    epoch 6 train_nll -0.36952 train_kl 0.00000 holdout_nll -0.36341 holdout_rmse 0.16916 nan_batches 0 chol_fail 0 tau_max 2.05254
+[  1170s]    epoch 7 train_nll -0.37100 train_kl 0.00000 holdout_nll -0.36197 holdout_rmse 0.16977 nan_batches 0 chol_fail 0 tau_max 2.15274
+[  1179s]    epoch 8 train_nll -0.37093 train_kl 0.00000 holdout_nll -0.36123 holdout_rmse 0.16969 nan_batches 0 chol_fail 0 tau_max 2.20355
+[  1189s]    epoch 9 train_nll -0.37311 train_kl 0.00000 holdout_nll -0.36113 holdout_rmse 0.16941 nan_batches 0 chol_fail 0 tau_max 2.21173
+[  1198s]    epoch 10 train_nll -0.37343 train_kl 0.00000 holdout_nll -0.35650 holdout_rmse 0.16931 nan_batches 0 chol_fail 0 tau_max 2.17666
+[  1198s]   A5-βNLL 학습 95초, 10 epoch
+[  1223s] 점·확률 예측
+                        LGBM v3 + 상수 분산  LGBM v3 + 이분산 오차 모델  LGBM 분위 회귀 (5·50·95%)  LGBM 구종 제외 + 상수 분산  HOF-Net A0  HOF-Net A0-β0.1  HOF-Net A0-β0.01  HOF-Net A1  HOF-Net A5  HOF-Net A0-βNLL  HOF-Net A5-βNLL
+RMSE                             0.1682               0.1682                 0.1881              0.1682      0.1701           0.1701            0.1694      0.1701      0.1686           0.1696           0.1686
+MAE                              0.1224               0.1224                 0.0959              0.1224      0.1254           0.1257            0.1223      0.1251      0.1235           0.1235           0.1216
+R2                               0.0224               0.0224                -0.2227              0.0222     -0.0001           0.0002            0.0086      0.0000      0.0178           0.0061           0.0173
+NLL                             -0.3634              -0.3706                    NaN             -0.3634     -0.3609          -0.3616           -0.3635     -0.3626     -0.3695          -0.3635          -0.3694
+CRPS                             0.0873               0.0871                    NaN              0.0873      0.0885           0.0884            0.0880      0.0886      0.0876           0.0878           0.0870
+커버리지 50%                         0.6837               0.7810                    NaN              0.6858      0.7894           0.7522            0.8167      0.7771      0.7206           0.7859           0.7658
+커버리지 80%                         0.8838               0.8928                    NaN              0.8834      0.8849           0.8829            0.8903      0.8886      0.8901           0.8847           0.8844
+커버리지 90%                         0.9257               0.9232                 0.9392              0.9261      0.9283           0.9259            0.9298      0.9299      0.9255           0.9235           0.9207
+커버리지 95%                         0.9425               0.9414                    NaN              0.9425      0.9440           0.9431            0.9455      0.9449      0.9429           0.9420           0.9408
+보정 오차 (평균 |커버리지 − 명목|)           0.0752               0.1014                    NaN              0.0757      0.1022           0.0920            0.1103      0.1002      0.0858           0.1005           0.0950
+90% 구간 평균 폭                      0.5433               0.5602                 0.4355              0.5434      0.5578           0.5499            0.5812      0.5693      0.5575           0.5555           0.5495
+[  1238s] 구위 지표 LGBM v3 완료
+[  1251s] 구위 지표 LGBM 구종 제외 완료
+[  1286s] 구위 지표 A0 완료
+[  1321s] 구위 지표 A0-β0.1 완료
+[  1355s] 구위 지표 A0-β0.01 완료
+[  1387s] 구위 지표 A1 완료
+[  1420s] 구위 지표 A5 완료
+[  1454s] 구위 지표 A0-βNLL 완료
+[  1488s] 구위 지표 A5-βNLL 완료
+[  1488s] 구위 지표
+                             LGBM v3  LGBM 구종 제외       A0  A0-β0.1  A0-β0.01       A1       A5  A0-βNLL  A5-βNLL
+검증 투수×구종 ρ(구위, whiff%)        0.7187      0.7172  -0.1222   0.0160    0.6687  -0.1309   0.6643   0.6591   0.6198
+검증 투수×구종 ρ(구위, xwOBAcon)     -0.2464     -0.2435   0.0060   0.0284   -0.2141   0.1337  -0.2419  -0.2313  -0.2102
+검증 투수 ρ(구위, whiff%)           0.5565      0.5430  -0.0268   0.0660    0.4515  -0.0002   0.4883   0.4609   0.4982
+2024 BA 격차                    0.1152      0.1125   0.0028  -0.0014    0.0787   0.0215   0.1065   0.0863   0.1068
+2024 Whiff 격차                 0.2469      0.2450  -0.0141   0.0023    0.2168   0.0011   0.2353   0.2181   0.2178
+2026 BA 격차                    0.1239      0.1224   0.0019   0.0050    0.0883   0.0067   0.1140   0.0911   0.1195
+2026 Whiff 격차                 0.2418      0.2405  -0.0158  -0.0003    0.2147  -0.0263   0.2312   0.2158   0.2215
+안정성 r(구위 2024, 구위 2025)       0.9417      0.9396   0.9600   0.8825    0.9588   0.9092   0.9429   0.9509   0.9323
+예측력 ρ(구위 2024, whiff% 2025)   0.7706      0.7669  -0.2036   0.0390    0.7339  -0.0699   0.7083   0.7142   0.6809
+안정성 r(구위 2025, 구위 2026)       0.9372      0.9330   0.9531   0.8622    0.9616   0.8900   0.9417   0.9521   0.9298
+예측력 ρ(구위 2025, whiff% 2026)   0.7777      0.7761  -0.1902   0.0389    0.7605  -0.0997   0.7334   0.7330   0.6976
+투수×구종 내 corr(점수, 높이 정규화)     -0.0694     -0.0730  -0.0518  -0.0547   -0.0661  -0.0311  -0.1059  -0.0775  -0.0870
+투수×구종 내 corr(점수, |plate_x|)   0.0242      0.0230   0.0098   0.0073    0.0120   0.0008   0.0267   0.0124   0.0210
+사구 평균 점수 (raw)               50.8367     50.9788  52.3471  50.2328   50.4828  51.6094  51.1298  51.6335  51.0388
+상위 1% 중 존 밖 볼 비율 (raw)        0.4159      0.4194   0.3815   0.3501    0.4078   0.3679   0.4121   0.4107   0.4121
+LGBM 과의 투구별 점수 상관 (2026)         NaN      0.9702  -0.0135   0.0385    0.7280   0.0348   0.8543   0.7433   0.8281
+LGBM 과의 투수×구종 평균 상관 (2026)       NaN      0.9871  -0.1321   0.0104    0.8561  -0.0557   0.9067   0.8517   0.8753
+[  1488s] 근거 비교 대상 A0-β0.01 {'A0': 0.17047400643901695, 'A0-β0.1': 0.17043046572620382, 'A0-β0.01': 0.16988072465334123, 'A1': 0.1704579175381497, 'A5': 0.1689930026586011, 'A0-βNLL': 0.16996082461517417, 'A5-βNLL': 0.16915831985823207}
+[  1514s] 근거 LGBM v3 : method shap, S0 50.60, 가법성 오차 최대 3.32e-03 · 99% 1.42e-13
+[  1538s] 근거 LGBM 구종 제외 : method shap, S0 50.58, 가법성 오차 최대 1.71e-03 · 99% 1.56e-13
+[  1538s] 근거 HOF-Net A0-β0.01 : method hof-additive, S0 50.38, 가법성 오차 최대 2.79e-03 · 99% 7.11e-15
+[  1539s] 근거 HOF-Net A0-βNLL : method hof-additive, S0 52.67, 가법성 오차 최대 1.45e-02 · 99% 5.32e-03
+[  1540s] 근거 HOF-Net A5 : method hof-additive, S0 70.36, 가법성 오차 최대 4.63e-03 · 99% 7.11e-15
+[  1540s] 근거 HOF-Net A5-βNLL : method hof-additive, S0 75.05, 가법성 오차 최대 7.68e-03 · 99% 7.11e-15
+[  1541s] 근거 일치도 (버전별)
+                               LGBM v3 LGBM 구종 제외 HOF-Net A0-β0.01 HOF-Net A0-βNLL    HOF-Net A5 HOF-Net A5-βNLL
+method                            shap       shap     hof-additive    hof-additive  hof-additive    hof-additive
+기준 점수 S0                     50.596556  50.575838        50.377878       52.667694     70.357339       75.054169
+가법성 오차 최대 (점)                  0.00332   0.001707         0.002785        0.014509      0.004627        0.007685
+구속 비중                         0.187228   0.281791         0.027409        0.169757      0.103379        0.147238
+수직 무브먼트 비중                    0.152756   0.207314         0.010484        0.014878      0.169654        0.202679
+수평 무브먼트 비중                    0.138072   0.132835         0.069145        0.111875      0.172259        0.110964
+진입각 비중                         0.07756   0.102144         0.030584        0.011235      0.057371        0.083165
+릴리스 위치 비중                     0.076993   0.082061         0.111546        0.026429      0.119076        0.111073
+익스텐션 비중                       0.038165   0.039364         0.012452        0.041862      0.023059        0.047069
+회전 비중                         0.075115   0.090044         0.020412        0.527916       0.31945        0.269154
+구종·투구손 비중                      0.25411   0.064446         0.717967        0.096047      0.035753        0.028658
+[LGBM 구종 제외] 구위 상관            0.969658        NaN         0.736988        0.751473      0.861977        0.830486
+[LGBM 구종 제외] 최대 + 요인 일치율        0.4575        NaN          0.09095          0.1369       0.17165         0.20525
+[LGBM 구종 제외] 최대 − 요인 일치율       0.48925        NaN          0.05915          0.1099         0.056          0.1347
+[LGBM 구종 제외] 구속 투구별 상관        0.782054        NaN         0.260388        0.762109       0.47318        0.292351
+[LGBM 구종 제외] 수직 무브먼트 투구별 상관   0.950072        NaN        -0.050707        0.471977      0.128295        0.649024
+[LGBM 구종 제외] 수평 무브먼트 투구별 상관   0.952667        NaN         0.374305         0.15672      0.458724       -0.027101
+[LGBM 구종 제외] 진입각 투구별 상관       0.948292        NaN        -0.073521        0.451207      0.111134       -0.069616
+[LGBM 구종 제외] 릴리스 위치 투구별 상관    0.901566        NaN         0.143412        0.132765      0.187343         0.22242
+[LGBM 구종 제외] 익스텐션 투구별 상관      0.958174        NaN        -0.655267        0.237411      0.089235        0.214605
+[LGBM 구종 제외] 회전 투구별 상관        0.919321        NaN         0.156738        0.312901      0.321715        0.385985
+[LGBM 구종 제외] 구종·투구손 투구별 상관    0.267839        NaN         0.071916        0.453512      0.470212        0.524804
+[LGBM v3] 구위 상관                    NaN   0.969658         0.729559        0.745275      0.856277        0.827175
+[LGBM v3] 최대 + 요인 일치율              NaN     0.4575          0.38785         0.11105        0.2535           0.173
+[LGBM v3] 최대 − 요인 일치율              NaN    0.48925          0.26735         0.11445       0.05865           0.131
+[LGBM v3] 구속 투구별 상관                NaN   0.782054         0.213487        0.585115      0.587816        0.507301
+[LGBM v3] 수직 무브먼트 투구별 상관           NaN   0.950072        -0.054585        0.418328      0.263132        0.639801
+[LGBM v3] 수평 무브먼트 투구별 상관           NaN   0.952667         0.377612        0.144003      0.375573       -0.116035
+[LGBM v3] 진입각 투구별 상관               NaN   0.948292        -0.099793        0.441792      0.092513       -0.062236
+[LGBM v3] 릴리스 위치 투구별 상관            NaN   0.901566          0.15478        0.114031      0.128992        0.246841
+[LGBM v3] 익스텐션 투구별 상관              NaN   0.958174        -0.653426        0.160338      0.103539        0.237441
+[LGBM v3] 회전 투구별 상관                NaN   0.919321        -0.013189        0.289234      0.290174        0.322722
+[LGBM v3] 구종·투구손 투구별 상관            NaN   0.267839         0.778071        0.201182      0.250332        0.207106
+[  1541s] 근거 예시
+            투구  구종                모델  기준 점수    구속  수직 무브먼트  수평 무브먼트  진입각  릴리스 위치  익스텐션    회전  구종·투구손    구위
+0   HOF 고득점 FF  FF           LGBM v3   50.6   9.9      5.0      0.7  6.3     2.2   1.2   2.5     1.5  80.0
+1   HOF 고득점 FF  FF        LGBM 구종 제외   50.6   9.9      5.4      1.3  6.2     2.6   1.5   3.0    -0.5  80.0
+2   HOF 고득점 FF  FF  HOF-Net A0-β0.01   50.4  -0.2     -0.2      1.1  0.1     0.4   0.6  -0.1     9.5  61.6
+3   HOF 고득점 FF  FF   HOF-Net A0-βNLL   52.7  -3.7     -0.2      1.8  0.0     0.4   5.2   8.5    -0.0  64.7
+4   HOF 고득점 FF  FF        HOF-Net A5   70.4   2.0     12.7     -1.2 -0.6     2.2   0.3  -5.8     0.0  80.0
+5   HOF 고득점 FF  FF   HOF-Net A5-βNLL   75.1   2.7      0.4      1.7 -0.9     4.9   0.3  -4.6     0.5  80.0
+6   HOF 고득점 SL  SL           LGBM v3   50.6   4.8      2.6      1.9  0.9    -0.7  -0.0   2.7     4.3  67.0
+7   HOF 고득점 SL  SL        LGBM 구종 제외   50.6   6.6      4.4      1.7  1.7    -0.4  -0.1   3.0    -0.4  67.0
+8   HOF 고득점 SL  SL  HOF-Net A0-β0.01   50.4   0.9     -0.1      0.9  1.4     4.5  -0.0  -0.7    22.7  80.0
+9   HOF 고득점 SL  SL   HOF-Net A0-βNLL   52.7   2.1      0.1      0.8  0.1     0.5   0.0   6.8     0.5  63.5
+10  HOF 고득점 SL  SL        HOF-Net A5   70.4   1.5     -1.4     -3.6 -0.5     5.0  -0.1  -0.5    -0.5  70.3
+11  HOF 고득점 SL  SL   HOF-Net A5-βNLL   75.1  -0.6      0.2     -4.1 -2.4     6.5  -1.3  -2.6     0.3  71.1
+12     HOF 저득점  EP           LGBM v3   50.6 -15.4      3.9      5.2 -0.6    -0.3  -3.7  -3.0    -5.1  31.6
+13     HOF 저득점  EP        LGBM 구종 제외   50.6 -15.5      2.0      3.3 -2.4     0.1  -7.3  -1.3    -0.7  28.7
+14     HOF 저득점  EP  HOF-Net A0-β0.01   50.4 -28.3      0.1      0.3  6.9    -4.0   0.3   0.0    -5.7  20.0
+15     HOF 저득점  EP   HOF-Net A0-βNLL   52.7 -12.7     -0.6     -0.9 -0.0    -0.3 -14.8  -2.7    -0.6  20.0
+16     HOF 저득점  EP        HOF-Net A5   70.4 -37.3      9.8    -15.3  0.5    21.1   2.8 -25.4    -1.3  25.2
+17     HOF 저득점  EP   HOF-Net A5-βNLL   75.1  -3.4    -22.1     -3.6 -7.8   -13.0   2.6  -4.7    -3.1  20.0
+[  1594s] 불확실성 · OOD
+                                         A0  A0-β0.1  A0-β0.01       A1  A0-βNLL
+U_latent 평균 (2025 검증)               0.00011  0.00011   0.00033  0.00006  0.00021
+U_alea 평균 (2025 검증)                 0.02884  0.02809   0.03122  0.03023  0.02880
+U_latent 비중 (2025 검증)               0.00368  0.00397   0.01031  0.00204  0.00739
+OOD 구속 >98 vs ≤95 AUROC (U_latent)  0.49535  0.48781   0.57709  0.39972  0.38913
+OOD 구속 >98 / ≤95 U_latent 평균비       0.73034  0.54824   1.05195  0.77052  0.93779
+2026 / 2025 검증 U_latent 평균비         1.01984  0.95952   0.97480  0.99385  0.98442
+[  1595s] 붕괴 점검
+             β  β-NLL  마지막 epoch 학습 KL (투구당)  홀드아웃 RMSE (최저)  상수 예측 RMSE  상수 대비 RMSE 개선 %  검증 예측 표준편차  epoch       학습 초
+A0        1.00    0.0                0.07261         0.17047     0.17048          0.00390     0.00009   19.0  241.82659
+A0-β0.1   0.10    0.0                0.20424         0.17043     0.17048          0.02944     0.00142    9.0  114.70968
+A0-β0.01  0.01    0.0                0.67724         0.16988     0.17048          0.35190     0.00884   13.0  165.87161
+A1        1.00    0.0                0.00490         0.17046     0.17048          0.01333     0.00033   18.0  204.93770
+A5        1.00    0.0                0.00000         0.16899     0.17048          0.87262     0.02453   10.0   94.05361
+A0-βNLL   0.01    0.5                1.33372         0.16996     0.17048          0.30492     0.00642   21.0  277.71658
+A5-βNLL   1.00    0.5                0.00000         0.16916     0.17048          0.77565     0.02257   10.0   94.67560
+[  1595s] Go/No-Go {
+ "점검 대상": "A0-β0.01",
+ "Check 1 : Σ 최소 고윳값 (≥ −ε)": 0.003798490459956138,
+ "Check 2 : NaN 배치 / Cholesky 실패": "0 / 0",
+ "Check 3 : 마지막 epoch 학습 KL (붕괴 아님 > 0.01)": 0.6772437931782586,
+ "Check 4 : τ 최대 (폭주 아님)": 1.9272031784057617,
+ "Check 5 : MC M=16 평균 최대 오차 / 분산 평균 상대오차": "2.32e-02 / 0.003",
+ "Check 5 : MC M=32 평균 최대 오차 / 분산 평균 상대오차": "1.55e-02 / 0.002",
+ "Check 5 : MC M=64 평균 최대 오차 / 분산 평균 상대오차": "9.75e-03 / 0.002",
+ "Check 6 : 대각(A1) 먼저 정상 동작 (A1 학습 완료, NaN 0)": "18 epoch, NaN 0"
+}
+[  1595s] 끝
