@@ -78,15 +78,45 @@ def _num(s):
     return s.to_numpy('float64', na_value=np.nan)
 
 
-def _group_resid(X, y, xs, keys, coef):
-    """그룹별 선형회귀 잔차 y − (b0 + Σ b·x). coef : {(키 값, ...): 계수}. 계수가 없는 그룹은 NaN"""
+def _group_resid(X, y, xs, keys, coef, default=None):
+    """그룹별 선형회귀 잔차 y − (b0 + Σ b·x). coef : {(키 값, ...): 계수}.
+    계수가 없는 그룹은 default(공통 계수)로 계산 (default 가 없으면 NaN). 입력(y·x)이 결측인 투구만 NaN"""
     res = np.full(len(X), np.nan)
     kv = list(zip(*[X[k].astype(str) for k in keys]))
     A = np.column_stack([np.ones(len(X))] + [x for x in xs])
+    done = np.zeros(len(X), bool)
     for k, b in coef.items():
         m = np.fromiter((t == k for t in kv), bool, len(kv))
         res[m] = y[m] - A[m] @ b
+        done |= m
+    if default is not None and (~done).any():
+        res[~done] = y[~done] - A[~done] @ np.asarray(default)
     return res
+
+
+def fit_group_coef(df, y, xs, keys, min_own=500, min_intercept=30):
+    """구종(×투구손)별 보정 계수 (vaa ~ plate_z 등).
+    - min_own 구 이상 그룹 : 그룹 자체 선형회귀 (v3 최초 규칙과 같음)
+    - 그보다 적은 그룹 : 공통 기울기(그룹별 절편을 둔 within 회귀) + 그룹 평균 절편 (min_intercept 구 미만이면 공통 절편)
+    반환 : (coef, default). default = 학습에 없던 그룹용 공통 계수 [절편, 기울기...]"""
+    d = df[keys + [y] + xs].copy()
+    for c in [y] + xs:
+        d[c] = d[c].astype(float)
+    d = d.dropna()
+    key = d[keys].astype(str).apply(tuple, axis=1)
+    dm = d[[y] + xs] - d[[y] + xs].groupby(key).transform('mean')
+    slope = np.linalg.lstsq(dm[xs].to_numpy(), dm[y].to_numpy(), rcond=None)[0]
+    resid = d[y].to_numpy() - d[xs].to_numpy() @ slope
+    default = np.r_[resid.mean(), slope]
+    coef = {}
+    for k, idx in key.groupby(key).groups.items():
+        g = d.loc[idx]
+        if len(g) >= min_own:
+            A = np.column_stack([np.ones(len(g))] + [g[x].to_numpy() for x in xs])
+            coef[k] = np.linalg.lstsq(A, g[y].to_numpy(), rcond=None)[0]
+        elif len(g) >= min_intercept:
+            coef[k] = np.r_[resid[key.index.get_indexer(idx)].mean(), slope]
+    return coef, default
 
 
 class AngleAdjustedStuffModel:
@@ -99,22 +129,26 @@ class AngleAdjustedStuffModel:
       기여(explain)는 vaa_aa -> vaa, haa_aa -> haa 열로 돌려주고 위치 열은 0 이다
     """
 
-    def __init__(self, lgbm, features, vaa_coef, haa_coef=None):
+    def __init__(self, lgbm, features, vaa_coef, haa_coef=None, vaa_default=None, haa_default=None):
         self.lgbm = lgbm
         self.features = list(features)          # LGBM 입력 (vaa_aa / haa_aa 포함)
         self.vaa_coef = vaa_coef                # {(pitch_type,): [a, b]}
         self.haa_coef = haa_coef                # {(pitch_type, p_throws): [a, b, c]} 또는 None
+        self.vaa_default = vaa_default          # 계수가 없는 구종용 공통 계수 (fit_group_coef). 없으면 NaN
+        self.haa_default = haa_default
         base = [f for f in self.features if f not in ('vaa_aa', 'haa_aa')]
         self.input_features = base + ['vaa', 'plate_z'] + (['haa', 'plate_x'] if haa_coef else [])
 
     def adjusted(self, X):
         """보정 진입각 열 (vaa_aa, haa_aa)"""
-        out = {'vaa_aa': _group_resid(X, _num(X['vaa']), [_num(X['plate_z'])], ['pitch_type'], self.vaa_coef)}
+        out = {'vaa_aa': _group_resid(X, _num(X['vaa']), [_num(X['plate_z'])], ['pitch_type'], self.vaa_coef,
+                                      getattr(self, 'vaa_default', None))}
         if self.haa_coef:
             lefty = (X['p_throws'].astype(str) == 'L').to_numpy()
             haa_raw = np.where(lefty, -_num(X['haa']), _num(X['haa']))
             rel_x_raw = np.where(lefty, -_num(X['release_pos_x']), _num(X['release_pos_x']))
-            out['haa_aa'] = _group_resid(X, haa_raw, [_num(X['plate_x']), rel_x_raw], ['pitch_type', 'p_throws'], self.haa_coef)
+            out['haa_aa'] = _group_resid(X, haa_raw, [_num(X['plate_x']), rel_x_raw], ['pitch_type', 'p_throws'], self.haa_coef,
+                                         getattr(self, 'haa_default', None))
         return out
 
     def model_frame(self, X):

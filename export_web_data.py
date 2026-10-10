@@ -224,6 +224,10 @@ def score_season(df, model, scaler, season):
     d[EXPLAIN_COLS] = c
     if CFG['drop_waste']:
         scored = ~sp.is_unscored(d)
+        for col in ('vaa_aa', 'haa_aa'):    # 보정 진입각은 점수가 있는 투구에서 결측이면 안 된다 (계수 누락 = 모델 파일 문제)
+            if col in d.columns and d.loc[scored, col].isna().any():
+                bad = d.loc[scored & d[col].isna(), 'pitch_type'].astype(str).value_counts().to_dict()
+                raise ValueError(f'{col} 결측 (점수 대상 투구) : {bad}')
         d['stuff_score'] = d['stuff_score'].where(scored)    # 터무니없는 위치의 볼 + 사구 : 점수 없음
         print(f"  점수 제외 : waste 볼 {sp.is_waste_ball(d).sum():,} + 사구 {(d['description'] == 'hit_by_pitch').sum():,}"
               f" + 트래킹 없음 {sp.is_no_tracking(d).sum():,}")
