@@ -68,7 +68,7 @@ export interface LeagueExplain {
   groups: string[]; // 요인 그룹 이름
   groupFeatures: string[][];
   overall: number[]; // 리그 전체 평균 그룹 기여
-  pitchTypes: Record<string, { n: number; feat: Record<string, number>; contrib: number[] }>;
+  pitchTypes: Record<string, { n: number; feat: Record<string, number | null>; contrib: number[] }>;
   method?: "shap" | "saabas"; // 기여 계산 방법
 }
 

@@ -61,13 +61,13 @@ export function PitchDetail({ p, lg }: { p: ExplainPitch; lg: LeagueExplain }) {
             const v = p.f[k];
             const r = ref?.[k];
             const g = GROUP_FEATS.findIndex((fs) => fs.includes(k));
-            if ((v === null || v === undefined) && r === undefined) return null; // 이 모델 버전에 없는 값 (예 : 보정 HAA)
+            if (v == null && r == null) return null; // 이 모델 버전에 없는 값 (예 : 보정 HAA)
             return (
               <tr key={k} className="border-b border-grid last:border-0">
                 <td className="py-1.5 text-ink-2">{t.feat[k]}</td>
-                <td className="py-1.5 text-right text-ink font-medium">{v === null ? "-" : `${v.toFixed(info.nd)}${info.unit}`}</td>
-                <td className="py-1.5 text-right text-ink-2">{r === undefined ? "-" : r.toFixed(info.nd)}</td>
-                <td className="py-1.5 text-right text-ink-2">{v === null || r === undefined ? "-" : fmtSigned(v - r, info.nd)}</td>
+                <td className="py-1.5 text-right text-ink font-medium">{v == null ? "-" : `${v.toFixed(info.nd)}${info.unit}`}</td>
+                <td className="py-1.5 text-right text-ink-2">{r == null ? "-" : r.toFixed(info.nd)}</td>
+                <td className="py-1.5 text-right text-ink-2">{v == null || r == null ? "-" : fmtSigned(v - r, info.nd)}</td>
                 <td className="py-1.5 text-right pl-2 text-ink-2">{g >= 0 ? `${groups[g]} ${fmtSigned(p.c![g], 1)}` : ""}</td>
               </tr>
             );

@@ -225,7 +225,8 @@ def score_season(df, model, scaler, season):
     if CFG['drop_waste']:
         scored = ~sp.is_unscored(d)
         d['stuff_score'] = d['stuff_score'].where(scored)    # 터무니없는 위치의 볼 + 사구 : 점수 없음
-        print(f"  점수 제외 : waste 볼 {sp.is_waste_ball(d).sum():,} + 사구 {(d['description'] == 'hit_by_pitch').sum():,}")
+        print(f"  점수 제외 : waste 볼 {sp.is_waste_ball(d).sum():,} + 사구 {(d['description'] == 'hit_by_pitch').sum():,}"
+              f" + 트래킹 없음 {sp.is_no_tracking(d).sum():,}")
         d.loc[~scored, EXPLAIN_COLS] = np.nan
     for col in sp.STUFF_CAT_FEATURES:
         d[col] = d[col].astype(str)
@@ -504,11 +505,11 @@ def explain_league(d, S0):
     pts = {}
     for pt, g in d.groupby('pitch_type'):
         pts[pt] = {'n': int(len(g)),
-                   'feat': {k: round(float(g[src].mean()), 2) for k, (src, _) in EXPLAIN_FEATS.items()},
-                   'contrib': [round(float(v), 2) for v in g[EXPLAIN_COLS].mean()]}
+                   'feat': {k: _num(g[src].mean(), 2) for k, (src, _) in EXPLAIN_FEATS.items()},
+                   'contrib': [_num(v, 2) for v in g[EXPLAIN_COLS].mean()]}
     return {'base': round(S0, 3), 'groups': [n for n, _ in EXPLAIN_GROUPS],
             'groupFeatures': [fs for _, fs in EXPLAIN_GROUPS],
-            'overall': [round(float(v), 2) for v in d[EXPLAIN_COLS].mean()], 'pitchTypes': pts}
+            'overall': [_num(v, 2) for v in d[EXPLAIN_COLS].mean()], 'pitchTypes': pts}
 
 
 def outcome_rates(g):
@@ -544,7 +545,7 @@ def league_payload(d, valid_start=None):
             'pitchQuantiles': np.round(np.percentile(g['stuff_score'], [5, 25, 50, 75, 95]), 2).tolist(),
             'pitcherPercentiles': (np.round(np.percentile(per_pitcher, pct), 2).tolist()
                                    if len(per_pitcher) >= 10 else None),
-            'velo': round(float(g['release_speed'].mean()), 1),
+            'velo': _num(g['release_speed'].mean(), 1),
             **{k: (round(v, 4) if v is not None else None) for k, v in outcome_rates(g).items()},
         }
 
@@ -566,13 +567,14 @@ def league_payload(d, valid_start=None):
 
 
 def dump(obj, path):
+    """allow_nan=False : NaN 은 JSON 이 아니라 브라우저가 파일 전체를 못 읽는다 -> 배포 전에 export 를 실패시킨다"""
     with open(path, 'w', encoding='utf-8') as f:
-        json.dump(obj, f, ensure_ascii=False, separators=(',', ':'))
+        json.dump(obj, f, ensure_ascii=False, separators=(',', ':'), allow_nan=False)
 
 
 def dump_gz(obj, path):
     """투수별 파일은 gzip 으로 저장 (배포 용량 121MB -> 약 28MB, 브라우저에서 DecompressionStream 으로 해제)"""
-    raw = json.dumps(obj, ensure_ascii=False, separators=(',', ':')).encode('utf-8')
+    raw = json.dumps(obj, ensure_ascii=False, separators=(',', ':'), allow_nan=False).encode('utf-8')
     with open(path, 'wb') as f:
         f.write(gzip.compress(raw, compresslevel=9, mtime=0))
 
@@ -672,13 +674,13 @@ def summary_payload(d, pitchers, games, pas):
             'pitches': int(m.sum()),
             'pitchers': int(x['pitcher'].nunique()),
             'games': int(x['game_pk'].nunique()),
-            'stuff': round(float(x['stuff_score'].mean()), 2),
+            'stuff': _num(x['stuff_score'].mean(), 2),
             'rates': {k: (round(v, 4) if v is not None else None) for k, v in outcome_rates(x).items()},
             'buckets': [{'label': lab, **{k: (round(v, 4) if v is not None else None)
                                           for k, v in outcome_rates(x[bins[m] == lab]).items()}} for lab in STUFF_BIN_LABELS],
             'minPitches': SUMMARY_MIN_PITCHES[gt],
             'leaders': [{'id': int(pid), 'name': info[pid]['name'], 'teams': info[pid]['teams'], 'n': int(r['size']),
-                         'stuff': round(float(r['mean']), 2)} for pid, r in leaders.iterrows()],
+                         'stuff': _num(r['mean'], 2)} for pid, r in leaders.iterrows()],
             'impGames': games_json(g_.sort_values('imp', ascending=False).head(10)),
             'stuffGames': games_json(g_[g_['n'] >= HIGHLIGHT_MIN_LEAGUE_GAME_PITCHES].sort_values('s', ascending=False).head(10)),
             'impPas': records_json(p_.reindex(p_['wpa'].abs().sort_values(ascending=False).index).head(10), PA_ND),

@@ -45,7 +45,7 @@ export function featVsLeague(ps: ExplainPitch[], key: string, lg: LeagueExplain)
   for (const p of scored(ps)) {
     const v = p.f[key];
     const ref = lg.pitchTypes[p.pt]?.feat[key];
-    if (v === null || v === undefined || ref === undefined) continue;
+    if (v === null || v === undefined || ref === null || ref === undefined) continue;
     sv += v;
     sd += v - ref;
     n++;

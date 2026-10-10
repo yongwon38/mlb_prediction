@@ -237,9 +237,14 @@ def is_waste_ball(df):
     return df['description'].isin(BALL_DESC) & waste
 
 
+def is_no_tracking(df):
+    """트래킹이 없는 투구 (구속·진입각·투구 높이 중 하나라도 결측). 물리량이 없어 구위를 매길 근거가 없다 (시즌당 0~3구)"""
+    return df[[c for c in ('release_speed', 'vaa', 'plate_z') if c in df.columns]].isna().any(axis=1)
+
+
 def is_unscored(df):
-    """화면에서 구위 점수를 매기지 않는 투구 : waste 볼 + 사구 (사구도 터무니없는 위치의 공)"""
-    return is_waste_ball(df) | (df['description'] == 'hit_by_pitch')
+    """화면에서 구위 점수를 매기지 않는 투구 : waste 볼 + 사구 (사구도 터무니없는 위치의 공) + 트래킹 없는 투구"""
+    return is_waste_ball(df) | (df['description'] == 'hit_by_pitch') | is_no_tracking(df)
 
 
 def fit_stuff_model(X_tr, y_tr, X_es, y_es, n_iter=12, seed=SEED, verbose=True):
