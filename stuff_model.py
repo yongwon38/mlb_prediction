@@ -74,6 +74,81 @@ class LGBMStuffModel:
         return 'shap' if exact else 'saabas'
 
 
+def _num(s):
+    return s.to_numpy('float64', na_value=np.nan)
+
+
+def _group_resid(X, y, xs, keys, coef):
+    """그룹별 선형회귀 잔차 y − (b0 + Σ b·x). coef : {(키 값, ...): 계수}. 계수가 없는 그룹은 NaN"""
+    res = np.full(len(X), np.nan)
+    kv = list(zip(*[X[k].astype(str) for k in keys]))
+    A = np.column_stack([np.ones(len(X))] + [x for x in xs])
+    for k, b in coef.items():
+        m = np.fromiter((t == k for t in kv), bool, len(kv))
+        res[m] = y[m] - A[m] @ b
+    return res
+
+
+class AngleAdjustedStuffModel:
+    """v3 : LGBM + 위치를 보정한 진입각을 모델 안에서 계산 (stuff_pipeline_261010_vaa4·5.ipynb)
+
+    - HAVAA (vaa_aa) : vaa − (a + b·plate_z), 구종별 선형회귀 잔차 (Chamberlain 'VAA Above Average')
+    - 보정 HAA (haa_aa, 선택) : haa − (a + b·plate_x + c·release_pos_x), 구종 × 투구손별 선형회귀 잔차 (Chamberlain 'HAA Above Average').
+      haa·release_pos_x 는 add_stuff_features 가 좌투를 반전해 두므로 좌우 반전 전 원값으로 되돌려 계산
+    - 입력 X 는 input_features (원값 vaa·haa 와 위치 plate_z·plate_x 포함). 위치는 보정에만 쓰고 모델에는 넣지 않는다.
+      기여(explain)는 vaa_aa -> vaa, haa_aa -> haa 열로 돌려주고 위치 열은 0 이다
+    """
+
+    def __init__(self, lgbm, features, vaa_coef, haa_coef=None):
+        self.lgbm = lgbm
+        self.features = list(features)          # LGBM 입력 (vaa_aa / haa_aa 포함)
+        self.vaa_coef = vaa_coef                # {(pitch_type,): [a, b]}
+        self.haa_coef = haa_coef                # {(pitch_type, p_throws): [a, b, c]} 또는 None
+        base = [f for f in self.features if f not in ('vaa_aa', 'haa_aa')]
+        self.input_features = base + ['vaa', 'plate_z'] + (['haa', 'plate_x'] if haa_coef else [])
+
+    def adjusted(self, X):
+        """보정 진입각 열 (vaa_aa, haa_aa)"""
+        out = {'vaa_aa': _group_resid(X, _num(X['vaa']), [_num(X['plate_z'])], ['pitch_type'], self.vaa_coef)}
+        if self.haa_coef:
+            lefty = (X['p_throws'].astype(str) == 'L').to_numpy()
+            haa_raw = np.where(lefty, -_num(X['haa']), _num(X['haa']))
+            rel_x_raw = np.where(lefty, -_num(X['release_pos_x']), _num(X['release_pos_x']))
+            out['haa_aa'] = _group_resid(X, haa_raw, [_num(X['plate_x']), rel_x_raw], ['pitch_type', 'p_throws'], self.haa_coef)
+        return out
+
+    def model_frame(self, X):
+        Xm = X[[f for f in self.features if f in X.columns]].copy()
+        for k, v in self.adjusted(X).items():
+            Xm[k] = v
+        return Xm[self.features]
+
+    def add_derived(self, d):
+        """export 용 : 근거 표시에 쓸 보정 진입각 열을 붙인다"""
+        for k, v in self.adjusted(d).items():
+            d[k] = v
+        return d
+
+    def predict(self, X):
+        return self.lgbm.predict(self.model_frame(X))
+
+    @property
+    def categories(self):
+        return self.lgbm.booster_.pandas_categorical
+
+    def explain(self, X, exact=True):
+        c, base = LGBMStuffModel(self.lgbm).explain(self.model_frame(X), exact)
+        to_input = {'vaa_aa': 'vaa', 'haa_aa': 'haa'}
+        cols = list(X.columns)
+        out = np.zeros((len(X), len(cols)))
+        for j, f in enumerate(self.features):
+            out[:, cols.index(to_input.get(f, f))] += c[:, j]
+        return out, base
+
+    def method(self, exact=True):
+        return 'shap' if exact else 'saabas'
+
+
 def _is_stuff_model(m):
     return all(hasattr(m, a) for a in ('predict', 'explain', 'categories', 'method'))
 

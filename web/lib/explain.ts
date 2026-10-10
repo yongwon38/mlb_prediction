@@ -11,6 +11,8 @@ export const FEAT_INFO: Record<string, { unit: string; nd: number }> = {
   axis: { unit: "°", nd: 0 },
   vaa: { unit: "°", nd: 1 },
   haa: { unit: "°", nd: 1 },
+  havaa: { unit: "°", nd: 2 },
+  hahaa: { unit: "°", nd: 2 },
   ext: { unit: " ft", nd: 1 },
   rz: { unit: " ft", nd: 1 },
   arm: { unit: "°", nd: 0 },
@@ -18,8 +20,8 @@ export const FEAT_INFO: Record<string, { unit: string; nd: number }> = {
 
 export const EXPLAIN_FEAT_KEYS = Object.keys(FEAT_INFO);
 
-/** 요인 그룹별 대표 원값 (league.explain.groups 순서와 같음) */
-export const GROUP_FEATS: string[][] = [["v"], ["ivb"], ["hb"], ["vaa", "haa"], ["rz", "arm"], ["ext"], ["spin", "axis"], []];
+/** 요인 그룹별 대표 원값 (league.explain.groups 순서와 같음). v3 의 진입각 요인은 보정 진입각(HAVAA, 예비 모델은 보정 HAA 도) */
+export const GROUP_FEATS: string[][] = [["v"], ["ivb"], ["hb"], ["havaa", "hahaa"], ["rz", "arm"], ["ext"], ["spin", "axis"], []];
 
 export const scored = (ps: ExplainPitch[]) => ps.filter((p) => p.c !== null && p.s !== null);
 

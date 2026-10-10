@@ -6,8 +6,9 @@
 
 - 2025 : 모델 학습 시즌 (선택한 모델 버전의 stuff_scores_2025.parquet 과 동일한 값인지 검증)
 - 2024, 2026 : 2025 학습 모델을 그대로 적용한 out-of-sample score
-- MODEL_VERSION 으로 사용할 모델 선택 (v1 : models/, outputs/ / v2 : models/v2/, outputs/v2/)
-- v2 : 볼 판정 + Savant Waste 존 투구(sp.is_waste_ball)와 사구(sp.is_unscored)는 score 없음(null). 행은 유지해 분포도에는 표시
+- MODEL_VERSION 으로 사용할 모델 선택 (v1 : models/ / v2 : models/v2/ / v3 : models/v3/ (웹) / v3_h4 : models/v3_h4/ (예비))
+- v2 이후 : 볼 판정 + Savant Waste 존 투구(sp.is_waste_ball)와 사구(sp.is_unscored)는 score 없음(null). 행은 유지해 분포도에는 표시
+- v3 : 궤적 초기값·가속도·원값 진입각 제외 + HAVAA. 모델 입력은 원값 vaa·plate_z 이고 보정은 모델 객체 안에서 (stuff_model.AngleAdjustedStuffModel)
 
 실행 : python export_web_data.py                       (전체 시즌)
        python export_web_data.py --seasons 2026         (특정 시즌만, meta.json 은 항상 전체 시즌 목록)
@@ -26,11 +27,19 @@ import data_store
 import stuff_model as sm
 import stuff_pipeline as sp
 
-MODEL_VERSION = 'v2'
+MODEL_VERSION = 'v3'
+# v3 기본 피처 : 궤적 초기값·가속도(투구 위치를 그대로 담음) 제외 (stuff_pipeline_261010*.ipynb)
+_V3_BASE = [f for f in sp.STUFF_FEATURES if f not in ('vx0', 'vz0', 'ax', 'ay', 'az', 'vy0')]
 MODELS = {
     'v1': {'dir': 'models', 'outputs': 'outputs', 'features': sp.STUFF_FEATURES, 'drop_waste': False},
     'v2': {'dir': os.path.join('models', 'v2'), 'outputs': os.path.join('outputs', 'v2'),
            'features': sp.STUFF_FEATURES_V2, 'drop_waste': True},
+    # features = 모델 객체에 넘기는 입력 (보정 진입각은 모델 안에서 계산). extra_feats = 근거 표시용 파생 열
+    'v3': {'dir': os.path.join('models', 'v3'), 'outputs': os.path.join('outputs', 'v3'),
+           'features': _V3_BASE + ['vaa', 'plate_z'], 'drop_waste': True, 'extra_feats': {'havaa': ('vaa_aa', 1)}},
+    'v3_h4': {'dir': os.path.join('models', 'v3_h4'), 'outputs': os.path.join('outputs', 'v3_h4'),
+              'features': _V3_BASE + ['vaa', 'plate_z', 'haa', 'plate_x'], 'drop_waste': True,
+              'extra_feats': {'havaa': ('vaa_aa', 1), 'hahaa': ('haa_aa', 1)}},
 }
 CFG = MODELS[MODEL_VERSION]
 
@@ -110,7 +119,7 @@ EXPLAIN_GROUPS = [
     ('구속', ['release_speed', 'velo_diff', 'vy0', 'ay']),
     ('수직 무브먼트', ['pfx_z', 'ivb_diff', 'az']),
     ('수평 무브먼트', ['pfx_x', 'hb_diff', 'ax']),
-    ('진입각·궤적', ['vaa', 'haa', 'vx0', 'vz0']),
+    ('진입각', ['vaa', 'haa', 'vx0', 'vz0']),    # v3 는 vaa(= HAVAA 기여)만, v3_h4 는 haa(= 보정 HAA 기여)까지
     ('릴리스 위치', ['release_pos_x', 'release_pos_z', 'arm_angle']),
     ('익스텐션', ['release_extension']),
     ('회전', ['release_spin_rate', 'spin_axis']),
@@ -120,7 +129,7 @@ EXPLAIN_COLS = [f'e{j}' for j in range(len(EXPLAIN_GROUPS))]
 # 근거 문장용 원값 (모델 입력 기준 : 좌투는 좌우 반전 = 우투 기준, 무브먼트는 inch)
 EXPLAIN_FEATS = {'v': ('release_speed', 1), 'ivb': ('pfx_z', 1), 'hb': ('pfx_x', 1), 'spin': ('release_spin_rate', 0),
                  'axis': ('spin_axis', 0), 'vaa': ('vaa', 1), 'haa': ('haa', 1), 'ext': ('release_extension', 1),
-                 'rz': ('release_pos_z', 1), 'arm': ('arm_angle', 0)}
+                 'rz': ('release_pos_z', 1), 'arm': ('arm_angle', 0), **CFG.get('extra_feats', {})}
 
 
 SHAP_DIR = os.path.join(CFG['outputs'], 'shap')    # compute_shap.py 가 만드는 정확한 SHAP 캐시
@@ -170,7 +179,8 @@ def explain_contrib(model, scaler, X, pred, score, season, keys):
     deriv = (scaler.transform(pred + h) - scaler.transform(pred - h)) / (2 * h)
     near = np.abs(diff) < 1e-4
     k = np.where(near, deriv, (score - S0) / np.where(near, 1.0, diff))
-    c = np.column_stack([contrib[:, [feats.index(f) for f in fs]].sum(axis=1) for _, fs in EXPLAIN_GROUPS]) * k[:, None]
+    # 모델에 없는 피처(예 : v3 의 궤적 초기값)는 그룹에서 빠진다. 위치 열(plate_z 등)은 기여 0 이라 어느 그룹에도 넣지 않는다
+    c = np.column_stack([contrib[:, [feats.index(f) for f in fs if f in feats]].sum(axis=1) for _, fs in EXPLAIN_GROUPS]) * k[:, None]
     err = np.abs(S0 + c.sum(axis=1) - score)[~near]
     assert err.max() < 1e-6, f'기여도 가법성 오차 {err.max()}'
     return c, S0, method
@@ -199,7 +209,10 @@ def stuff_frame(raw, model):
     d = pd.concat(parts)
     for col, cats in zip(sp.STUFF_CAT_FEATURES, model.categories):
         d[col] = pd.Categorical(d[col].astype(str), categories=cats)
-    return d[d['pitch_type'].notna()]    # 학습 시 없던 구종 제외
+    d = d[d['pitch_type'].notna()]    # 학습 시 없던 구종 제외
+    if hasattr(model, 'add_derived'):    # v3 : 근거 표시용 보정 진입각 열 (HAVAA)
+        d = model.add_derived(d.copy())
+    return d
 
 
 def score_season(df, model, scaler, season):

@@ -27,7 +27,11 @@
 - 설명변수 : 해당 타구 결과에 대응되는 투구 데이터 (**로케이션 `plate_x`/`plate_z`, 카운트, 타자 정보 제외**)
   - 구속, 무브먼트(`pfx_x`/`pfx_z`), 릴리스 포인트, 익스텐션, 회전수·회전축, 팔각도, 초기 속도/가속도, 구종, 투구손, 주 패스트볼 대비 구속·무브먼트 차이
   - 좌투는 수평 성분 부호를 반전해 우투 기준으로 정규화
-  - **v2(현재 웹 모델)** : 위 변수 + **VAA·HAA**(홈플레이트 도달 진입각, `sp.approach_angles`, 원값). VAA 는 plate_z 와 상관 0.75 로 높이 정보가 일부 섞임
+  - v2 : 위 변수 + **VAA·HAA**(홈플레이트 도달 진입각, `sp.approach_angles`, 원값). VAA 는 plate_z 와 상관 0.75 로 높이 정보가 섞임
+  - **v3(현재 웹 모델, 2026-10-10)** : 초기 속도·가속도(`vx0`·`vy0`·`vz0`·`ax`·`ay`·`az`)와 원값 VAA·HAA 를 **제외**하고 **HAVAA**(높이 보정 VAA = vaa − (a + b·plate_z), 구종별 선형회귀 잔차, Chamberlain 'VAA Above Average')를 추가
+    - 이유 : 궤적 초기값·가속도는 릴리스 위치와 합치면 홈플레이트 도달 위치를 물리식으로 그대로 재현(R² 0.99998) → 모델이 로케이션을 몰래 학습 (존 밖 볼 고득점). 실험 : `stuff_pipeline_261010*.ipynb`, 업무일지 2026-10-10
+    - 보정 계수는 모델 객체(`stuff_model.AngleAdjustedStuffModel`)에 저장. 모델 입력은 원값 `vaa`·`plate_z`(보정에만 사용)
+    - 예비 `v3_h4` : v3 + 보정 HAA(구종 × 투구손별 plate_x·release_pos_x 선형 잔차). `export_web_data.MODEL_VERSION = 'v3_h4'` 로 전환 가능 (개별 투구 좌우 위치 누수가 커서 미사용)
 - 학습 표본 : 1단계와 동일(파울·미타격 제외) + **헛스윙 투구는 포함하며 y = 0**
   - v1 은 루킹 삼진도 y = 0 으로 포함했으나 **v2 부터 루킹 삼진은 제외** (`build_stuff_dataset(..., include_looking_k=False)`)
 - 모델 : **베이스라인은 LGBM**. 사용자가 추후 3단계 모델을 직접 만들어 교체할 예정이다.
@@ -45,7 +49,9 @@
 | 버전 | 노트북 | 모델 / 산출물 | 비고 |
 |---|---|---|---|
 | v1 | `stuff_pipeline_260929.ipynb` | `models/`, `outputs/` | 베이스라인 |
-| v2 | `stuff_pipeline_261005.ipynb` | `models/v2/`, `outputs/v2/` | VAA·HAA, 루킹삼진 제외, waste 볼 제외. **웹 사용 중** (`export_web_data.MODEL_VERSION`) |
+| v2 | `stuff_pipeline_261005.ipynb` | `models/v2/`, `outputs/v2/` | VAA·HAA, 루킹삼진 제외, waste 볼 제외 (되돌리기용으로 보관) |
+| v3 | `stuff_pipeline_261010_v3.ipynb` (실험 `stuff_pipeline_261010*.ipynb`) | `models/v3/`, `outputs/v3/` | 궤적 초기값·가속도·원값 진입각 제외 + HAVAA. **웹 사용 중** (`export_web_data.MODEL_VERSION`) |
+| v3_h4 | 위와 같음 | `models/v3_h4/` | v3 + 보정 HAA. 예비 (미사용) |
 - 새 버전은 기존 산출물을 덮어쓰지 않고 `models/vN/`, `outputs/vN/` 에 저장
 
 ## 3. 데이터 규칙
@@ -63,7 +69,7 @@ models/                        학습된 모델 (joblib)
 outputs/                       예측 결과, 지표, 그림
 업무일지/업무일지_YYYYMMDD.md    일일 업무일지
 export_web_data.py             웹용 데이터 export (시즌별 구위 score -> web/public/data/{season}/ : index·league·summary·stats(MLB 공식 기록).json, p/ e/ 투수별 .json.gz(경기·타석 표 포함))
-compute_shap.py                정확한 SHAP 캐시 계산 (outputs/v2/shap/, 약 12시간 : 정규 shap_{season}.npz + 시범·포스트 shap_{season}_extra.npz). 없으면 export 가 Saabas 기여 사용
+compute_shap.py                정확한 SHAP 캐시 계산 (outputs/{모델 버전}/shap/, 약 12시간 : 정규 shap_{season}.npz + 시범·포스트 shap_{season}_extra.npz). 없으면 export 가 Saabas 기여 사용
 web/                           Next.js 분석 페이지 (static export, Vercel 배포) : / 홈, /pitcher, /games, /explain(/pitch-types, /bands, /pitch)
 data_store.py                  온라인 데이터 저장소 (HF Datasets : statcast 월별 parquet, SHAP 캐시, 웹 데이터 스냅샷)
 ops.py                         클라우드 운영 명령 (update / bootstrap / pull-web / push-web / pull-shap / push-shap / shap-todo)
@@ -82,7 +88,7 @@ data_status.json               데이터 기준일 (daily 가 커밋)
 - 원격 레포 : https://github.com/yongwon38/mlb_prediction (공개 레포, 브랜치 `main`)
 - 다른 PC 에서는 `git clone` 후 작업하고, 작업 시작 전 `git pull` 로 최신화한다.
 - `.gitignore` 는 **화이트리스트 방식**이다. 데이터(`*.pkl`), `.env`, `outputs/*.parquet`, 개인 PDF·기존 작업물은 절대 커밋하지 않는다.
-  - 모델은 **현재 웹 모델 폴더(`models/v2/*.joblib`)만 커밋**한다 (클라우드 배치가 git 의 모델로 점수를 매김). 웹 모델 버전을 바꾸면 `.gitignore` 의 `models/v2` 줄도 함께 바꾼다
+  - 모델은 **웹 모델(`models/v3/`)·예비(`models/v3_h4/`)·직전 웹 모델(`models/v2/`)만 커밋**한다 (클라우드 배치가 git 의 모델로 점수를 매김). 웹 모델 버전을 바꾸면 `.gitignore` 의 `models/...` 줄도 함께 바꾼다
   - 새로 추적할 파일(새 노트북, 모듈 등)은 `.gitignore` 에 `!/파일명` 을 추가해 허용한다.
   - 커밋 전 `git status` 로 스테이징 목록을 반드시 확인한다.
 - 노트북 커밋 전 로컬 절대경로가 찍힌 stderr 출력이 있으면 제거한다 (공개 레포).

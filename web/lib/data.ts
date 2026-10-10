@@ -87,7 +87,7 @@ export async function loadPitches(season: number, id: number): Promise<{ file: P
   return { file, pitches };
 }
 
-export const EXPLAIN_FEATS = ["v", "ivb", "hb", "spin", "axis", "vaa", "haa", "ext", "rz", "arm"] as const;
+export const EXPLAIN_FEATS = ["v", "ivb", "hb", "spin", "axis", "vaa", "haa", "havaa", "hahaa", "ext", "rz", "arm"] as const;
 
 /** 설명 페이지 : 투수 파일 + 설명 파일을 합쳐 투구별 기여·원값을 붙인다 */
 export async function loadExplainPitches(season: number, id: number): Promise<{ file: PitcherFile; pitches: ExplainPitch[] }> {

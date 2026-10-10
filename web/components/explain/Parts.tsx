@@ -61,6 +61,7 @@ export function PitchDetail({ p, lg }: { p: ExplainPitch; lg: LeagueExplain }) {
             const v = p.f[k];
             const r = ref?.[k];
             const g = GROUP_FEATS.findIndex((fs) => fs.includes(k));
+            if ((v === null || v === undefined) && r === undefined) return null; // 이 모델 버전에 없는 값 (예 : 보정 HAA)
             return (
               <tr key={k} className="border-b border-grid last:border-0">
                 <td className="py-1.5 text-ink-2">{t.feat[k]}</td>
