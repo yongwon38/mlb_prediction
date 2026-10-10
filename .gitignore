@@ -18,6 +18,10 @@
 /outputs/v2/*
 !/outputs/v2/*.png
 !/outputs/v2/*.csv
+!/outputs/vaa_exp/
+/outputs/vaa_exp/*
+!/outputs/vaa_exp/*.png
+!/outputs/vaa_exp/*.csv
 
 # 클라우드 운영 (GitHub Actions + HF 데이터셋 + Vercel)
 !/.github/
