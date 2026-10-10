@@ -60,6 +60,7 @@ const signed = (v: number, nd: number) => `${v >= 0 ? "+" : ""}${v.toFixed(nd)}`
 export function groupDetail(ps: ExplainPitch[], g: number, lg: LeagueExplain, t: Dict): string {
   const keys = GROUP_FEATS[g] ?? [];
   if (!keys.length) {
+    if (lg.groups[g] === "투구손") return t.explain.handSelf; // v4 : 구종을 모델에서 뺀 버전
     const pts = [...new Set(scored(ps).map((p) => p.pt))];
     return pts.length === 1 ? t.explain.ptSelf(pts[0]) : t.explain.ptMix;
   }

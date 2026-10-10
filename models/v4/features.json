@@ -1,0 +1,36 @@
+{
+ "features": [
+  "release_speed",
+  "pfx_x",
+  "pfx_z",
+  "release_pos_x",
+  "release_pos_z",
+  "release_extension",
+  "release_spin_rate",
+  "spin_axis",
+  "arm_angle",
+  "velo_diff",
+  "hb_diff",
+  "ivb_diff",
+  "p_throws",
+  "vaa_aa"
+ ],
+ "input_features": [
+  "release_speed",
+  "pfx_x",
+  "pfx_z",
+  "release_pos_x",
+  "release_pos_z",
+  "release_extension",
+  "release_spin_rate",
+  "spin_axis",
+  "arm_angle",
+  "velo_diff",
+  "hb_diff",
+  "ivb_diff",
+  "p_throws",
+  "vaa",
+  "plate_z",
+  "pitch_type"
+ ]
+}

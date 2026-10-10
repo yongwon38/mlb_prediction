@@ -58,3 +58,7 @@
 /models/v3_h4/*
 !/models/v3_h4/*.joblib
 !/models/v3_h4/*.json
+!/models/v4/
+/models/v4/*
+!/models/v4/*.joblib
+!/models/v4/*.json

@@ -127,17 +127,21 @@ class AngleAdjustedStuffModel:
       haa·release_pos_x 는 add_stuff_features 가 좌투를 반전해 두므로 좌우 반전 전 원값으로 되돌려 계산
     - 입력 X 는 input_features (원값 vaa·haa 와 위치 plate_z·plate_x 포함). 위치는 보정에만 쓰고 모델에는 넣지 않는다.
       기여(explain)는 vaa_aa -> vaa, haa_aa -> haa 열로 돌려주고 위치 열은 0 이다
+    - v4 : 구종(pitch_type)을 LGBM 입력에서 뺀 모델. 구종은 보정 계수를 고르는 데만 쓰므로 input_features 에는 남는다(기여 0).
+      category_list = STUFF_CAT_FEATURES 순서의 범주 목록 (LGBM 이 구종 범주를 모르므로 v3 의 구종 범주를 함께 저장)
     """
 
-    def __init__(self, lgbm, features, vaa_coef, haa_coef=None, vaa_default=None, haa_default=None):
+    def __init__(self, lgbm, features, vaa_coef, haa_coef=None, vaa_default=None, haa_default=None, category_list=None):
         self.lgbm = lgbm
         self.features = list(features)          # LGBM 입력 (vaa_aa / haa_aa 포함)
         self.vaa_coef = vaa_coef                # {(pitch_type,): [a, b]}
         self.haa_coef = haa_coef                # {(pitch_type, p_throws): [a, b, c]} 또는 None
         self.vaa_default = vaa_default          # 계수가 없는 구종용 공통 계수 (fit_group_coef). 없으면 NaN
         self.haa_default = haa_default
+        self.category_list = category_list
         base = [f for f in self.features if f not in ('vaa_aa', 'haa_aa')]
-        self.input_features = base + ['vaa', 'plate_z'] + (['haa', 'plate_x'] if haa_coef else [])
+        self.input_features = (base + ['vaa', 'plate_z'] + (['haa', 'plate_x'] if haa_coef else [])
+                               + [k for k in ('pitch_type', 'p_throws') if k not in base and (k == 'pitch_type' or haa_coef)])
 
     def adjusted(self, X):
         """보정 진입각 열 (vaa_aa, haa_aa)"""
@@ -168,7 +172,7 @@ class AngleAdjustedStuffModel:
 
     @property
     def categories(self):
-        return self.lgbm.booster_.pandas_categorical
+        return getattr(self, 'category_list', None) or self.lgbm.booster_.pandas_categorical
 
     def explain(self, X, exact=True):
         c, base = LGBMStuffModel(self.lgbm).explain(self.model_frame(X), exact)

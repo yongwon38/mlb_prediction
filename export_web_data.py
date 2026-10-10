@@ -6,7 +6,7 @@
 
 - 2025 : 모델 학습 시즌 (선택한 모델 버전의 stuff_scores_2025.parquet 과 동일한 값인지 검증)
 - 2024, 2026 : 2025 학습 모델을 그대로 적용한 out-of-sample score
-- MODEL_VERSION 으로 사용할 모델 선택 (v1 : models/ / v2 : models/v2/ / v3 : models/v3/ (웹) / v3_h4 : models/v3_h4/ (예비))
+- MODEL_VERSION 으로 사용할 모델 선택 (v1 : models/ / v2 : models/v2/ / v3 : models/v3/ / v3_h4 : models/v3_h4/ (예비) / v4 : models/v4/ (웹))
 - v2 이후 : 볼 판정 + Savant Waste 존 투구(sp.is_waste_ball)와 사구(sp.is_unscored)는 score 없음(null). 행은 유지해 분포도에는 표시
 - v3 : 궤적 초기값·가속도·원값 진입각 제외 + HAVAA. 모델 입력은 원값 vaa·plate_z 이고 보정은 모델 객체 안에서 (stuff_model.AngleAdjustedStuffModel)
 
@@ -27,7 +27,7 @@ import data_store
 import stuff_model as sm
 import stuff_pipeline as sp
 
-MODEL_VERSION = 'v3'
+MODEL_VERSION = 'v4'
 # v3 기본 피처 : 궤적 초기값·가속도(투구 위치를 그대로 담음) 제외 (stuff_pipeline_261010*.ipynb)
 _V3_BASE = [f for f in sp.STUFF_FEATURES if f not in ('vx0', 'vz0', 'ax', 'ay', 'az', 'vy0')]
 MODELS = {
@@ -40,6 +40,10 @@ MODELS = {
     'v3_h4': {'dir': os.path.join('models', 'v3_h4'), 'outputs': os.path.join('outputs', 'v3_h4'),
               'features': _V3_BASE + ['vaa', 'plate_z', 'haa', 'plate_x'], 'drop_waste': True,
               'extra_feats': {'havaa': ('vaa_aa', 1), 'hahaa': ('haa_aa', 1)}},
+    # v4 : v3 에서 구종(pitch_type) 변수 제외 (stuff_pipeline_261011_v4.ipynb). 구종은 HAVAA 계수 선택에만 쓰고 모델에는 넣지 않는다
+    'v4': {'dir': os.path.join('models', 'v4'), 'outputs': os.path.join('outputs', 'v4'),
+           'features': [f for f in _V3_BASE if f != 'pitch_type'] + ['vaa', 'plate_z', 'pitch_type'], 'drop_waste': True,
+           'extra_feats': {'havaa': ('vaa_aa', 1)}, 'pitch_type_in_model': False},
 }
 CFG = MODELS[MODEL_VERSION]
 
@@ -123,7 +127,7 @@ EXPLAIN_GROUPS = [
     ('릴리스 위치', ['release_pos_x', 'release_pos_z', 'arm_angle']),
     ('익스텐션', ['release_extension']),
     ('회전', ['release_spin_rate', 'spin_axis']),
-    ('구종·투구손', ['pitch_type', 'p_throws']),
+    ('구종·투구손' if CFG.get('pitch_type_in_model', True) else '투구손', ['pitch_type', 'p_throws']),    # v4 는 투구손만
 ]
 EXPLAIN_COLS = [f'e{j}' for j in range(len(EXPLAIN_GROUPS))]
 # 근거 문장용 원값 (모델 입력 기준 : 좌투는 좌우 반전 = 우투 기준, 무브먼트는 inch)

@@ -44,4 +44,5 @@ export function useLangEffects() {
 }
 
 /** league.json 의 요인 그룹 이름(한국어) 대신 사전의 이름. 개수가 다르면 원래 이름 */
-export const groupNames = (t: Dict, groups: string[]) => (groups.length === t.groups.length ? t.groups : groups);
+export const groupNames = (t: Dict, groups: string[]) =>
+  groups.length === t.groups.length ? t.groups.map((g, i) => (groups[i] === "투구손" ? t.handOnly : g)) : groups;

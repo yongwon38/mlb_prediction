@@ -28,10 +28,12 @@
   - 구속, 무브먼트(`pfx_x`/`pfx_z`), 릴리스 포인트, 익스텐션, 회전수·회전축, 팔각도, 초기 속도/가속도, 구종, 투구손, 주 패스트볼 대비 구속·무브먼트 차이
   - 좌투는 수평 성분 부호를 반전해 우투 기준으로 정규화
   - v2 : 위 변수 + **VAA·HAA**(홈플레이트 도달 진입각, `sp.approach_angles`, 원값). VAA 는 plate_z 와 상관 0.75 로 높이 정보가 섞임
-  - **v3(현재 웹 모델, 2026-10-10)** : 초기 속도·가속도(`vx0`·`vy0`·`vz0`·`ax`·`ay`·`az`)와 원값 VAA·HAA 를 **제외**하고 **HAVAA**(높이 보정 VAA = vaa − (a + b·plate_z), 구종별 선형회귀 잔차, Chamberlain 'VAA Above Average')를 추가
+  - **v3(2026-10-10, 직전 웹 모델)** : 초기 속도·가속도(`vx0`·`vy0`·`vz0`·`ax`·`ay`·`az`)와 원값 VAA·HAA 를 **제외**하고 **HAVAA**(높이 보정 VAA = vaa − (a + b·plate_z), 구종별 선형회귀 잔차, Chamberlain 'VAA Above Average')를 추가
     - 이유 : 궤적 초기값·가속도는 릴리스 위치와 합치면 홈플레이트 도달 위치를 물리식으로 그대로 재현(R² 0.99998) → 모델이 로케이션을 몰래 학습 (존 밖 볼 고득점). 실험 : `stuff_pipeline_261010*.ipynb`, 업무일지 2026-10-10
     - 보정 계수는 모델 객체(`stuff_model.AngleAdjustedStuffModel`)에 저장. 모델 입력은 원값 `vaa`·`plate_z`(보정에만 사용)
     - 예비 `v3_h4` : v3 + 보정 HAA(구종 × 투구손별 plate_x·release_pos_x 선형 잔차). `export_web_data.MODEL_VERSION = 'v3_h4'` 로 전환 가능 (개별 투구 좌우 위치 누수가 커서 미사용)
+    - HAVAA 계수는 `stuff_model.fit_group_coef` : 500구 이상 구종은 자체 회귀, 적은 구종(너클볼·스크루볼)은 공통 기울기 + 자체 절편, 그 외 공통 계수 → **HAVAA 결측 없음** (트래킹 없는 투구는 점수 제외, `sp.is_no_tracking`)
+  - **v4(현재 웹 모델, 2026-10-11)** : v3 에서 **구종(`pitch_type`) 변수 제외** (14개 변수). 구종은 HAVAA 계수 선택에만 쓰고 LGBM 에는 넣지 않는다. v3 하이퍼파라미터로 학습 (검증 ρ whiff 0.719 → 0.717, 근거 중 구종·투구손 비중 25% → 6%). 웹 마지막 요인 이름은 '투구손'. 실험 : `outputs/hofnet_nopt/`, 업무일지 7-10·7-11
 - 학습 표본 : 1단계와 동일(파울·미타격 제외) + **헛스윙 투구는 포함하며 y = 0**
   - v1 은 루킹 삼진도 y = 0 으로 포함했으나 **v2 부터 루킹 삼진은 제외** (`build_stuff_dataset(..., include_looking_k=False)`)
 - 모델 : **베이스라인은 LGBM**. 사용자가 추후 3단계 모델을 직접 만들어 교체할 예정이다.
@@ -50,8 +52,9 @@
 |---|---|---|---|
 | v1 | `stuff_pipeline_260929.ipynb` | `models/`, `outputs/` | 베이스라인 |
 | v2 | `stuff_pipeline_261005.ipynb` | `models/v2/`, `outputs/v2/` | VAA·HAA, 루킹삼진 제외, waste 볼 제외 (되돌리기용으로 보관) |
-| v3 | `stuff_pipeline_261010_v3.ipynb` (실험 `stuff_pipeline_261010*.ipynb`) | `models/v3/`, `outputs/v3/` | 궤적 초기값·가속도·원값 진입각 제외 + HAVAA. **웹 사용 중** (`export_web_data.MODEL_VERSION`) |
+| v3 | `stuff_pipeline_261010_v3.ipynb` (실험 `stuff_pipeline_261010*.ipynb`, 수정 `stuff_pipeline_261011_v3fix.ipynb`) | `models/v3/`, `outputs/v3/` | 궤적 초기값·가속도·원값 진입각 제외 + HAVAA (되돌리기용으로 보관) |
 | v3_h4 | 위와 같음 | `models/v3_h4/` | v3 + 보정 HAA. 예비 (미사용) |
+| v4 | `stuff_pipeline_261011_v4.ipynb` | `models/v4/`, `outputs/v4/` | v3 − 구종 변수. **웹 사용 중** (`export_web_data.MODEL_VERSION`) |
 - 새 버전은 기존 산출물을 덮어쓰지 않고 `models/vN/`, `outputs/vN/` 에 저장
 
 ## 3. 데이터 규칙
@@ -88,7 +91,7 @@ data_status.json               데이터 기준일 (daily 가 커밋)
 - 원격 레포 : https://github.com/yongwon38/mlb_prediction (공개 레포, 브랜치 `main`)
 - 다른 PC 에서는 `git clone` 후 작업하고, 작업 시작 전 `git pull` 로 최신화한다.
 - `.gitignore` 는 **화이트리스트 방식**이다. 데이터(`*.pkl`), `.env`, `outputs/*.parquet`, 개인 PDF·기존 작업물은 절대 커밋하지 않는다.
-  - 모델은 **웹 모델(`models/v3/`)·예비(`models/v3_h4/`)·직전 웹 모델(`models/v2/`)만 커밋**한다 (클라우드 배치가 git 의 모델로 점수를 매김). 웹 모델 버전을 바꾸면 `.gitignore` 의 `models/...` 줄도 함께 바꾼다
+  - 모델은 **웹 모델(`models/v4/`)·예비(`models/v3_h4/`)·직전 웹 모델(`models/v3/`, `models/v2/`)만 커밋**한다 (클라우드 배치가 git 의 모델로 점수를 매김). 웹 모델 버전을 바꾸면 `.gitignore` 의 `models/...` 줄도 함께 바꾼다
   - 새로 추적할 파일(새 노트북, 모듈 등)은 `.gitignore` 에 `!/파일명` 을 추가해 허용한다.
   - 커밋 전 `git status` 로 스테이징 목록을 반드시 확인한다.
 - 노트북 커밋 전 로컬 절대경로가 찍힌 stderr 출력이 있으면 제거한다 (공개 레포).
