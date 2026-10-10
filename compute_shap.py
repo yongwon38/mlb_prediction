@@ -12,6 +12,7 @@ export_web_data.py 는 이 캐시(outputs/v2/shap/shap_{season}.npz)가 있으�
        python compute_shap.py 2026 --incremental --shard 3 --n-shards 8   (클라우드 병렬 : 남은 투구의 3번째 1/8 -> 조각 파일)
        python compute_shap.py 2026 --incremental                      (조각 파일이 있으면 합쳐서 shap_2026.npz)
 끝나면 : python export_web_data.py -> web/ 에서 재배포
+증분 캐시는 키 + 피처 해시(소수 6자리 반올림)로 재사용한다. 해시 방식을 바꾸면 한 번은 전체 재계산 (shap 워크플로)
 """
 import argparse
 import os
@@ -76,8 +77,10 @@ def compute(season, path, model, extra=False):
 
 
 def feature_hash(X):
-    """투구별 피처 값 해시 (피처가 같으면 SHAP 도 같다)"""
-    return pd.util.hash_pandas_object(X, index=False).to_numpy()
+    """투구별 피처 값 해시 (피처가 같으면 SHAP 도 같다)
+
+    소수 6자리 반올림 후 해시 : 러너 CPU 에 따라(AVX-512 SVML 등) arctan 결과가 1ulp 달라 vaa/haa 해시가 어긋나는 것 방지"""
+    return pd.util.hash_pandas_object(X.round(6), index=False).to_numpy()
 
 
 def shard_path(tag, k, n):
