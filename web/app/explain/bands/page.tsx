@@ -8,10 +8,13 @@ import { ReasonList } from "@/components/explain/Parts";
 import { STUFF_BUCKETS, bandOf } from "@/lib/analysis";
 import { fmtSigned, meanContrib, meanScore, mixReference, scored, topReasons } from "@/lib/explain";
 import { useExplainState } from "@/lib/useExplain";
+import { groupNames, useT } from "@/lib/i18n";
 
 /** 구위 산출 근거 — 점수대별 */
 export default function ExplainBands() {
   const st = useExplainState();
+  const tt = useT();
+  const t = tt.explain;
   const { lg, byPt, band, setBand } = st;
   const nG = lg?.groups.length ?? 0;
 
@@ -30,30 +33,31 @@ export default function ExplainBands() {
   const g1 = useMemo(() => (one ? byPt.filter((p) => bandOf(p.s) === one) : []), [byPt, one]);
   const mean = useMemo(() => (lg && one ? meanContrib(g1, nG) : null), [g1, lg, one, nG]);
   const ref = useMemo(() => (lg && one ? mixReference(g1, lg) : null), [g1, lg, one]);
-  const reasons = useMemo(() => (lg && one ? topReasons(g1, lg) : null), [g1, lg, one]);
+  const reasons = useMemo(() => (lg && one ? topReasons(g1, lg, tt) : null), [g1, lg, one, tt]);
   const avg = meanScore(g1);
+  const groups = lg ? groupNames(tt, lg.groups) : [];
 
   return (
     <ExplainShell st={st} active="explain/bands" filters="pt">
       {lg && (
         <>
-          <Section title="점수대별 요인 기여" sub="이 투수의 좋은 공(60+)과 나쁜 공(<40)은 무엇이 다른가. 구종 선택이 적용됩니다. 행을 누르면 상세">
-            <ContribMatrix groups={lg.groups} rows={rows} base={lg.base} active={one} onRow={(k) => setBand(one === k ? [] : [k])} />
+          <Section title={t.bandMatrix} sub={t.bandMatrixSub}>
+            <ContribMatrix groups={groups} rows={rows} base={lg.base} active={one} onRow={(k) => setBand(one === k ? [] : [k])} />
           </Section>
           {one ? (
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-start">
               <Section
-                title={`구위 ${one} 구간 — 요인별 기여`}
-                sub={`${scored(g1).length.toLocaleString()}구 · 평균 구위 ${avg?.toFixed(1) ?? "-"} = 기준 ${lg.base.toFixed(1)} + ${avg !== null ? fmtSigned(avg - lg.base, 1) : "-"} · 점선 = 같은 구종 구성의 리그 평균`}
+                title={t.bandDetail(one)}
+                sub={t.bandDetailSub(scored(g1).length, avg?.toFixed(1) ?? "-", lg.base.toFixed(1), avg !== null ? fmtSigned(avg - lg.base, 1) : "-")}
               >
-                {mean ? <ContribBars groups={lg.groups} values={mean} compare={ref} /> : <p className="text-sm text-muted">점수가 있는 투구가 없습니다.</p>}
+                {mean ? <ContribBars groups={groups} values={mean} compare={ref} /> : <p className="text-sm text-muted">{tt.common.noScored}</p>}
               </Section>
-              <Section title={`${one} 구간 주요 근거`} sub="원값은 리그 동일 구종 평균과 비교">
+              <Section title={t.bandReasons(one)} sub={t.vsLeagueSub}>
                 <ReasonList reasons={reasons} />
               </Section>
             </div>
           ) : (
-            <p className="text-sm text-muted px-1">표에서 점수대 행을 누르면 그 구간의 요인별 기여와 주요 근거가 표시됩니다.</p>
+            <p className="text-sm text-muted px-1">{t.bandEmpty}</p>
           )}
         </>
       )}

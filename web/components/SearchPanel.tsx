@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PitcherEntry, SeasonIndex } from "@/lib/types";
+import { useT } from "@/lib/i18n";
 
 const normalize = (s: string) =>
   s
@@ -19,14 +20,15 @@ interface Props {
 
 export default function SearchPanel({ index, selectedId, onSelect }: Props) {
   const [mode, setMode] = useState<"name" | "team">("name");
+  const t = useT().search;
 
   return (
     <div className="card p-4">
-      <div role="tablist" aria-label="검색 방식" className="flex gap-1 mb-3 text-sm">
+      <div role="tablist" aria-label={t.modeAria} className="flex gap-1 mb-3 text-sm">
         {(
           [
-            ["name", "이름으로 검색"],
-            ["team", "구단으로 찾기"],
+            ["name", t.byName],
+            ["team", t.byTeam],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -41,7 +43,7 @@ export default function SearchPanel({ index, selectedId, onSelect }: Props) {
         ))}
       </div>
       {!index ? (
-        <div className="h-10 text-sm text-muted flex items-center">투수 목록 불러오는 중…</div>
+        <div className="h-10 text-sm text-muted flex items-center">{t.loading}</div>
       ) : mode === "name" ? (
         <NameSearch pitchers={index.pitchers} onSelect={onSelect} />
       ) : (
@@ -56,6 +58,7 @@ function NameSearch({ pitchers, onSelect }: { pitchers: PitcherEntry[]; onSelect
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const boxRef = useRef<HTMLDivElement>(null);
+  const t = useT().search;
 
   const keyed = useMemo(() => pitchers.map((p) => ({ p, key: normalize(p.name) })), [pitchers]);
   const results = useMemo(() => {
@@ -89,8 +92,8 @@ function NameSearch({ pitchers, onSelect }: { pitchers: PitcherEntry[]; onSelect
         role="combobox"
         aria-expanded={open && results.length > 0}
         aria-controls="pitcher-results"
-        aria-label="투수 이름"
-        placeholder="투수 이름 (영문) — 예: Skenes, deGrom, Tarik"
+        aria-label={t.nameAria}
+        placeholder={t.placeholder}
         className="w-full"
         value={q}
         onChange={(e) => (setQ(e.target.value), setOpen(true), setActive(0))}
@@ -108,7 +111,7 @@ function NameSearch({ pitchers, onSelect }: { pitchers: PitcherEntry[]; onSelect
       />
       {open && q && (
         <ul id="pitcher-results" role="listbox" className="absolute z-30 mt-1 w-full card shadow-lg max-h-80 overflow-auto py-1">
-          {results.length === 0 && <li className="px-3 py-2 text-sm text-muted">검색 결과 없음</li>}
+          {results.length === 0 && <li className="px-3 py-2 text-sm text-muted">{t.none}</li>}
           {results.map((p, i) => (
             <li
               key={p.id}
@@ -125,7 +128,7 @@ function NameSearch({ pitchers, onSelect }: { pitchers: PitcherEntry[]; onSelect
                 </span>
               </span>
               <span className="text-muted tnum shrink-0">
-                {p.n.toLocaleString()}구 · 구위 {p.stuff?.toFixed(1) ?? "-"}
+                {t.resultMeta(p.n, p.stuff?.toFixed(1) ?? "-")}
               </span>
             </li>
           ))}
@@ -138,6 +141,7 @@ function NameSearch({ pitchers, onSelect }: { pitchers: PitcherEntry[]; onSelect
 function TeamSearch({ index, selectedId, onSelect }: { index: SeasonIndex; selectedId: number | null; onSelect: Props["onSelect"] }) {
   const [league, setLeague] = useState<"" | "AL" | "NL">("");
   const [team, setTeam] = useState("");
+  const t = useT().search;
 
   const roster = useMemo(
     () => (team ? index.pitchers.filter((p) => p.teams.includes(team)).sort((a, b) => b.n - a.n) : []),
@@ -147,17 +151,17 @@ function TeamSearch({ index, selectedId, onSelect }: { index: SeasonIndex; selec
   return (
     <div className="grid gap-2 sm:grid-cols-3">
       <label className="flex flex-col gap-1 text-xs text-muted">
-        리그
+        {t.league}
         <select value={league} onChange={(e) => (setLeague(e.target.value as "" | "AL" | "NL"), setTeam(""))}>
-          <option value="">리그 선택</option>
-          <option value="AL">아메리칸리그 (AL)</option>
-          <option value="NL">내셔널리그 (NL)</option>
+          <option value="">{t.pickLeague}</option>
+          <option value="AL">{t.al}</option>
+          <option value="NL">{t.nl}</option>
         </select>
       </label>
       <label className="flex flex-col gap-1 text-xs text-muted">
-        구단
+        {t.team}
         <select value={team} disabled={!league} onChange={(e) => setTeam(e.target.value)}>
-          <option value="">{league ? "구단 선택" : "리그를 먼저 선택"}</option>
+          <option value="">{league ? t.pickTeam : t.leagueFirst}</option>
           {league &&
             Object.entries(index.teams[league])
               .sort((a, b) => a[1].localeCompare(b[1]))
@@ -169,17 +173,16 @@ function TeamSearch({ index, selectedId, onSelect }: { index: SeasonIndex; selec
         </select>
       </label>
       <label className="flex flex-col gap-1 text-xs text-muted">
-        선수
+        {t.player}
         <select
           value={roster.some((p) => p.id === selectedId) ? String(selectedId) : ""}
           disabled={!team}
           onChange={(e) => e.target.value && onSelect(Number(e.target.value), team)}
         >
-          <option value="">{team ? `선수 선택 (${roster.length}명, 투구수 순)` : "구단을 먼저 선택"}</option>
+          <option value="">{team ? t.pickPlayer(roster.length) : t.teamFirst}</option>
           {roster.map((p) => (
             <option key={p.id} value={p.id}>
-              {p.name} — {p.n.toLocaleString()}구, 구위 {p.stuff?.toFixed(1) ?? "-"}
-              {p.teams.length > 1 ? " (이적)" : ""}
+              {t.rosterItem(p.name, p.n, p.stuff?.toFixed(1) ?? "-", p.teams.length > 1)}
             </option>
           ))}
         </select>

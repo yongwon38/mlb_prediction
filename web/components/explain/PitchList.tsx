@@ -1,21 +1,20 @@
 "use client";
 import { useMemo, useState } from "react";
 import type { ExplainPitch } from "@/lib/types";
-import { RESULT_LABELS } from "@/lib/analysis";
 import { pitchColor, useDarkMode } from "@/lib/colors";
 import { pitchOneLiner, scored } from "@/lib/explain";
+import { useT } from "@/lib/i18n";
 import { Toggle } from "@/components/Panels";
 
 type Order = "best" | "worst" | "date";
-const ORDERS: [Order, string][] = [
-  ["best", "구위 높은 순"],
-  ["worst", "구위 낮은 순"],
-  ["date", "날짜순"],
-];
+const ORDER_KEYS: Order[] = ["best", "worst", "date"];
 const PAGE = 30;
 
 export default function PitchList({ ps, pitchTypes, groups, selected, onSelect }: { ps: ExplainPitch[]; pitchTypes: string[]; groups: string[]; selected: number | null; onSelect: (i: number) => void }) {
   const dark = useDarkMode();
+  const tt = useT();
+  const t = tt.explain;
+  const ORDERS: [Order, string][] = ORDER_KEYS.map((k) => [k, t.orders[k]]);
   const [order, setOrder] = useState<Order>("best");
   const [limit, setLimit] = useState(PAGE);
   const rows = useMemo(() => {
@@ -28,8 +27,8 @@ export default function PitchList({ ps, pitchTypes, groups, selected, onSelect }
   return (
     <div className="flex flex-col gap-2 min-w-0">
       <div className="flex items-center justify-between gap-2">
-        <Toggle label="정렬" value={order} options={ORDERS} onChange={(o) => (setOrder(o), setLimit(PAGE))} />
-        <span className="text-xs text-muted tnum">{rows.length.toLocaleString()}구</span>
+        <Toggle label={t.sortAria} value={order} options={ORDERS} onChange={(o) => (setOrder(o), setLimit(PAGE))} />
+        <span className="text-xs text-muted tnum">{tt.common.pitches(rows.length)}</span>
       </div>
       <ul className="max-h-[520px] overflow-y-auto text-xs border-t border-grid">
         {rows.slice(0, limit).map((p) => (
@@ -45,7 +44,7 @@ export default function PitchList({ ps, pitchTypes, groups, selected, onSelect }
                 {p.pt}
               </span>
               <span className="truncate text-ink-2">
-                {RESULT_LABELS[p.r]} · {pitchOneLiner(p, groups)}
+                {tt.results[p.r]} · {pitchOneLiner(p, groups, tt)}
               </span>
               <span className="tnum font-semibold text-ink w-9 text-right">{(p.s as number).toFixed(1)}</span>
             </button>
@@ -54,7 +53,7 @@ export default function PitchList({ ps, pitchTypes, groups, selected, onSelect }
       </ul>
       {rows.length > limit && (
         <button className="text-xs text-accent-ink underline underline-offset-2 self-start" onClick={() => setLimit(limit + PAGE)}>
-          {PAGE}구 더 보기
+          {t.more(PAGE)}
         </button>
       )}
     </div>

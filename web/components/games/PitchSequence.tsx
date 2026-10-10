@@ -1,8 +1,8 @@
 "use client";
 import { useState } from "react";
 import type { Pitch } from "@/lib/types";
-import { RESULT_LABELS } from "@/lib/analysis";
 import { pitchColor, useDarkMode } from "@/lib/colors";
+import { useT } from "@/lib/i18n";
 
 const W = 720;
 const H = 200;
@@ -23,8 +23,10 @@ export default function PitchSequence({
 }) {
   const dark = useDarkMode();
   const [hover, setHover] = useState<Pitch | null>(null);
+  const tt = useT();
+  const t = tt.games;
   const n = ps.length;
-  if (!n) return <p className="text-sm text-muted">투구가 없습니다.</p>;
+  if (!n) return <p className="text-sm text-muted">{t.seqEmpty}</p>;
   const x = (k: number) => PAD.l + ((W - PAD.l - PAD.r) * (k + 0.5)) / n;
   const y = (s: number) => PAD.t + ((H - PAD.t - PAD.b) * (Y_DOM[1] - Math.min(Math.max(s, Y_DOM[0]), Y_DOM[1]))) / (Y_DOM[1] - Y_DOM[0]);
   const innStarts = ps.map((p, k) => (k === 0 || ps[k - 1].inn !== p.inn ? k : -1)).filter((k) => k >= 0);
@@ -33,7 +35,7 @@ export default function PitchSequence({
 
   return (
     <div className="relative">
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={`경기 내 투구 ${n}구의 순서별 구위`}>
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={t.seqAria(n)}>
         {selIdx.length > 0 && <rect x={x(selIdx[0]) - step / 2} y={PAD.t} width={step * selIdx.length} height={H - PAD.t - PAD.b} fill="var(--accent)" fillOpacity={0.12} />}
         {[30, 40, 50, 60, 70].map((v) => (
           <g key={v}>
@@ -47,7 +49,7 @@ export default function PitchSequence({
           <g key={k}>
             {k > 0 && <line x1={x(k) - step / 2} x2={x(k) - step / 2} y1={PAD.t - 6} y2={H - PAD.b} stroke="var(--axis)" strokeDasharray="3 3" />}
             <text x={x(k) - step / 2 + 3} y={PAD.t - 6} fontSize={10} fill="var(--muted)">
-              {ps[k].inn}회
+              {tt.common.inning(ps[k].inn)}
             </text>
           </g>
         ))}
@@ -71,12 +73,13 @@ export default function PitchSequence({
           ),
         )}
         <text x={W - PAD.r} y={H - 6} fontSize={10} textAnchor="end" fill="var(--muted)">
-          경기 내 투구 순서 → (아래 빈 원 = 점수 제외)
+          {t.seqAxis}
         </text>
       </svg>
       {hover && (
         <div className="absolute top-1 right-2 card px-2.5 py-1.5 text-xs pointer-events-none tnum">
-          {hover.gp}구째 · {hover.inn}회 · {hover.pt} {hover.v?.toFixed(1) ?? "-"}mph · 구위 <b>{hover.s?.toFixed(1) ?? "-"}</b> · {RESULT_LABELS[hover.r]}
+          {t.seqHover(hover.gp, hover.inn, hover.pt, hover.v?.toFixed(1) ?? "-")}
+          <b>{hover.s?.toFixed(1) ?? "-"}</b> · {tt.results[hover.r]}
         </div>
       )}
     </div>

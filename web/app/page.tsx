@@ -11,14 +11,10 @@ import { ctxHref, readQuery, usePageState } from "@/lib/appState";
 import { loadSummary } from "@/lib/data";
 import { stuffColor, useDarkMode } from "@/lib/colors";
 import { scoreText, signedPct, ipText } from "@/lib/games";
-import { PA_LABELS } from "@/lib/analysis";
-import type { Meta, SeasonSummary, SeasonSummaryGt } from "@/lib/types";
+import { type Dict, useT } from "@/lib/i18n";
+import type { SeasonSummary, SeasonSummaryGt } from "@/lib/types";
 
-const SECTIONS = [
-  { href: "/pitcher", t: "투수 분석", d: "투구 로케이션·타구 분포·구종 아스널·시즌 공식 기록 등 투수 한 명의 전체 분석" },
-  { href: "/games", t: "경기·타석", d: "승부처·구위 하이라이트로 추천된 경기와 타석, 또는 직접 고른 경기를 투구 단위로" },
-  { href: "/explain", t: "구위 산출 근거", d: "구위 점수가 어떤 요인(구속·무브먼트·진입각…)으로 만들어졌는지 — 개요·구종별·점수대별·투구 1개" },
-];
+const SECTIONS = ["pitcher", "games", "explain"] as const;
 
 /** 홈 : 시즌 요약 (리그 지표, 구위 리더, 승부처, 구위 하이라이트) */
 export default function Home() {
@@ -26,6 +22,8 @@ export default function Home() {
   const { meta, season, setSeason, gt, setGt, index, error, setError } = usePageState();
   const [summary, setSummary] = useState<{ season: number; s: SeasonSummary } | null>(null);
   const dark = useDarkMode();
+  const tt = useT();
+  const t = tt.home;
 
   // 예전 링크(/?season=..&pitcher=..) -> 투수 분석 페이지 (URL 동기화와 겹치지 않게 즉시 전체 이동)
   useEffect(() => {
@@ -52,38 +50,38 @@ export default function Home() {
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-ink">Stuff Lab</h1>
-          <p className="text-sm text-ink-2">투구 물리량만으로 평가한 MLB 투수 구위(Stuff, 20–80) — 시즌 요약</p>
+          <p className="text-sm text-ink-2">{t.tagline}</p>
         </div>
         <SeasonSelect meta={meta} season={season} onChange={setSeason} />
       </header>
 
-      {error && <div className="card p-3 text-sm text-bad">데이터를 불러오지 못했습니다 : {error}</div>}
+      {error && <div className="card p-3 text-sm text-bad">{tt.common.loadError(error)}</div>}
 
       <SearchPanel key={season ?? 0} index={index} selectedId={null} onSelect={(id) => router.push(ctxHref("/pitcher", { season, pitcher: id, gt: [g] }))} />
       {index && <SeasonNotice index={index} trainSeason={meta?.trainSeason ?? 2025} />}
 
       <div className="grid gap-3 sm:grid-cols-3">
-        {SECTIONS.map((x) => (
-          <Link key={x.href} href={ctxHref(x.href, { season, gt: [g] })} className="card p-4 hover:bg-surface-2 flex flex-col gap-1">
-            <span className="text-sm font-semibold text-ink">{x.t} →</span>
-            <span className="text-xs text-muted">{x.d}</span>
+        {SECTIONS.map((k) => (
+          <Link key={k} href={ctxHref(`/${k}`, { season, gt: [g] })} className="card p-4 hover:bg-surface-2 flex flex-col gap-1">
+            <span className="text-sm font-semibold text-ink">{tt.nav[k]} →</span>
+            <span className="text-xs text-muted">{t.cards[k]}</span>
           </Link>
         ))}
       </div>
 
       {meta && index && (
         <div className="card p-3">
-          <GameTypePicker labels={meta.gameTypes} value={[g]} onChange={setGt} counts={index.gameTypes} single />
+          <GameTypePicker value={[g]} onChange={setGt} counts={index.gameTypes} single />
         </div>
       )}
 
       {!sm || !meta ? (
-        <div className="card p-10 text-center text-sm text-muted">시즌 요약 불러오는 중…</div>
+        <div className="card p-10 text-center text-sm text-muted">{t.loading}</div>
       ) : (
         <>
-          <LeagueTiles sm={sm} label={meta.gameTypes[g]} />
+          <LeagueTiles sm={sm} label={tt.gameTypes[g]} t={tt} />
           <div className="grid gap-4 lg:grid-cols-2 items-start">
-            <Section title={`구위 리더 TOP 10 — ${meta.gameTypes[g]}`} sub={`평균 구위 · ${sm.minPitches}구 이상 · 이름을 누르면 투수 분석`}>
+            <Section title={t.leaders(tt.gameTypes[g])} sub={t.leadersSub(sm.minPitches)}>
               <ol className="text-sm">
                 {sm.leaders.map((p, i) => (
                   <li key={p.id}>
@@ -93,7 +91,7 @@ export default function Home() {
                         <span className="font-medium text-ink">{p.name}</span>
                         <span className="text-muted ml-2 text-xs">{p.teams.join("/")}</span>
                       </span>
-                      <span className="text-xs text-muted tnum">{p.n.toLocaleString()}구</span>
+                      <span className="text-xs text-muted tnum">{tt.common.pitches(p.n)}</span>
                       <span className="w-12 text-right font-semibold tnum" style={{ color: stuffColor(p.stuff, dark) }}>
                         {p.stuff.toFixed(1)}
                       </span>
@@ -102,21 +100,21 @@ export default function Home() {
                 ))}
               </ol>
             </Section>
-            <Section title="구위 구간별 실제 결과" sub="구위 점수가 높을수록 헛스윙↑ 피안타율↓ — 모델이 실제 결과와 맞는지">
-              <BucketTable sm={sm} />
+            <Section title={t.buckets} sub={t.bucketsSub}>
+              <BucketTable sm={sm} t={tt} />
             </Section>
           </div>
 
           <div className="grid gap-4 lg:grid-cols-2 items-start">
-            <Section title="승부처 경기 TOP 10" sub="투수 한 명의 등판 기준 · 타석별 |WPA| 합 × 경기 유형 가중치 · 누르면 경기·타석 페이지">
-              <GameList rows={sm.impGames} meta={meta} metric="imp" href={(r) => go("/games", r.pid, { game: r.gi })} />
+            <Section title={t.impGames} sub={t.impGamesSub}>
+              <GameList rows={sm.impGames} metric="imp" href={(r) => go("/games", r.pid, { game: r.gi })} />
             </Section>
-            <Section title="구위 하이라이트 경기 TOP 10" sub="평균 구위가 가장 높았던 등판 (40구 이상)">
-              <GameList rows={sm.stuffGames} meta={meta} metric="s" href={(r) => go("/games", r.pid, { game: r.gi })} />
+            <Section title={t.stuffGames} sub={t.stuffGamesSub}>
+              <GameList rows={sm.stuffGames} metric="s" href={(r) => go("/games", r.pid, { game: r.gi })} />
             </Section>
           </div>
 
-          <Section title="승부처 타석 TOP 10" sub="승리확률을 가장 크게 바꾼 타석 (투수 관점 : + 막아냄 / − 허용) · 누르면 그 타석">
+          <Section title={t.impPas} sub={t.impPasSub}>
             <ul className="text-sm">
               {sm.impPas.map((r) => (
                 <li key={`${r.pid}-${r.pai}`}>
@@ -124,9 +122,9 @@ export default function Home() {
                     <span className="text-xs text-muted tnum w-20">{r.date}</span>
                     <span className="min-w-0">
                       <span className="block truncate text-ink">
-                        <b>{r.name}</b> vs {r.batName} — {r.ev === 0 ? "교체" : PA_LABELS[r.ev]}
+                        <b>{r.name}</b> vs {r.batName} · {r.ev === 0 ? t.removed : tt.paEvents[r.ev]}
                         <span className="text-muted text-xs ml-2">
-                          {r.team} vs {r.opp} · {r.inn}회 {r.o ?? "-"}사
+                          {r.team} vs {r.opp} · {tt.game.innOuts(r.inn, r.o)}
                         </span>
                       </span>
                       {r.des && <span className="block truncate text-xs text-muted">{r.des}</span>}
@@ -145,15 +143,15 @@ export default function Home() {
   );
 }
 
-function LeagueTiles({ sm, label }: { sm: SeasonSummaryGt; label: string }) {
+function LeagueTiles({ sm, label, t }: { sm: SeasonSummaryGt; label: string; t: Dict }) {
   const cells: [string, string][] = [
-    [`${label} 투구 (점수 있는)`, sm.pitches.toLocaleString()],
-    ["투수 / 경기", `${sm.pitchers.toLocaleString()} / ${sm.games.toLocaleString()}`],
-    ["평균 구위", f1(sm.stuff)],
+    [t.home.tiles.pitches(label), sm.pitches.toLocaleString()],
+    [t.home.tiles.pitchersGames, `${sm.pitchers.toLocaleString()} / ${sm.games.toLocaleString()}`],
+    [t.common.avgStuff, f1(sm.stuff)],
     ["Whiff%", pct(sm.rates.whiff)],
     ["CSW%", pct(sm.rates.csw)],
-    ["피안타율", f3(sm.rates.ba)],
-    ["피장타율", f3(sm.rates.slg)],
+    [t.common.ba, f3(sm.rates.ba)],
+    [t.common.slg, f3(sm.rates.slg)],
     ["xwOBA", f3(sm.rates.xwoba)],
   ];
   return (
@@ -168,16 +166,16 @@ function LeagueTiles({ sm, label }: { sm: SeasonSummaryGt; label: string }) {
   );
 }
 
-function BucketTable({ sm }: { sm: SeasonSummaryGt }) {
+function BucketTable({ sm, t }: { sm: SeasonSummaryGt; t: Dict }) {
   const maxW = Math.max(...sm.buckets.map((b) => b.whiff ?? 0), 0.01);
   return (
     <table className="w-full text-xs tnum">
       <thead>
         <tr className="text-muted border-b border-grid">
-          <th className="text-left font-normal py-1.5">구위</th>
-          <th className="text-right font-normal py-1.5">투구</th>
+          <th className="text-left font-normal py-1.5">{t.home.th.stuff}</th>
+          <th className="text-right font-normal py-1.5">{t.home.th.pitches}</th>
           <th className="text-left font-normal py-1.5 pl-3">Whiff%</th>
-          <th className="text-right font-normal py-1.5">피안타율</th>
+          <th className="text-right font-normal py-1.5">{t.common.ba}</th>
           <th className="text-right font-normal py-1.5">xwOBAcon</th>
         </tr>
       </thead>
@@ -201,8 +199,9 @@ function BucketTable({ sm }: { sm: SeasonSummaryGt }) {
   );
 }
 
-function GameList({ rows, meta, metric, href }: { rows: SeasonSummaryGt["impGames"]; meta: Meta; metric: "imp" | "s"; href: (r: SeasonSummaryGt["impGames"][number]) => string }) {
+function GameList({ rows, metric, href }: { rows: SeasonSummaryGt["impGames"]; metric: "imp" | "s"; href: (r: SeasonSummaryGt["impGames"][number]) => string }) {
   const dark = useDarkMode();
+  const t = useT();
   return (
     <ul className="text-sm">
       {rows.map((r) => (
@@ -216,12 +215,12 @@ function GameList({ rows, meta, metric, href }: { rows: SeasonSummaryGt["impGame
                 {r.team} {r.home ? "vs" : "@"} {r.opp}
               </span>
               <span className="text-muted text-xs ml-2">
-                {r.rd !== "R" ? `${meta.rounds[r.rd]} · ` : ""}
-                {scoreText(r)} · {ipText(r.outs)}이닝 {r.n}구
+                {r.rd !== "R" ? `${t.rounds[r.rd] ?? r.rd} · ` : ""}
+                {t.home.gameMeta(scoreText(r, t), ipText(r.outs), r.n)}
               </span>
             </span>
             {metric === "imp" ? (
-              <span className="tnum font-semibold text-ink" title="중요도">
+              <span className="tnum font-semibold text-ink" title={t.home.leverage}>
                 {r.imp.toFixed(2)}
               </span>
             ) : (

@@ -3,6 +3,7 @@ import { useMemo, useState } from "react";
 import type { League, Pitch } from "@/lib/types";
 import { type Note, type Stats, groupBy, percentileOf, stats } from "@/lib/analysis";
 import { pitchColor, useDarkMode } from "@/lib/colors";
+import { type Dict, useT } from "@/lib/i18n";
 
 export const f3 = (x: number | null | undefined) => (x === null || x === undefined ? "-" : x.toFixed(3).replace(/^0/, ""));
 export const pct = (x: number | null | undefined, d = 1) => (x === null || x === undefined ? "-" : `${(x * 100).toFixed(d)}%`);
@@ -55,32 +56,34 @@ function Tile({ label, value, sub, tone }: { label: string; value: string; sub?:
 }
 
 export function SummaryTiles({ st, league }: { st: Stats; league: League }) {
+  const t = useT();
+  const T = t.tiles;
   const p = percentileOf(league.pitcherPercentiles, st.stuff);
   const lg = league.overall;
   // 투수 관점 : 높을수록 좋은 지표(good-high) / 낮을수록 좋은 지표
   const cmp = (v: number | null, ref: number | null, higherIsGood: boolean, fmt: (x: number) => string) => {
     if (v === null || ref === null) return { sub: undefined, tone: undefined };
     const better = higherIsGood ? v > ref : v < ref;
-    return { sub: `리그 ${fmt(ref)}`, tone: (Math.abs(v - ref) / ref > 0.05 ? (better ? "good" : "bad") : undefined) as "good" | "bad" | undefined };
+    return { sub: T.lg(fmt(ref)), tone: (Math.abs(v - ref) / ref > 0.05 ? (better ? "good" : "bad") : undefined) as "good" | "bad" | undefined };
   };
   const pc = (x: number) => pct(x);
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-      <Tile label="평균 구위 (20-80)" value={f1(st.stuff)} sub={p === null ? undefined : `리그 투수 상위 ${100 - p}%`} tone={p === null ? undefined : p >= 60 ? "good" : p <= 40 ? "bad" : undefined} />
-      <Tile label="투구 / 타석" value={`${st.n.toLocaleString()}`} sub={`${st.pa.toLocaleString()} 타석 · K ${st.k} · BB ${st.bb}`} />
+      <Tile label={T.stuff} value={f1(st.stuff)} sub={p === null ? undefined : T.stuffSub(100 - p)} tone={p === null ? undefined : p >= 60 ? "good" : p <= 40 ? "bad" : undefined} />
+      <Tile label={T.pitchesPa} value={`${st.n.toLocaleString()}`} sub={T.pitchesPaSub(st.pa, st.k, st.bb)} />
       <Tile label="Whiff%" value={pct(st.whiff)} {...cmp(st.whiff, lg.whiff, true, pc)} />
       <Tile label="CSW%" value={pct(st.csw)} {...cmp(st.csw, lg.csw, true, pc)} />
-      <Tile label="피안타율" value={f3(st.ba)} {...cmp(st.ba, lg.ba, false, f3)} />
-      <Tile label="피장타율" value={f3(st.slg)} {...cmp(st.slg, lg.slg, false, f3)} />
-      <Tile label="피xwOBA" value={f3(st.xwoba)} {...cmp(st.xwoba, lg.xwoba, false, f3)} />
-      <Tile label="Chase% / Zone%" value={`${pct(st.chase, 0)} / ${pct(st.zonePct, 0)}`} sub="존 밖 스윙 / 존 투구" />
+      <Tile label={t.common.ba} value={f3(st.ba)} {...cmp(st.ba, lg.ba, false, f3)} />
+      <Tile label={t.common.slg} value={f3(st.slg)} {...cmp(st.slg, lg.slg, false, f3)} />
+      <Tile label={t.common.xwoba} value={f3(st.xwoba)} {...cmp(st.xwoba, lg.xwoba, false, f3)} />
+      <Tile label="Chase% / Zone%" value={`${pct(st.chase, 0)} / ${pct(st.zonePct, 0)}`} sub={T.chaseZoneSub} />
     </div>
   );
 }
 
 export function NotesList({ notes }: { notes: Note[] }) {
   const icon = { good: "▲", bad: "▼", info: "•" };
-  const label = { good: "강점", bad: "주의", info: "참고" };
+  const label = useT().noteTone;
   return (
     <ul className="flex flex-col gap-2 text-sm">
       {notes.map((n, i) => (
@@ -111,25 +114,27 @@ interface Row {
   lgStuff: number | null;
 }
 
-const COLS: Col[] = [
-  { key: "n", label: "투구", get: (r) => r.st.n, fmt: (v) => (v ?? 0).toLocaleString() },
-  { key: "usage", label: "구사율", get: (r) => r.usage, fmt: (v) => pct(v) },
-  { key: "velo", label: "구속", title: "평균 구속 (mph)", get: (r) => r.st.velo, fmt: (v) => f1(v) },
-  { key: "ivb", label: "IVB", title: "수직 무브먼트 (in, 중력 제외)", get: (r) => r.st.ivb, fmt: (v) => f1(v) },
-  { key: "hb", label: "HB", title: "수평 무브먼트 (in, 포수 시점 +는 1루쪽)", get: (r) => r.st.hb, fmt: (v) => f1(v) },
-  { key: "spin", label: "회전", get: (r) => r.st.spin, fmt: (v) => f1(v, 0) },
-  { key: "stuff", label: "구위", title: "평균 구위 score (20-80)", get: (r) => r.st.stuff, fmt: (v) => f1(v) },
-  { key: "pctl", label: "리그 %ile", title: "리그 동일 구종(50구+ 투수) 대비 퍼센타일", get: (r) => r.pctl, fmt: (v) => (v === null ? "-" : String(v)) },
+const arsenalCols = (t: Dict): Col[] => [
+  { key: "n", label: t.arsenal.n, get: (r) => r.st.n, fmt: (v) => (v ?? 0).toLocaleString() },
+  { key: "usage", label: t.arsenal.usage, get: (r) => r.usage, fmt: (v) => pct(v) },
+  { key: "velo", label: t.arsenal.velo, title: t.arsenal.veloTitle, get: (r) => r.st.velo, fmt: (v) => f1(v) },
+  { key: "ivb", label: "IVB", title: t.arsenal.ivbTitle, get: (r) => r.st.ivb, fmt: (v) => f1(v) },
+  { key: "hb", label: "HB", title: t.arsenal.hbTitle, get: (r) => r.st.hb, fmt: (v) => f1(v) },
+  { key: "spin", label: t.arsenal.spin, get: (r) => r.st.spin, fmt: (v) => f1(v, 0) },
+  { key: "stuff", label: t.arsenal.stuff, title: t.arsenal.stuffTitle, get: (r) => r.st.stuff, fmt: (v) => f1(v) },
+  { key: "pctl", label: t.arsenal.pctl, title: t.arsenal.pctlTitle, get: (r) => r.pctl, fmt: (v) => (v === null ? "-" : String(v)) },
   { key: "whiff", label: "Whiff%", get: (r) => r.st.whiff, fmt: (v) => pct(v) },
   { key: "csw", label: "CSW%", get: (r) => r.st.csw, fmt: (v) => pct(v) },
   { key: "chase", label: "Chase%", get: (r) => r.st.chase, fmt: (v) => pct(v) },
-  { key: "ba", label: "피안타율", get: (r) => r.st.ba, fmt: (v) => f3(v) },
-  { key: "slg", label: "피장타율", get: (r) => r.st.slg, fmt: (v) => f3(v) },
-  { key: "xwobacon", label: "xwOBAcon", title: "인플레이 타구 xwOBA", get: (r) => r.st.xwobacon, fmt: (v) => f3(v) },
+  { key: "ba", label: t.common.ba, get: (r) => r.st.ba, fmt: (v) => f3(v) },
+  { key: "slg", label: t.common.slg, get: (r) => r.st.slg, fmt: (v) => f3(v) },
+  { key: "xwobacon", label: "xwOBAcon", title: t.arsenal.xwobaconTitle, get: (r) => r.st.xwobacon, fmt: (v) => f3(v) },
 ];
 
 export function ArsenalTable({ ps, pitchTypes, league, pitchNames }: { ps: Pitch[]; pitchTypes: string[]; league: League; pitchNames: Record<string, string> }) {
   const dark = useDarkMode();
+  const t = useT();
+  const COLS = useMemo(() => arsenalCols(t), [t]);
   const [sort, setSort] = useState<{ key: string; desc: boolean }>({ key: "usage", desc: true });
   const rows = useMemo(() => {
     const g = groupBy(ps, (p) => p.pt);
@@ -142,14 +147,14 @@ export function ArsenalTable({ ps, pitchTypes, league, pitchNames }: { ps: Pitch
       });
     const col = COLS.find((c) => c.key === sort.key)!;
     return out.sort((a, b) => ((col.get(a) ?? -Infinity) - (col.get(b) ?? -Infinity)) * (sort.desc ? -1 : 1));
-  }, [ps, pitchTypes, league, sort]);
+  }, [ps, pitchTypes, league, sort, COLS]);
 
   return (
     <div className="overflow-x-auto -mx-4 px-4">
       <table className="w-full text-xs tnum border-collapse min-w-[860px]">
         <thead>
           <tr className="text-muted border-b border-grid">
-            <th className="text-left font-normal py-2 pr-2">구종</th>
+            <th className="text-left font-normal py-2 pr-2">{t.arsenal.pitch}</th>
             {COLS.map((c) => (
               <th key={c.key} className="text-right font-normal py-2 px-1.5" title={c.title} aria-sort={sort.key === c.key ? (sort.desc ? "descending" : "ascending") : "none"}>
                 <button className="hover:text-ink" onClick={() => setSort({ key: c.key, desc: sort.key === c.key ? !sort.desc : true })}>
@@ -181,7 +186,7 @@ export function ArsenalTable({ ps, pitchTypes, league, pitchNames }: { ps: Pitch
         </tbody>
       </table>
       <p className="text-[11px] text-muted mt-2">
-        리그 %ile : 같은 구종을 {league.minPitchTypePitches}구 이상 던진 투수들의 평균 구위 분포에서의 위치. 20구 미만 구종은 흐리게 표시.
+        {t.arsenal.foot(league.minPitchTypePitches)}
       </p>
     </div>
   );

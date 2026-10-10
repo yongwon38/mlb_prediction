@@ -6,6 +6,7 @@ import { hitColor, useDarkMode } from "@/lib/colors";
 import { Tooltip } from "@/components/StrikeZone";
 import { ResultLegend, ResultMarker } from "@/components/ResultMarker";
 import { f1, f3, pct } from "@/components/Panels";
+import { useT } from "@/lib/i18n";
 
 // 필드 좌표 (ft) : 홈 = (0,0), +x = 1루 쪽, +y = 외야. 화면은 포수 시점과 같은 좌우 방향 (왼쪽 = 3루/좌익)
 const X_DOM: [number, number] = [-265, 265];
@@ -47,6 +48,7 @@ export default function SprayChart({ ps, ghost, all, selecting, pitchNames }: Pr
   const dark = useDarkMode();
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<Pitch | null>(null);
+  const t = useT().spray;
 
   // 아웃 -> 1루타 -> 장타 -> 홈런 순으로 그려 안타가 위에 오도록
   const pts = useMemo(
@@ -105,7 +107,7 @@ export default function SprayChart({ ps, ghost, all, selecting, pitchNames }: Pr
         viewBox={`0 0 ${W} ${H}`}
         className="w-full h-auto touch-none select-none"
         role="img"
-        aria-label={`인플레이 타구 분포 ${pts.length}개`}
+        aria-label={t.aria(pts.length)}
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
         onPointerDown={onMove}
@@ -134,10 +136,10 @@ export default function SprayChart({ ps, ghost, all, selecting, pitchNames }: Pr
           strokeOpacity={0.7}
         />
         <text x={8} y={H - 8} fontSize={11} fill="var(--muted)">
-          ← 3루쪽 (좌익)
+          {t.left}
         </text>
         <text x={W - 8} y={H - 8} fontSize={11} fill="var(--muted)" textAnchor="end">
-          (우익) 1루쪽 →
+          {t.right}
         </text>
         {layer}
         {hover && hp && <circle cx={hp.x} cy={hp.y} r={10} fill="none" stroke="var(--ink)" strokeWidth={1.5} pointerEvents="none" />}
@@ -145,11 +147,9 @@ export default function SprayChart({ ps, ghost, all, selecting, pitchNames }: Pr
 
       {hover && hp && <Tooltip p={hover} left={(hp.x / W) * 100} top={(hp.y / H) * 100} pitchNames={pitchNames} />}
 
-      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-2" aria-label="타구 결과 범례">
+      <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-2" aria-label={t.legendAria}>
         <ResultLegend shapes={SPRAY_SHAPES} color={(sh) => hitColor(SHAPE_CLASS[sh], dark)} />
-        <span className="ml-auto tnum text-muted">
-          타구 {pts.length.toLocaleString()}개{missing ? ` (좌표 없음 ${missing})` : ""}
-        </span>
+        <span className="ml-auto tnum text-muted">{t.count(pts.length, missing)}</span>
       </div>
 
       <BattedTable sel={selStats} all={allStats} selecting={selecting} />
@@ -157,22 +157,26 @@ export default function SprayChart({ ps, ghost, all, selecting, pitchNames }: Pr
   );
 }
 
+const BATTED_FMT: ((s: BattedStats) => string)[] = [
+  (s) => s.n.toLocaleString(),
+  (s) => (s.ev === null ? "-" : `${f1(s.ev)} mph`),
+  (s) => pct(s.hardHit),
+  (s) => f3(s.ba),
+  (s) => `${pct(s.dir.pull, 0)} / ${pct(s.dir.center, 0)} / ${pct(s.dir.oppo, 0)}`,
+  (s) => `${pct(s.la.gb, 0)} / ${pct(s.la.ld, 0)} / ${pct(s.la.fb, 0)} / ${pct(s.la.pu, 0)}`,
+];
+
 function BattedTable({ sel, all, selecting }: { sel: BattedStats; all: BattedStats; selecting: boolean }) {
-  const rows: [string, (s: BattedStats) => string][] = [
-    ["타구 수", (s) => s.n.toLocaleString()],
-    ["평균 타구속도", (s) => (s.ev === null ? "-" : `${f1(s.ev)} mph`)],
-    ["하드히트% (95+)", (s) => pct(s.hardHit)],
-    ["인플레이 안타율", (s) => f3(s.ba)],
-    ["당겨침 / 센터 / 밀어침", (s) => `${pct(s.dir.pull, 0)} / ${pct(s.dir.center, 0)} / ${pct(s.dir.oppo, 0)}`],
-    ["땅볼 / 라인드라이브 / 뜬공 / 팝업", (s) => `${pct(s.la.gb, 0)} / ${pct(s.la.ld, 0)} / ${pct(s.la.fb, 0)} / ${pct(s.la.pu, 0)}`],
-  ];
+  const tt = useT();
+  const t = tt.spray;
+  const rows: [string, (s: BattedStats) => string][] = BATTED_FMT.map((f, i) => [t.rows[i], f]);
   return (
     <table className="mt-3 w-full text-xs tnum">
       <thead>
         <tr className="text-muted border-b border-grid">
-          <th className="text-left font-normal py-1.5">인플레이 타구</th>
-          {selecting && <th className="text-right font-normal py-1.5 px-1.5">선택 구간</th>}
-          <th className="text-right font-normal py-1.5 pl-1.5">{selecting ? "전체" : "값"}</th>
+          <th className="text-left font-normal py-1.5">{t.head}</th>
+          {selecting && <th className="text-right font-normal py-1.5 px-1.5">{t.selected}</th>}
+          <th className="text-right font-normal py-1.5 pl-1.5">{selecting ? tt.common.all : t.value}</th>
         </tr>
       </thead>
       <tbody>

@@ -5,6 +5,7 @@ import type { League, Pitch, Rates } from "@/lib/types";
 import { COUNT_STATES, GAME_PITCH_BUCKETS, STUFF_BUCKETS, type Stats, groupBy, quantile, stats } from "@/lib/analysis";
 import { pitchColor, sequential, useDarkMode, warmRamp } from "@/lib/colors";
 import { Toggle, f1, f3, pct } from "./Panels";
+import { useT } from "@/lib/i18n";
 
 const AXIS = { stroke: "var(--axis)", tick: { fill: "var(--muted)", fontSize: 11 }, tickLine: false };
 const tooltipStyle = {
@@ -19,6 +20,7 @@ const tooltipStyle = {
 // ---------------------------------------------------------------------------
 export function StuffDistribution({ ps, pitchTypes, league }: { ps: Pitch[]; pitchTypes: string[]; league: League }) {
   const dark = useDarkMode();
+  const t = useT().charts;
   const [hover, setHover] = useState<string | null>(null);
   const rows = useMemo(() => {
     const g = groupBy(ps.filter((p) => p.s !== null), (p) => p.pt);
@@ -36,7 +38,7 @@ export function StuffDistribution({ ps, pitchTypes, league }: { ps: Pitch[]; pit
   if (!rows.length) return <Empty />;
   return (
     <div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="구종별 구위 분포">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={t.distAria}>
         {[20, 30, 40, 50, 60, 70, 80].map((v) => (
           <g key={v}>
             <line x1={x(v)} x2={x(v)} y1={T} y2={H - 24} stroke={v === 50 ? "var(--axis)" : "var(--grid)"} />
@@ -69,20 +71,20 @@ export function StuffDistribution({ ps, pitchTypes, league }: { ps: Pitch[]; pit
       </svg>
       <div className="flex flex-wrap gap-4 text-xs text-ink-2 mt-1">
         <span className="flex items-center gap-1.5">
-          <span className="w-5 h-2 rounded-sm bg-accent" /> 이 투수 (25–75%, 선 5–95%)
+          <span className="w-5 h-2 rounded-sm bg-accent" /> {t.distMe}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-5 h-3 rounded-sm bg-muted/25" /> 리그 동일 구종 (25–75%)
+          <span className="w-5 h-3 rounded-sm bg-muted/25" /> {t.distLg}
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-0.5 h-3 bg-ink" /> 중앙값
+          <span className="w-0.5 h-3 bg-ink" /> {t.median}
         </span>
       </div>
       <div className="text-xs text-muted mt-1 h-4 tnum">
         {hover &&
           (() => {
             const r = rows.find((v) => v.pt === hover)!;
-            return `${r.pt} ${r.n}구 · 중앙값 ${f1(r.q[2])} (리그 ${f1(r.lg?.[2])}) · 평균 ${f1(r.mean)} · 25–75% ${f1(r.q[1])}–${f1(r.q[3])}`;
+            return t.distHover(r.pt, r.n, f1(r.q[2]), f1(r.lg?.[2]), f1(r.mean), f1(r.q[1]), f1(r.q[3]));
           })()}
       </div>
     </div>
@@ -93,15 +95,13 @@ export function StuffDistribution({ ps, pitchTypes, league }: { ps: Pitch[]; pit
 // 2. 코스별 히트맵 (포수 시점, Statcast zone 1~9 + 바깥 11~14)
 // ---------------------------------------------------------------------------
 type ZoneMetric = "stuff" | "ba" | "whiff" | "usage";
-const ZONE_METRICS: [ZoneMetric, string][] = [
-  ["stuff", "평균 구위"],
-  ["usage", "투구 비중"],
-  ["whiff", "Whiff%"],
-  ["ba", "피안타율"],
-];
+const ZONE_METRIC_KEYS: ZoneMetric[] = ["stuff", "usage", "whiff", "ba"];
 
 export function ZoneHeatmap({ ps }: { ps: Pitch[] }) {
   const dark = useDarkMode();
+  const tt = useT();
+  const t = tt.charts;
+  const ZONE_METRICS: [ZoneMetric, string][] = ZONE_METRIC_KEYS.map((k) => [k, t.zoneMetrics[k]]);
   const [metric, setMetric] = useState<ZoneMetric>("stuff");
   const [hover, setHover] = useState<number | null>(null);
   const zs = useMemo(() => {
@@ -116,9 +116,9 @@ export function ZoneHeatmap({ ps }: { ps: Pitch[] }) {
   }, [ps]);
 
   const spec = {
-    stuff: { get: (c: { st: Stats }) => c.st.stuff, dom: [40, 60], fmt: (v: number) => v.toFixed(1), min: (c: { st: Stats }) => c.st.n >= 10, sub: (c: { st: Stats }) => `${c.st.n}구` },
-    usage: { get: (c: { share: number }) => c.share, dom: [0, 0.15], fmt: (v: number) => pct(v, 0), min: () => true, sub: (c: { st: Stats }) => `${c.st.n}구` },
-    whiff: { get: (c: { st: Stats }) => c.st.whiff, dom: [0, 0.45], fmt: (v: number) => pct(v, 0), min: (c: { st: Stats }) => c.st.swings >= 10, sub: (c: { st: Stats }) => `스윙 ${c.st.swings}` },
+    stuff: { get: (c: { st: Stats }) => c.st.stuff, dom: [40, 60], fmt: (v: number) => v.toFixed(1), min: (c: { st: Stats }) => c.st.n >= 10, sub: (c: { st: Stats }) => tt.common.pitches(c.st.n) },
+    usage: { get: (c: { share: number }) => c.share, dom: [0, 0.15], fmt: (v: number) => pct(v, 0), min: () => true, sub: (c: { st: Stats }) => tt.common.pitches(c.st.n) },
+    whiff: { get: (c: { st: Stats }) => c.st.whiff, dom: [0, 0.45], fmt: (v: number) => pct(v, 0), min: (c: { st: Stats }) => c.st.swings >= 10, sub: (c: { st: Stats }) => t.swings(c.st.swings) },
     ba: { get: (c: { st: Stats }) => c.st.ba, dom: [0.1, 0.4], fmt: (v: number) => f3(v), min: (c: { st: Stats }) => c.st.ab >= 8, sub: (c: { st: Stats }) => `${c.st.hits}/${c.st.ab}` },
   }[metric];
 
@@ -151,10 +151,10 @@ export function ZoneHeatmap({ ps }: { ps: Pitch[] }) {
   return (
     <div>
       <div className="flex justify-end mb-2">
-        <Toggle label="히트맵 지표" value={metric} options={ZONE_METRICS} onChange={setMetric} />
+        <Toggle label={t.zoneMetricAria} value={metric} options={ZONE_METRICS} onChange={setMetric} />
       </div>
       <div className="flex flex-col items-center">
-        <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[320px] h-auto" role="img" aria-label={`코스별 ${ZONE_METRICS.find((m) => m[0] === metric)![1]}`}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[320px] h-auto" role="img" aria-label={t.zoneAria(t.zoneMetrics[metric])}>
           {[11, 12, 13, 14].map((z) => {
             const k = cell(z);
             return (
@@ -183,16 +183,16 @@ export function ZoneHeatmap({ ps }: { ps: Pitch[] }) {
           })}
           <rect x={P + S} y={P + S} width={S * 3} height={S * 3} fill="none" stroke="var(--zone-line)" strokeWidth={2} />
           <text x={P} y={H - 4} fontSize={10} fill="var(--muted)">
-            ← 3루쪽
+            {tt.zone.left}
           </text>
           <text x={W - P} y={H - 4} fontSize={10} fill="var(--muted)" textAnchor="end">
-            1루쪽 → (포수 시점)
+            {t.zoneRight}
           </text>
         </svg>
         <div className="text-xs text-muted h-4 tnum mt-1">
           {hc
-            ? `${hover! <= 9 ? `존 ${hover}` : "존 밖"} · ${hc.st.n}구 · 구위 ${f1(hc.st.stuff)} · Whiff ${pct(hc.st.whiff)} · 피안타율 ${f3(hc.st.ba)} (${hc.st.hits}/${hc.st.ab})`
-            : "칸에 마우스를 올리면 상세 지표 · 표본이 적은 칸은 회색"}
+            ? t.zoneHover(hover! <= 9, hover!, hc.st.n, f1(hc.st.stuff), pct(hc.st.whiff), f3(hc.st.ba), hc.st.hits, hc.st.ab)
+            : t.zoneIdle}
         </div>
       </div>
     </div>
@@ -203,14 +203,16 @@ export function ZoneHeatmap({ ps }: { ps: Pitch[] }) {
 // 3. 구위 구간별 결과 (이 투수 vs 리그)
 // ---------------------------------------------------------------------------
 type BucketMetric = "ba" | "slg" | "whiff" | "xwobacon";
-const BUCKET_METRICS: [BucketMetric, string][] = [
-  ["ba", "피안타율"],
-  ["slg", "피장타율"],
-  ["whiff", "Whiff%"],
-  ["xwobacon", "xwOBAcon"],
-];
 
 export function BucketChart({ ps, leagueBuckets }: { ps: Pitch[]; leagueBuckets: (Rates & { label: string })[] }) {
+  const tt = useT();
+  const t = tt.charts;
+  const BUCKET_METRICS: [BucketMetric, string][] = [
+    ["ba", tt.common.ba],
+    ["slg", tt.common.slg],
+    ["whiff", "Whiff%"],
+    ["xwobacon", "xwOBAcon"],
+  ];
   const [metric, setMetric] = useState<BucketMetric>("ba");
   const scored = useMemo(() => ps.filter((p) => p.s !== null), [ps]);
   const data = useMemo(
@@ -235,7 +237,7 @@ export function BucketChart({ ps, leagueBuckets }: { ps: Pitch[]; leagueBuckets:
   return (
     <div>
       <div className="flex justify-end mb-2">
-        <Toggle label="구간 지표" value={metric} options={BUCKET_METRICS} onChange={setMetric} />
+        <Toggle label={t.bucketMetricAria} value={metric} options={BUCKET_METRICS} onChange={setMetric} />
       </div>
       <div className="h-56">
         <ResponsiveContainer width="100%" height="100%">
@@ -243,10 +245,10 @@ export function BucketChart({ ps, leagueBuckets }: { ps: Pitch[]; leagueBuckets:
             <CartesianGrid vertical={false} stroke="var(--grid)" />
             <XAxis dataKey="label" {...AXIS} />
             <YAxis {...AXIS} axisLine={false} tickFormatter={fmt} width={48} />
-            <Tooltip {...tooltipStyle} formatter={(v) => (typeof v === "number" ? fmt(v) : "-")} labelFormatter={(l) => `구위 ${l}`} />
+            <Tooltip {...tooltipStyle} formatter={(v) => (typeof v === "number" ? fmt(v) : "-")} labelFormatter={(l) => tt.common.stuffOf(String(l))} />
             <Legend wrapperStyle={{ fontSize: 12, color: "var(--ink-2)" }} iconType="circle" iconSize={8} />
-            <Bar dataKey="pitcher" name="이 투수" fill="var(--accent)" radius={[4, 4, 0, 0]} />
-            <Bar dataKey="league" name="리그" fill="var(--axis)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="pitcher" name={t.me} fill="var(--accent)" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="league" name={tt.common.league} fill="var(--axis)" radius={[4, 4, 0, 0]} />
           </BarChart>
         </ResponsiveContainer>
       </div>
@@ -254,11 +256,11 @@ export function BucketChart({ ps, leagueBuckets }: { ps: Pitch[]; leagueBuckets:
         {data.map((d) => (
           <div key={d.label}>
             <div className="text-ink-2">{pct(d.share, 0)}</div>
-            <div>{d.n}구</div>
+            <div>{tt.common.pitches(d.n)}</div>
           </div>
         ))}
       </div>
-      <p className="text-[11px] text-muted mt-2">구간별 투구 비중(아래 숫자)과 결과. 타석을 끝낸 투구의 구위 기준이며 표본이 적은 구간(10타수 미만)은 비워 둠.</p>
+      <p className="text-[11px] text-muted mt-2">{t.bucketFoot}</p>
     </div>
   );
 }
@@ -268,6 +270,8 @@ export function BucketChart({ ps, leagueBuckets }: { ps: Pitch[]; leagueBuckets:
 // ---------------------------------------------------------------------------
 export function CountMix({ ps, pitchTypes }: { ps: Pitch[]; pitchTypes: string[] }) {
   const dark = useDarkMode();
+  const tt = useT();
+  const t = tt.charts;
   const [hover, setHover] = useState<string | null>(null);
   const rows = useMemo(
     () =>
@@ -276,15 +280,15 @@ export function CountMix({ ps, pitchTypes }: { ps: Pitch[]; pitchTypes: string[]
         const by = groupBy(g, (p) => p.pt);
         return {
           key: c.key,
-          label: c.label,
+          label: tt.countStates[c.key],
           n: g.length,
           stuff: stats(g).stuff,
           parts: pitchTypes.filter((pt) => by.has(pt)).map((pt) => ({ pt, share: by.get(pt)!.length / g.length, stuff: stats(by.get(pt)!).stuff })),
         };
       }),
-    [ps, pitchTypes],
+    [ps, pitchTypes, tt],
   );
-  const W = 560, L = 76, R = 64, RH = 34;
+  const W = 560, L = 96, R = 64, RH = 34;
   const H = rows.length * RH + 4;
   const bw = W - L - R;
   return (
@@ -297,9 +301,9 @@ export function CountMix({ ps, pitchTypes }: { ps: Pitch[]; pitchTypes: string[]
           </span>
         ))}
       </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label="카운트 상황별 구종 비율">
+      <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={t.countAria}>
         <text x={W - 4} y={10} fontSize={10} fill="var(--muted)" textAnchor="end">
-          평균 구위
+          {tt.common.avgStuff}
         </text>
         {rows.map((r, i) => {
           const y = i * RH + 12;
@@ -310,7 +314,7 @@ export function CountMix({ ps, pitchTypes }: { ps: Pitch[]; pitchTypes: string[]
                 {r.label}
               </text>
               <text x={0} y={y + 25} fontSize={9.5} fill="var(--muted)" className="tnum">
-                {r.n}구
+                {tt.common.pitches(r.n)}
               </text>
               {r.parts.map((p) => {
                 const x0 = L + acc * bw;
@@ -341,7 +345,7 @@ export function CountMix({ ps, pitchTypes }: { ps: Pitch[]; pitchTypes: string[]
             const [k, pt] = hover.split(":");
             const r = rows.find((v) => v.key === k)!;
             const p = r.parts.find((v) => v.pt === pt)!;
-            return `${r.label} · ${pt} ${pct(p.share)} · 구위 ${f1(p.stuff)}`;
+            return t.countHover(r.label, pt, pct(p.share), f1(p.stuff));
           })()}
       </div>
     </div>
@@ -353,6 +357,8 @@ export function CountMix({ ps, pitchTypes }: { ps: Pitch[]; pitchTypes: string[]
 // ---------------------------------------------------------------------------
 export function TrendCharts({ ps, pitchTypes }: { ps: Pitch[]; pitchTypes: string[] }) {
   const dark = useDarkMode();
+  const tt = useT();
+  const t = tt.charts;
   const [mode, setMode] = useState<"month" | "fatigue">("month");
   const shown = useMemo(() => pitchTypes.filter((pt) => ps.filter((p) => p.pt === pt).length >= 40), [ps, pitchTypes]);
 
@@ -363,7 +369,7 @@ export function TrendCharts({ ps, pitchTypes }: { ps: Pitch[]; pitchTypes: strin
       return [...byM.keys()]
         .sort((a, b) => a - b)
         .map((m) => {
-          const row: Record<string, number | string | null> = { label: `${m}월` };
+          const row: Record<string, number | string | null> = { label: tt.common.month(m) };
           const g = groupBy(byM.get(m)!, (p) => p.pt);
           for (const pt of shown) row[pt] = (g.get(pt)?.length ?? 0) >= minN ? stats(g.get(pt)!).stuff : null;
           return row;
@@ -378,17 +384,17 @@ export function TrendCharts({ ps, pitchTypes }: { ps: Pitch[]; pitchTypes: strin
       for (const pt of shown) row[pt] = (g.get(pt)?.length ?? 0) >= minN ? stats(g.get(pt)!).stuff : null;
       return row;
     });
-  }, [ps, shown, mode]);
+  }, [ps, shown, mode, tt]);
 
   return (
     <div>
       <div className="flex justify-end mb-2">
         <Toggle
-          label="추이 기준"
+          label={t.trendAria}
           value={mode}
           options={[
-            ["month", "월별"],
-            ["fatigue", "경기 내 투구수"],
+            ["month", t.byMonth],
+            ["fatigue", t.byPitchCount],
           ]}
           onChange={setMode}
         />
@@ -412,7 +418,7 @@ export function TrendCharts({ ps, pitchTypes }: { ps: Pitch[]; pitchTypes: strin
         </div>
       )}
       <p className="text-[11px] text-muted mt-2">
-        {mode === "month" ? "월별 구종 평균 구위 (해당 월 15구 이상)." : "경기 내 투구 순번 구간별 구종 평균 구위 — 체력 저하에 따른 구위 하락을 확인 (15구 이상)."}
+        {mode === "month" ? t.trendMonth : t.trendFatigue}
       </p>
     </div>
   );
@@ -423,6 +429,8 @@ export function TrendCharts({ ps, pitchTypes }: { ps: Pitch[]; pitchTypes: strin
 // ---------------------------------------------------------------------------
 export function PlatoonTable({ ps, pitchTypes }: { ps: Pitch[]; pitchTypes: string[] }) {
   const dark = useDarkMode();
+  const tt = useT();
+  const t = tt.charts;
   const sides = useMemo(() => {
     const out = { L: ps.filter((p) => p.lhb), R: ps.filter((p) => !p.lhb) };
     return (["L", "R"] as const).map((s) => {
@@ -438,16 +446,16 @@ export function PlatoonTable({ ps, pitchTypes }: { ps: Pitch[]; pitchTypes: stri
           <tr className="text-muted">
             <th />
             <th colSpan={4} className="font-normal text-center border-b border-grid pb-1">
-              vs 좌타자
+              {t.vsL}
             </th>
             <th colSpan={4} className="font-normal text-center border-b border-grid pb-1">
-              vs 우타자
+              {t.vsR}
             </th>
           </tr>
           <tr className="text-muted border-b border-grid">
-            <th className="text-left font-normal py-1.5">구종</th>
+            <th className="text-left font-normal py-1.5">{tt.common.pitch}</th>
             {[0, 1].map((i) => (
-              <FragmentHead key={i} />
+              <FragmentHead key={i} heads={t.platoonHead} />
             ))}
           </tr>
         </thead>
@@ -467,16 +475,16 @@ export function PlatoonTable({ ps, pitchTypes }: { ps: Pitch[]; pitchTypes: stri
             </tr>
           ))}
           <tr className="font-semibold text-ink">
-            <td className="py-1.5">전체</td>
+            <td className="py-1.5">{t.total}</td>
             {sides.map(({ s, total }) => (
-              <FragmentCells key={s} cls={cell} vals={[`${total.n}구`, f1(total.stuff), pct(total.whiff, 0), f3(total.ba)]} />
+              <FragmentCells key={s} cls={cell} vals={[tt.common.pitches(total.n), f1(total.stuff), pct(total.whiff, 0), f3(total.ba)]} />
             ))}
           </tr>
           <tr className="text-ink-2">
-            <td className="py-1.5">피xwOBA</td>
+            <td className="py-1.5">{tt.common.xwoba}</td>
             {sides.map(({ s, total }) => (
               <td key={s} colSpan={4} className="text-center py-1.5">
-                {f3(total.xwoba)} <span className="text-muted">({total.pa} 타석)</span>
+                {f3(total.xwoba)} <span className="text-muted">{t.paCount(total.pa)}</span>
               </td>
             ))}
           </tr>
@@ -486,10 +494,10 @@ export function PlatoonTable({ ps, pitchTypes }: { ps: Pitch[]; pitchTypes: stri
   );
 }
 
-function FragmentHead() {
+function FragmentHead({ heads }: { heads: string[] }) {
   return (
     <>
-      {["구사율", "구위", "Whiff", "피안타율"].map((h) => (
+      {heads.map((h) => (
         <th key={h} className="text-right font-normal px-1.5 py-1.5">
           {h}
         </th>
@@ -511,5 +519,6 @@ function FragmentCells({ vals, cls, dim }: { vals: string[]; cls: string; dim?: 
 }
 
 function Empty() {
-  return <div className="h-24 flex items-center justify-center text-sm text-muted">표본 부족</div>;
+  const t = useT().charts;
+  return <div className="h-24 flex items-center justify-center text-sm text-muted">{t.empty}</div>;
 }

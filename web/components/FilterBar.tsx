@@ -2,6 +2,7 @@
 import type { Pitch } from "@/lib/types";
 import { COUNT_STATES, RESULT_FILTERS } from "@/lib/analysis";
 import { pitchColor, useDarkMode } from "@/lib/colors";
+import { useT } from "@/lib/i18n";
 
 export interface Filters {
   pitchTypes: string[]; // 빈 배열 = 전체
@@ -55,12 +56,14 @@ interface Props {
 
 export default function FilterBar({ filters: f, setFilters, pitchTypes, teams, validStart, shown, total }: Props) {
   const dark = useDarkMode();
+  const tt = useT();
+  const t = tt.filters;
   const set = (patch: Partial<Filters>) => setFilters({ ...f, ...patch });
   const active = JSON.stringify(f) !== JSON.stringify(EMPTY_FILTERS);
 
   return (
     <div className="card p-3 flex flex-col gap-2.5 text-xs">
-      <Row label="구종">
+      <Row label={t.pitch}>
         {pitchTypes.map((pt) => (
           <button key={pt} className="chip" aria-pressed={f.pitchTypes.includes(pt)} onClick={() => set({ pitchTypes: toggle(f.pitchTypes, pt) })}>
             <span className="w-2.5 h-2.5 rounded-full" style={{ background: pitchColor(pitchTypes, pt, dark) }} />
@@ -68,35 +71,29 @@ export default function FilterBar({ filters: f, setFilters, pitchTypes, teams, v
           </button>
         ))}
       </Row>
-      <Row label="결과">
+      <Row label={t.result}>
         {RESULT_FILTERS.map((r) => (
           <button key={r.key} className="chip" aria-pressed={f.results.includes(r.key)} onClick={() => set({ results: toggle(f.results, r.key) })}>
-            {r.label}
+            {tt.resultFilters[r.key]}
           </button>
         ))}
       </Row>
-      <Row label="상황">
-        {(
-          [
-            ["all", "전체 타자"],
-            ["L", "vs 좌타"],
-            ["R", "vs 우타"],
-          ] as const
-        ).map(([k, label]) => (
+      <Row label={t.situation}>
+        {(["all", "L", "R"] as const).map((k) => (
           <button key={k} className="chip" aria-pressed={f.hand === k} onClick={() => set({ hand: k })}>
-            {label}
+            {t.hand[k]}
           </button>
         ))}
         <span className="w-px h-5 bg-grid mx-1" />
         {COUNT_STATES.map((c) => (
           <button key={c.key} className="chip" aria-pressed={f.counts.includes(c.key)} onClick={() => set({ counts: toggle(f.counts, c.key) })}>
-            {c.label}
+            {tt.countStates[c.key]}
           </button>
         ))}
       </Row>
-      <Row label="기타">
+      <Row label={t.more}>
         <label className="flex items-center gap-1.5 text-ink-2">
-          구위
+          {t.stuff}
           <input
             type="number"
             min={20}
@@ -105,7 +102,7 @@ export default function FilterBar({ filters: f, setFilters, pitchTypes, teams, v
             value={f.stuffMin}
             onChange={(e) => set({ stuffMin: Number(e.target.value) })}
             className="w-14 rounded-md border border-line bg-surface px-1.5 py-1 tnum"
-            aria-label="구위 최소"
+            aria-label={t.stuffMin}
           />
           ~
           <input
@@ -116,7 +113,7 @@ export default function FilterBar({ filters: f, setFilters, pitchTypes, teams, v
             value={f.stuffMax}
             onChange={(e) => set({ stuffMax: Number(e.target.value) })}
             className="w-14 rounded-md border border-line bg-surface px-1.5 py-1 tnum"
-            aria-label="구위 최대"
+            aria-label={t.stuffMax}
           />
         </label>
         {teams.length > 1 &&
@@ -130,17 +127,15 @@ export default function FilterBar({ filters: f, setFilters, pitchTypes, teams, v
             className="chip"
             aria-pressed={f.validOnly}
             onClick={() => set({ validOnly: !f.validOnly })}
-            title="모델 학습에 쓰이지 않은 기간만 보기"
+            title={t.validTitle}
           >
-            검증기간만 ({validStart.slice(5)}~)
+            {t.validOnly(validStart.slice(5))}
           </button>
         )}
-        <span className="ml-auto text-muted tnum">
-          {shown.toLocaleString()} / {total.toLocaleString()}구
-        </span>
+        <span className="ml-auto text-muted tnum">{t.shown(shown, total)}</span>
         {active && (
           <button className="text-accent-ink underline underline-offset-2" onClick={() => setFilters(EMPTY_FILTERS)}>
-            필터 초기화
+            {t.reset}
           </button>
         )}
       </Row>
@@ -151,7 +146,7 @@ export default function FilterBar({ filters: f, setFilters, pitchTypes, teams, v
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex items-start gap-2">
-      <span className="w-8 shrink-0 pt-1.5 text-muted">{label}</span>
+      <span className="min-w-8 shrink-0 pt-1.5 text-muted">{label}</span>
       <div className="flex flex-wrap items-center gap-1.5 flex-1">{children}</div>
     </div>
   );

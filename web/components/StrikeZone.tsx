@@ -1,8 +1,9 @@
 "use client";
 import { useMemo, useRef, useState } from "react";
 import type { Pitch } from "@/lib/types";
-import { PA_LABELS, RESULT_LABELS, ZONE_BOT, ZONE_HALF_WIDTH, ZONE_TOP, resultShape } from "@/lib/analysis";
+import { ZONE_BOT, ZONE_HALF_WIDTH, ZONE_TOP, resultShape } from "@/lib/analysis";
 import { STUFF_DOMAIN, stuffColor, stuffOpacity, useDarkMode } from "@/lib/colors";
+import { useT } from "@/lib/i18n";
 import { ResultLegend, ResultMarker } from "@/components/ResultMarker";
 
 const W = 440;
@@ -25,6 +26,7 @@ export default function StrikeZone({ pitches, ghost = [], pitchNames, onPick, nu
   const dark = useDarkMode();
   const svgRef = useRef<SVGSVGElement>(null);
   const [hover, setHover] = useState<Pitch | null>(null);
+  const t = useT().zone;
 
   // 구위 낮은 공을 먼저 그려 진한(구위 높은) 공이 위에 오도록
   const pts = useMemo(
@@ -95,7 +97,7 @@ export default function StrikeZone({ pitches, ghost = [], pitchNames, onPick, nu
         viewBox={`0 0 ${W} ${H}`}
         className="w-full h-auto touch-none select-none"
         role="img"
-        aria-label={`포수 시점 투구 위치 ${pts.length}구, 빨갈수록 구위 높음`}
+        aria-label={t.aria(pts.length)}
         onPointerMove={onMove}
         onPointerLeave={() => setHover(null)}
         onPointerDown={onMove}
@@ -120,10 +122,10 @@ export default function StrikeZone({ pitches, ghost = [], pitchNames, onPick, nu
           stroke="var(--axis)"
         />
         <text x={8} y={H - 10} fontSize={11} fill="var(--muted)">
-          ← 3루쪽
+          {t.left}
         </text>
         <text x={W - 8} y={H - 10} fontSize={11} fill="var(--muted)" textAnchor="end">
-          1루쪽 →
+          {t.right}
         </text>
         {layer}
         <rect x={zl} y={zt} width={zr - zl} height={zb - zt} fill="none" stroke="var(--zone-line)" strokeWidth={1.5} />
@@ -134,7 +136,7 @@ export default function StrikeZone({ pitches, ghost = [], pitchNames, onPick, nu
         )}
       </svg>
 
-      {hover && hp && <Tooltip p={hover} left={(hp.x / W) * 100} top={(hp.y / H) * 100} pitchNames={pitchNames} hint={onPick && hover.s !== null ? "클릭하면 구위 산출 근거" : undefined} />}
+      {hover && hp && <Tooltip p={hover} left={(hp.x / W) * 100} top={(hp.y / H) * 100} pitchNames={pitchNames} hint={onPick && hover.s !== null ? t.hint : undefined} />}
 
       <Legend dark={dark} n={pts.length} />
     </div>
@@ -143,6 +145,8 @@ export default function StrikeZone({ pitches, ghost = [], pitchNames, onPick, nu
 
 export function Tooltip({ p, left, top, pitchNames, hint }: { p: Pitch; left: number; top: number; pitchNames: Record<string, string>; hint?: string }) {
   const right = left > 55;
+  const tt = useT();
+  const t = tt.zone;
   const fmt = (v: number | null, d = 1, unit = "") => (v === null ? "-" : `${v.toFixed(d)}${unit}`);
   return (
     <div
@@ -153,29 +157,32 @@ export function Tooltip({ p, left, top, pitchNames, hint }: { p: Pitch; left: nu
         <span>
           {pitchNames[p.pt] ?? p.pt} ({p.pt})
         </span>
-        <span className="tnum">{p.s === null ? "구위 -" : `구위 ${p.s.toFixed(1)}`}</span>
+        <span className="tnum">{p.s === null ? t.stuffNone : tt.common.stuffOf(p.s.toFixed(1))}</span>
       </div>
-      {p.s === null && <div className="text-muted mb-1">{p.r === 9 ? "사구" : "존에서 크게 벗어난 볼"} — 구위 점수 제외</div>}
-      <div className="text-muted mb-1">
-        {p.date} · {p.inn}회 · {p.b}-{p.k} 카운트 · {p.lhb ? "좌타" : "우타"}
-      </div>
+      {p.s === null && (
+        <div className="text-muted mb-1">
+          {p.r === 9 ? t.hbp : t.waste}
+          {t.unscoredSuffix}
+        </div>
+      )}
+      <div className="text-muted mb-1">{t.tipLine(p.date, p.inn, p.b, p.k, p.lhb)}</div>
       <dl className="grid grid-cols-2 gap-x-2 gap-y-0.5 tnum text-ink-2">
-        <dt>결과</dt>
+        <dt>{tt.common.result}</dt>
         <dd className="text-ink font-medium">
-          {RESULT_LABELS[p.r]}
-          {p.pa > 0 && p.pa !== 1 && !(p.pa >= 3 && p.pa <= 6) ? ` (${PA_LABELS[p.pa]})` : ""}
+          {tt.results[p.r]}
+          {p.pa > 0 && p.pa !== 1 && !(p.pa >= 3 && p.pa <= 6) ? ` (${tt.paEvents[p.pa]})` : ""}
         </dd>
-        <dt>구속</dt>
+        <dt>{tt.common.velo}</dt>
         <dd>{fmt(p.v, 1, " mph")}</dd>
-        <dt>무브먼트</dt>
+        <dt>{t.movement}</dt>
         <dd>
           H {fmt(p.hb, 1)} / V {fmt(p.ivb, 1)} in
         </dd>
-        <dt>회전수</dt>
+        <dt>{t.spin}</dt>
         <dd>{fmt(p.spin, 0, " rpm")}</dd>
         {p.ev !== null && (
           <>
-            <dt>타구</dt>
+            <dt>{t.batted}</dt>
             <dd>
               {fmt(p.ev, 1)} mph / {fmt(p.la, 0)}°
             </dd>
@@ -183,8 +190,8 @@ export function Tooltip({ p, left, top, pitchNames, hint }: { p: Pitch; left: nu
             <dd>{p.xba === null ? "-" : p.xba.toFixed(3)}</dd>
           </>
         )}
-        <dt>경기 내</dt>
-        <dd>{p.gp}번째 투구</dd>
+        <dt>{t.inGame}</dt>
+        <dd>{t.gamePitch(p.gp)}</dd>
       </dl>
       {hint && <div className="mt-1.5 text-accent-ink">{hint} →</div>}
     </div>
@@ -192,6 +199,7 @@ export function Tooltip({ p, left, top, pitchNames, hint }: { p: Pitch; left: nu
 }
 
 function Legend({ dark, n }: { dark: boolean; n: number }) {
+  const tt = useT();
   const stops = Array.from({ length: 11 }, (_, i) => {
     const s = STUFF_DOMAIN[0] + ((STUFF_DOMAIN[1] - STUFF_DOMAIN[0]) * i) / 10;
     const [r, g, b] = stuffColor(s, dark).slice(4, -1).split(",");
@@ -200,20 +208,20 @@ function Legend({ dark, n }: { dark: boolean; n: number }) {
   return (
     <div className="mt-2 flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-xs text-ink-2">
       <div className="flex items-center gap-2">
-        <span>구위</span>
+        <span>{tt.common.stuff}</span>
         <span className="tnum text-muted">≤{STUFF_DOMAIN[0]}</span>
         <span className="h-2.5 w-32 rounded-sm" style={{ background: `linear-gradient(90deg, ${stops.join(",")})` }} />
         <span className="tnum text-muted">{STUFF_DOMAIN[1]}≥</span>
       </div>
-      <div className="flex flex-wrap items-center gap-3" aria-label="마커 모양">
+      <div className="flex flex-wrap items-center gap-3" aria-label={tt.zone.shapesAria}>
         <ResultLegend shapes={["dot", "square", "triangle", "diamond", "star"]} />
         <span className="flex items-center gap-1">
           <svg width={12} height={12}>
             <circle cx={6} cy={6} r={4.5} fill="none" stroke="var(--muted)" strokeWidth={1} />
           </svg>
-          점수 제외(존 밖 볼·사구)
+          {tt.zone.legendUnscored}
         </span>
-        <span className="tnum text-muted">{n.toLocaleString()}구</span>
+        <span className="tnum text-muted">{tt.common.pitches(n)}</span>
       </div>
     </div>
   );

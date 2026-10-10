@@ -1,5 +1,6 @@
 "use client";
 import { type ResultShape } from "@/lib/analysis";
+import { useT } from "@/lib/i18n";
 
 /** 투구 분포도·타구 분포도 공용 결과 기호 : ● 비타격 / ■ 아웃 / ▲ 1루타 / ◆ 2·3루타 / ★ 홈런 */
 export function ResultMarker({
@@ -41,16 +42,9 @@ export function ResultMarker({
   }
 }
 
-export const SHAPE_LABELS: Record<ResultShape, string> = {
-  dot: "볼·스트라이크·파울",
-  square: "아웃",
-  triangle: "1루타",
-  diamond: "2·3루타",
-  star: "홈런",
-};
-
 /** 결과 기호 범례. color 를 주면 결과별 색, 없으면 회색 기호 */
 export function ResultLegend({ shapes, color }: { shapes: ResultShape[]; color?: (s: ResultShape) => string }) {
+  const labels = useT().shapes;
   return (
     <>
       {shapes.map((s) => (
@@ -58,7 +52,7 @@ export function ResultLegend({ shapes, color }: { shapes: ResultShape[]; color?:
           <svg width={12} height={12} aria-hidden>
             <ResultMarker shape={s} x={6} y={6.3} r={3.6} fill={color ? color(s) : "var(--muted)"} />
           </svg>
-          {SHAPE_LABELS[s]}
+          {labels[s]}
         </span>
       ))}
     </>

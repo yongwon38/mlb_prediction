@@ -60,6 +60,11 @@ body {
   color: var(--ink);
 }
 
+/* 영어 방문자 : 정적 HTML(한국어)이 보이지 않도록 하이드레이션까지 가림 (lib/i18n/init.ts) */
+html.lang-pending body {
+  visibility: hidden;
+}
+
 .card {
   background: var(--surface);
   border: 1px solid var(--border);

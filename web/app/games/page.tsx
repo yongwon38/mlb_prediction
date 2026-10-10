@@ -8,9 +8,9 @@ import { Section, Toggle } from "@/components/Panels";
 import { GameTypePicker, PitcherHeader, SeasonSelect } from "@/components/PageHeader";
 import Methodology from "@/components/Methodology";
 import { ctxHref, numParam, usePageState, usePitcherData } from "@/lib/appState";
-import { RESULT_LABELS } from "@/lib/analysis";
 import { pitchColor, stuffColor, useDarkMode } from "@/lib/colors";
 import { batterName, gameLabel, ipText, paResult, runnersText, scoreText, signedPct, situation } from "@/lib/games";
+import { useT } from "@/lib/i18n";
 import type { GameRow, Meta, PaRow, Pitch, PitcherFile } from "@/lib/types";
 
 const MIN_GAME_PITCHES = 15; // 구위 하이라이트 경기 최소 투구
@@ -26,6 +26,8 @@ export default function GamesPage() {
   });
   const data = usePitcherData(season, entry?.id ?? null, setError);
   const router = useRouter();
+  const tt = useT();
+  const t = tt.games;
 
   const gtCounts = useMemo(() => {
     const c = [0, 0, 0];
@@ -54,9 +56,9 @@ export default function GamesPage() {
   return (
     <main className="mx-auto w-full max-w-[1280px] px-4 py-6 flex flex-col gap-4">
       <PitcherHeader
-        title="경기·타석"
+        title={t.title}
         name={entry?.name ?? null}
-        info={entry ? `${entry.throws === "R" ? "우투" : "좌투"} · ${entry.teams.join(" → ")} · ${season} 시즌 ${file ? `${file.games.length}경기` : ""}` : "투수를 고르면 중요한 경기·타석을 추천하거나 직접 고를 수 있습니다"}
+        info={entry ? `${tt.common.throws(entry.throws)} · ${entry.teams.join(" → ")} · ${t.info(season, file ? file.games.length : null)}` : t.idle}
         season={season}
         pitcherId={entry ? pitcherId : null}
         gt={gt}
@@ -64,20 +66,20 @@ export default function GamesPage() {
         right={<SeasonSelect meta={meta} season={season} onChange={(s) => (setSeason(s), pickGame(null))} />}
       />
 
-      {error && <div className="card p-3 text-sm text-bad">데이터를 불러오지 못했습니다 : {error}</div>}
+      {error && <div className="card p-3 text-sm text-bad">{tt.common.loadError(error)}</div>}
 
       {!entry && (
         <>
           <SearchPanel key={season ?? 0} index={index} selectedId={pitcherId} onSelect={(id) => (setPitcherId(id), pickGame(null))} />
-          {pitcherId && index && <div className="card p-10 text-center text-sm text-muted">이 시즌에는 이 투수의 기록이 없습니다.</div>}
+          {pitcherId && index && <div className="card p-10 text-center text-sm text-muted">{tt.common.noRecord}</div>}
         </>
       )}
-      {entry && !data && <div className="card p-10 text-center text-sm text-muted">{entry.name} 경기 데이터 불러오는 중…</div>}
+      {entry && !data && <div className="card p-10 text-center text-sm text-muted">{t.loading(entry.name)}</div>}
 
       {data && meta && file && (
         <>
           <div className="card p-3">
-            <GameTypePicker labels={meta.gameTypes} value={effGt} onChange={(v) => (setGt(v), pickGame(null))} counts={gtCounts} />
+            <GameTypePicker value={effGt} onChange={(v) => (setGt(v), pickGame(null))} counts={gtCounts} />
           </div>
 
           <div className="grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] items-start">
@@ -85,20 +87,20 @@ export default function GamesPage() {
 
             <div className="flex flex-col gap-4 min-w-0">
               {!g ? (
-                <Section title="경기를 고르세요">
-                  <p className="text-sm text-muted">왼쪽에서 추천 경기·타석을 누르거나, &lsquo;직접 선택&rsquo;에서 날짜·상대로 경기를 고르세요.</p>
+                <Section title={t.pick}>
+                  <p className="text-sm text-muted">{t.pickBody}</p>
                 </Section>
               ) : (
                 <>
-                  <GameSummary g={g} meta={meta} />
+                  <GameSummary g={g} />
                   {p ? (
                     <PaView file={file} meta={meta} p={p} ps={paPs} gamePs={gamePs} onBack={() => setPa(null)} onPick={toExplain} />
                   ) : (
-                    <Section title="경기 투구 분포" sub="빨갈수록 구위 높음 · 점을 클릭하면 그 공의 구위 산출 근거">
+                    <Section title={t.gameDist} sub={t.gameDistSub}>
                       <StrikeZone pitches={gamePs} pitchNames={meta.pitchNames} onPick={toExplain} />
                     </Section>
                   )}
-                  <Section title="투구 순서별 구위" sub="점 색 = 구종 · 세로 점선 = 이닝 경계 · 점을 누르면 그 타석으로">
+                  <Section title={t.seq} sub={t.seqSub}>
                     <PitchSequence ps={gamePs} pitchTypes={file.pitchTypes} selectedPa={pa} onPickPa={(k) => setPa(k)} />
                   </Section>
                   <PaTable file={file} g={g} selected={pa} onPick={(k) => setPa(k)} />
@@ -119,6 +121,8 @@ export default function GamesPage() {
 // ---------------------------------------------------------------------------
 function Picker({ file, meta, gts, game, pa, onPick }: { file: PitcherFile; meta: Meta; gts: number[]; game: number | null; pa: number | null; onPick: (g: number | null, pa?: number | null) => void }) {
   const [mode, setMode] = useState<"rec" | "manual">("rec");
+  const tt = useT();
+  const t = tt.games;
   const games = useMemo(() => file.games.map((g, gi) => ({ g, gi })).filter(({ g }) => gts.includes(g.gt)), [file, gts]);
   const pas = useMemo(() => {
     const ok = new Set(games.map((x) => x.gi));
@@ -134,41 +138,41 @@ function Picker({ file, meta, gts, game, pa, onPick }: { file: PitcherFile; meta
   }, [games, pas]);
 
   return (
-    <Section title="경기·타석 고르기" right={<Toggle label="선택 방식" value={mode} options={[["rec", "추천"], ["manual", "직접 선택"]]} onChange={setMode} />}>
+    <Section title={t.pickerTitle} right={<Toggle label={t.modeAria} value={mode} options={[["rec", t.rec], ["manual", t.manual]]} onChange={setMode} />}>
       {mode === "rec" ? (
         <div className="flex flex-col gap-4 text-sm">
-          <RecGroup title="승부처 경기" note={`타석별 승리확률 변화(|WPA|) 합 × 경기 유형 가중치 (포스트시즌 ${meta.importanceWeight.D}배, 월드시리즈 ${meta.importanceWeight.W}배, 시범경기 ${meta.importanceWeight.S}배)`}>
+          <RecGroup title={t.impGames} note={t.impGamesNote(meta.importanceWeight.D, meta.importanceWeight.W, meta.importanceWeight.S)}>
             {rec.byImp.map(({ g, gi }) => (
-              <RecItem key={gi} active={game === gi && pa === null} onClick={() => onPick(gi)} main={gameLabel(g, meta)} sub={`${scoreText(g)} · ${ipText(g.outs)}이닝 ${g.n}구 · WPA ${signedPct(g.wpa)}`} value={g.imp.toFixed(2)} valueLabel="중요도" />
+              <RecItem key={gi} active={game === gi && pa === null} onClick={() => onPick(gi)} main={gameLabel(g, tt)} sub={t.impGameSub(scoreText(g, tt), ipText(g.outs), g.n, signedPct(g.wpa))} value={g.imp.toFixed(2)} valueLabel={t.leverage} />
             ))}
           </RecGroup>
-          <RecGroup title="승부처 타석" note="승리확률을 가장 크게 바꾼 타석 (+ 막아냄 / − 허용)">
+          <RecGroup title={t.impPas} note={t.impPasNote}>
             {rec.paImp.map(({ p, pai }) => (
               <RecItem
                 key={pai}
                 active={pa === pai}
                 onClick={() => onPick(p.g, pai)}
-                main={`${file.games[p.g].date} vs ${batterName(file, p)} — ${paResult(p)}`}
-                sub={situation(p)}
+                main={t.paMain(file.games[p.g].date, batterName(file, p), paResult(p, tt))}
+                sub={situation(p, tt)}
                 value={signedPct(p.wpa)}
                 valueLabel="WPA"
                 tone={(p.wpa ?? 0) >= 0 ? "good" : "bad"}
               />
             ))}
           </RecGroup>
-          <RecGroup title="구위 하이라이트 — 경기" note={`평균 구위 최고·최저 경기 (${MIN_GAME_PITCHES}구 이상)`}>
-            {[...rec.bestGames.map((x) => ({ ...x, tag: "최고" })), ...rec.worstGames.map((x) => ({ ...x, tag: "최저" }))].map(({ g, gi, tag }) => (
-              <RecItem key={`${tag}${gi}`} active={game === gi && pa === null} onClick={() => onPick(gi)} main={`${tag} · ${gameLabel(g, meta)}`} sub={`${g.n}구 · 60+ ${g.s60 !== null ? Math.round(g.s60 * 100) : "-"}% · ${scoreText(g)}`} value={g.s!.toFixed(1)} valueLabel="평균 구위" />
+          <RecGroup title={t.stuffGames} note={t.stuffGamesNote(MIN_GAME_PITCHES)}>
+            {[...rec.bestGames.map((x) => ({ ...x, tag: t.best })), ...rec.worstGames.map((x) => ({ ...x, tag: t.worst }))].map(({ g, gi, tag }) => (
+              <RecItem key={`${tag}${gi}`} active={game === gi && pa === null} onClick={() => onPick(gi)} main={`${tag} · ${gameLabel(g, tt)}`} sub={t.stuffGameSub(g.n, g.s60 !== null ? String(Math.round(g.s60 * 100)) : "-", scoreText(g, tt))} value={g.s!.toFixed(1)} valueLabel={tt.common.avgStuff} />
             ))}
           </RecGroup>
-          <RecGroup title="구위 하이라이트 — 타석" note={`평균 구위가 가장 높았던 타석 (${MIN_PA_PITCHES}구 이상)`}>
+          <RecGroup title={t.stuffPas} note={t.stuffPasNote(MIN_PA_PITCHES)}>
             {rec.bestPas.map(({ p, pai }) => (
-              <RecItem key={pai} active={pa === pai} onClick={() => onPick(p.g, pai)} main={`${file.games[p.g].date} vs ${batterName(file, p)} — ${paResult(p)}`} sub={`${p.n}구 · 최고 ${p.smax?.toFixed(1) ?? "-"} · ${situation(p)}`} value={p.s!.toFixed(1)} valueLabel="평균 구위" />
+              <RecItem key={pai} active={pa === pai} onClick={() => onPick(p.g, pai)} main={t.paMain(file.games[p.g].date, batterName(file, p), paResult(p, tt))} sub={t.stuffPaSub(p.n, p.smax?.toFixed(1) ?? "-", situation(p, tt))} value={p.s!.toFixed(1)} valueLabel={tt.common.avgStuff} />
             ))}
           </RecGroup>
         </div>
       ) : (
-        <ManualPicker meta={meta} games={games} game={game} onPick={onPick} />
+        <ManualPicker games={games} game={game} onPick={onPick} />
       )}
     </Section>
   );
@@ -201,29 +205,29 @@ function RecItem({ main, sub, value, valueLabel, active, onClick, tone }: { main
   );
 }
 
-function ManualPicker({ meta, games, game, onPick }: { meta: Meta; games: { g: GameRow; gi: number }[]; game: number | null; onPick: (g: number | null, pa?: number | null) => void }) {
+function ManualPicker({ games, game, onPick }: { games: { g: GameRow; gi: number }[]; game: number | null; onPick: (g: number | null, pa?: number | null) => void }) {
   const [q, setQ] = useState("");
-  const shown = games.filter(({ g }) => !q || `${g.date} ${g.opp} ${meta.rounds[g.rd] ?? ""}`.toLowerCase().includes(q.toLowerCase()));
+  const tt = useT();
+  const t = tt.games;
+  const shown = games.filter(({ g }) => !q || `${g.date} ${g.opp} ${tt.rounds[g.rd] ?? ""}`.toLowerCase().includes(q.toLowerCase()));
   return (
     <div className="flex flex-col gap-2 text-sm">
-      <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="날짜(2026-06) 또는 상대 팀(LAD)으로 찾기" aria-label="경기 찾기" />
+      <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t.searchPh} aria-label={t.searchAria} />
       <ul className="max-h-[560px] overflow-y-auto border-t border-grid">
         {shown.map(({ g, gi }) => (
           <li key={gi}>
             <button onClick={() => onPick(gi)} aria-pressed={game === gi} className={`w-full text-left grid grid-cols-[1fr_auto_auto] items-center gap-x-3 px-1.5 py-1.5 border-b border-grid hover:bg-surface-2 ${game === gi ? "bg-surface-2" : ""}`}>
               <span className="truncate">
-                <span className="text-ink">{gameLabel(g, meta)}</span>
-                <span className="text-xs text-muted ml-2">{g.st ? "선발" : "구원"}</span>
+                <span className="text-ink">{gameLabel(g, tt)}</span>
+                <span className="text-xs text-muted ml-2">{g.st ? t.starter : t.reliever}</span>
               </span>
-              <span className="text-xs text-muted tnum">
-                {ipText(g.outs)}이닝 {g.n}구
-              </span>
+              <span className="text-xs text-muted tnum">{t.ipPitches(ipText(g.outs), g.n)}</span>
               <span className="tnum font-semibold text-ink w-10 text-right">{g.s?.toFixed(1) ?? "-"}</span>
             </button>
           </li>
         ))}
       </ul>
-      <p className="text-xs text-muted">{shown.length}경기 · 오른쪽 숫자 = 평균 구위. 경기를 고른 뒤 아래 타석 목록에서 타석을 고르세요.</p>
+      <p className="text-xs text-muted">{t.manualFoot(shown.length)}</p>
     </div>
   );
 }
@@ -231,26 +235,29 @@ function ManualPicker({ meta, games, game, onPick }: { meta: Meta; games: { g: G
 // ---------------------------------------------------------------------------
 // 오른쪽 : 경기 요약, 타석 목록, 타석 보기
 // ---------------------------------------------------------------------------
-function GameSummary({ g, meta }: { g: GameRow; meta: Meta }) {
-  const cells: [string, string][] = [
-    ["결과", scoreText(g)],
-    ["역할", g.st ? "선발" : "구원"],
-    ["이닝 (추정)", ipText(g.outs)],
-    ["투구", `${g.n}구`],
-    ["피안타 / 실점", `${g.h} / ${g.r}`],
-    ["K / BB / HR", `${g.k} / ${g.bb} / ${g.hr}`],
-    ["평균 구위", g.s?.toFixed(1) ?? "-"],
-    ["60+ 비율", g.s60 !== null ? `${Math.round(g.s60 * 100)}%` : "-"],
-    ["WPA", signedPct(g.wpa)],
-    ["중요도", g.imp.toFixed(2)],
+function GameSummary({ g }: { g: GameRow }) {
+  const tt = useT();
+  const t = tt.games;
+  const vals = [
+    scoreText(g, tt),
+    g.st ? t.starter : t.reliever,
+    ipText(g.outs),
+    String(g.n),
+    `${g.h} / ${g.r}`,
+    `${g.k} / ${g.bb} / ${g.hr}`,
+    g.s?.toFixed(1) ?? "-",
+    g.s60 !== null ? `${Math.round(g.s60 * 100)}%` : "-",
+    signedPct(g.wpa),
+    g.imp.toFixed(2),
   ];
+  const cells: [string, string][] = vals.map((v, i) => [t.summaryCells[i], v]);
   return (
     <Section
-      title={`${gameLabel(g, meta)} · ${meta.rounds[g.rd] ?? g.rd}`}
-      sub="이닝·안타·볼넷 등은 이 투수가 던진 투구의 Statcast 이벤트로 계산 · WPA 는 투수 관점(+ = 팀 승리확률 상승)"
+      title={`${gameLabel(g, tt, false)} · ${tt.rounds[g.rd] ?? g.rd}`}
+      sub={t.summarySub}
       right={
         <a className="text-xs text-accent-ink underline underline-offset-2" href={`https://baseballsavant.mlb.com/gamefeed?gamePk=${g.pk}`} target="_blank" rel="noreferrer">
-          Savant 게임피드 ↗
+          {tt.common.savantFeed}
         </a>
       }
     >
@@ -268,33 +275,34 @@ function GameSummary({ g, meta }: { g: GameRow; meta: Meta }) {
 
 function PaTable({ file, g, selected, onPick }: { file: PitcherFile; g: GameRow; selected: number | null; onPick: (pai: number) => void }) {
   const dark = useDarkMode();
+  const tt = useT();
+  const t = tt.games;
   const rows = file.pas.slice(g.pa0, g.pa0 + g.npa).map((p, k) => ({ p, pai: g.pa0 + k }));
+  const h = t.paHead;
   return (
-    <Section title="타석 목록" sub="행을 누르면 타석 보기 · WPA 는 투수 관점">
+    <Section title={t.paList} sub={t.paListSub}>
       <div className="overflow-x-auto">
         <table className="w-full text-xs tnum">
           <thead>
             <tr className="text-muted border-b border-grid">
-              <th className="text-left font-normal py-1.5">이닝</th>
-              <th className="text-left font-normal py-1.5">상황</th>
-              <th className="text-left font-normal py-1.5">타자</th>
-              <th className="text-left font-normal py-1.5">결과</th>
-              <th className="text-right font-normal py-1.5">투구</th>
-              <th className="text-right font-normal py-1.5">평균 구위</th>
-              <th className="text-right font-normal py-1.5">WPA</th>
+              <th className="text-left font-normal py-1.5">{h[0]}</th>
+              <th className="text-left font-normal py-1.5">{h[1]}</th>
+              <th className="text-left font-normal py-1.5">{h[2]}</th>
+              <th className="text-left font-normal py-1.5">{h[3]}</th>
+              <th className="text-right font-normal py-1.5">{h[4]}</th>
+              <th className="text-right font-normal py-1.5">{h[5]}</th>
+              <th className="text-right font-normal py-1.5">{h[6]}</th>
             </tr>
           </thead>
           <tbody>
             {rows.map(({ p, pai }) => (
               <tr key={pai} onClick={() => onPick(pai)} className={`border-b border-grid cursor-pointer hover:bg-surface-2 ${selected === pai ? "bg-surface-2" : ""}`}>
-                <td className="py-1.5 text-ink-2">{p.inn}회</td>
-                <td className="py-1.5 text-ink-2 whitespace-nowrap">
-                  {p.o ?? "-"}사 {runnersText(p.on)}
-                </td>
+                <td className="py-1.5 text-ink-2">{tt.common.inning(p.inn)}</td>
+                <td className="py-1.5 text-ink-2 whitespace-nowrap">{t.outsRunners(p.o, runnersText(p.on, tt))}</td>
                 <td className="py-1.5 text-ink whitespace-nowrap">
                   {batterName(file, p)} <span className="text-muted">{p.lhb ? "L" : "R"}</span>
                 </td>
-                <td className="py-1.5 text-ink-2 whitespace-nowrap">{paResult(p)}</td>
+                <td className="py-1.5 text-ink-2 whitespace-nowrap">{paResult(p, tt)}</td>
                 <td className="py-1.5 text-right text-ink-2">{p.n}</td>
                 <td className="py-1.5 text-right font-semibold" style={{ color: p.s !== null ? stuffColor(p.s, dark) : undefined }}>
                   {p.s?.toFixed(1) ?? "-"}
@@ -311,15 +319,18 @@ function PaTable({ file, g, selected, onPick }: { file: PitcherFile; g: GameRow;
 
 function PaView({ file, meta, p, ps, gamePs, onBack, onPick }: { file: PitcherFile; meta: Meta; p: PaRow; ps: Pitch[]; gamePs: Pitch[]; onBack: () => void; onPick: (x: Pitch) => void }) {
   const dark = useDarkMode();
+  const tt = useT();
+  const t = tt.games;
   const pai = ps[0]?.pai;
   const ghost = gamePs.filter((x) => x.pai !== pai);
+  const h = t.pitchHead;
   return (
     <Section
-      title={`타석 보기 — vs ${batterName(file, p)} (${p.lhb ? "좌타" : "우타"})`}
-      sub={`${situation(p)} · 결과 ${paResult(p)} · WPA ${signedPct(p.wpa)}`}
+      title={t.paView(batterName(file, p), !!p.lhb)}
+      sub={t.paViewSub(situation(p, tt), paResult(p, tt), signedPct(p.wpa))}
       right={
         <button className="text-xs text-accent-ink underline underline-offset-2" onClick={onBack}>
-          경기 전체 분포로
+          {t.back}
         </button>
       }
     >
@@ -329,12 +340,12 @@ function PaView({ file, meta, p, ps, gamePs, onBack, onPick }: { file: PitcherFi
         <table className="w-full text-xs tnum">
           <thead>
             <tr className="text-muted border-b border-grid">
-              <th className="text-left font-normal py-1.5">#</th>
-              <th className="text-left font-normal py-1.5">카운트</th>
-              <th className="text-left font-normal py-1.5">구종</th>
-              <th className="text-right font-normal py-1.5">구속</th>
-              <th className="text-right font-normal py-1.5">구위</th>
-              <th className="text-left font-normal py-1.5 pl-3">결과</th>
+              <th className="text-left font-normal py-1.5">{h[0]}</th>
+              <th className="text-left font-normal py-1.5">{h[1]}</th>
+              <th className="text-left font-normal py-1.5">{h[2]}</th>
+              <th className="text-right font-normal py-1.5">{h[3]}</th>
+              <th className="text-right font-normal py-1.5">{h[4]}</th>
+              <th className="text-left font-normal py-1.5 pl-3">{h[5]}</th>
               <th />
             </tr>
           </thead>
@@ -355,11 +366,11 @@ function PaView({ file, meta, p, ps, gamePs, onBack, onPick }: { file: PitcherFi
                 <td className="py-1.5 text-right font-semibold" style={{ color: x.s !== null ? stuffColor(x.s, dark) : undefined }}>
                   {x.s?.toFixed(1) ?? "-"}
                 </td>
-                <td className="py-1.5 pl-3 text-ink-2">{RESULT_LABELS[x.r]}</td>
+                <td className="py-1.5 pl-3 text-ink-2">{tt.results[x.r]}</td>
                 <td className="py-1.5 text-right">
                   {x.s !== null && (
                     <button className="text-accent-ink underline underline-offset-2" onClick={() => onPick(x)}>
-                      근거
+                      {t.why}
                     </button>
                   )}
                 </td>
@@ -368,7 +379,7 @@ function PaView({ file, meta, p, ps, gamePs, onBack, onPick }: { file: PitcherFi
           </tbody>
         </table>
       </div>
-      <p className="text-xs text-muted mt-2">숫자 = 타석 내 투구 순서 · 회색 점 = 같은 경기의 다른 투구 · 점이나 &lsquo;근거&rsquo;를 누르면 그 공의 구위 산출 근거</p>
+      <p className="text-xs text-muted mt-2">{t.paFoot}</p>
     </Section>
   );
 }

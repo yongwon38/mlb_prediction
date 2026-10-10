@@ -1,28 +1,30 @@
 "use client";
 import { divergingPole, useDarkMode } from "@/lib/colors";
 import { fmtSigned } from "@/lib/explain";
+import { useT } from "@/lib/i18n";
 
 /** 개별 투구 워터폴 : 기준 S0 -> 요인별 ± -> 최종 구위 (가로 = 구위 점수) */
 export default function Waterfall({ groups, c, base, final }: { groups: string[]; c: number[]; base: number; final: number }) {
   const dark = useDarkMode();
-  const steps: { label: string; from: number; to: number; kind: "base" | "step" | "final" }[] = [{ label: "기준", from: base, to: base, kind: "base" }];
+  const t = useT().explain;
+  const steps: { label: string; from: number; to: number; kind: "base" | "step" | "final" }[] = [{ label: t.base, from: base, to: base, kind: "base" }];
   let acc = base;
   groups.forEach((g, j) => {
     steps.push({ label: g, from: acc, to: acc + c[j], kind: "step" });
     acc += c[j];
   });
-  steps.push({ label: "최종 구위", from: final, to: final, kind: "final" });
+  steps.push({ label: t.final, from: final, to: final, kind: "final" });
 
   const vals = steps.flatMap((s) => [s.from, s.to]);
   const lo = Math.max(20, Math.floor(Math.min(...vals, 45) / 5) * 5);
   const hi = Math.min(80, Math.ceil(Math.max(...vals, 55) / 5) * 5);
-  const W = 560, L = 112, R = 56, RH = 24, T = 6;
+  const W = 560, L = 136, R = 56, RH = 24, T = 6;
   const H = T + steps.length * RH + 22;
   const x = (v: number) => L + ((Math.max(lo, Math.min(hi, v)) - lo) / (hi - lo)) * (W - L - R);
   const ticks = Array.from({ length: Math.round((hi - lo) / 5) + 1 }, (_, i) => lo + i * 5);
 
   return (
-    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={`구위 ${final.toFixed(1)} 산출 과정`}>
+    <svg viewBox={`0 0 ${W} ${H}`} className="w-full h-auto" role="img" aria-label={t.waterfallAria(final.toFixed(1))}>
       {ticks.map((t) => (
         <g key={t}>
           <line x1={x(t)} x2={x(t)} y1={T} y2={H - 20} stroke={t === 50 ? "var(--axis)" : "var(--grid)"} />

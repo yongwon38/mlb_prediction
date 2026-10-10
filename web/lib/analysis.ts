@@ -1,10 +1,9 @@
 import type { League, Pitch } from "./types";
+import type { Dict } from "./i18n/ko";
 
 // ---------------------------------------------------------------------------
-// 라벨 / 분류
+// 분류 (화면 이름은 사전 : t.results / t.paEvents / t.resultFilters / t.countStates)
 // ---------------------------------------------------------------------------
-export const RESULT_LABELS = ["볼", "루킹 스트라이크", "헛스윙", "파울", "인플레이 아웃", "1루타", "2루타", "3루타", "홈런", "사구"];
-export const PA_LABELS = ["", "아웃", "삼진", "1루타", "2루타", "3루타", "홈런", "볼넷", "사구", "희생타/기타"];
 
 /** 스캐터 마커 모양용 결과 그룹 */
 export type ResultGroup = "noncontact" | "out" | "hit";
@@ -16,22 +15,22 @@ export const resultShape = (r: number): ResultShape =>
   r === 4 ? "square" : r === 5 ? "triangle" : r === 6 || r === 7 ? "diamond" : r === 8 ? "star" : "dot";
 
 /** 결과 필터 칩 */
-export const RESULT_FILTERS: { key: string; label: string; codes: number[] }[] = [
-  { key: "ball", label: "볼·사구", codes: [0, 9] },
-  { key: "called", label: "루킹 S", codes: [1] },
-  { key: "whiff", label: "헛스윙", codes: [2] },
-  { key: "foul", label: "파울", codes: [3] },
-  { key: "out", label: "인플레이 아웃", codes: [4] },
-  { key: "hit", label: "안타", codes: [5, 6, 7] },
-  { key: "hr", label: "홈런", codes: [8] },
+export const RESULT_FILTERS: { key: string; codes: number[] }[] = [
+  { key: "ball", codes: [0, 9] },
+  { key: "called", codes: [1] },
+  { key: "whiff", codes: [2] },
+  { key: "foul", codes: [3] },
+  { key: "out", codes: [4] },
+  { key: "hit", codes: [5, 6, 7] },
+  { key: "hr", codes: [8] },
 ];
 
-export const COUNT_STATES: { key: string; label: string; test: (p: Pitch) => boolean }[] = [
-  { key: "first", label: "초구", test: (p) => p.b === 0 && p.k === 0 },
-  { key: "ahead", label: "투수 유리", test: (p) => p.k > p.b },
-  { key: "even", label: "동등", test: (p) => p.b === p.k && p.b > 0 },
-  { key: "behind", label: "타자 유리", test: (p) => p.b > p.k },
-  { key: "two", label: "2스트라이크", test: (p) => p.k === 2 },
+export const COUNT_STATES: { key: string; test: (p: Pitch) => boolean }[] = [
+  { key: "first", test: (p) => p.b === 0 && p.k === 0 },
+  { key: "ahead", test: (p) => p.k > p.b },
+  { key: "even", test: (p) => p.b === p.k && p.b > 0 },
+  { key: "behind", test: (p) => p.b > p.k },
+  { key: "two", test: (p) => p.k === 2 },
 ];
 
 export const STUFF_BUCKETS = [
@@ -234,29 +233,28 @@ export const ZONE_TOP = 3.5;
 export const ZONE_CELLS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 14];
 
 // ---------------------------------------------------------------------------
-// 스카우팅 노트 (규칙 기반)
+// 스카우팅 노트 (규칙 기반, 문구는 사전 t.notes)
 // ---------------------------------------------------------------------------
 const f3 = (x: number | null) => (x === null ? "-" : x.toFixed(3).replace(/^0/, ""));
 const pct = (x: number | null) => (x === null ? "-" : `${(x * 100).toFixed(1)}%`);
-const ord = (p: number) => (p >= 50 ? `상위 ${100 - p}%` : `하위 ${p}%`);
+const sgn = (x: number) => `${x >= 0 ? "+" : ""}${x.toFixed(1)}`;
 
 export interface Note {
   tone: "good" | "bad" | "info";
   text: string;
 }
 
-export function scoutingNotes(ps: Pitch[], all: Pitch[], league: League, pitchTypes: string[], pitchNames: Record<string, string>): Note[] {
+export function scoutingNotes(ps: Pitch[], all: Pitch[], league: League, pitchTypes: string[], pitchNames: Record<string, string>, t: Dict): Note[] {
+  const T = t.notes;
   const notes: Note[] = [];
-  if (ps.length < 30) return [{ tone: "info", text: "선택한 조건의 투구가 30구 미만이라 노트를 만들지 않았습니다. 필터를 넓혀 보세요." }];
+  if (ps.length < 30) return [{ tone: "info", text: T.few }];
 
   const total = stats(ps);
   const overallPct = percentileOf(league.pitcherPercentiles, total.stuff);
   if (overallPct !== null) {
     notes.push({
       tone: overallPct >= 60 ? "good" : overallPct <= 40 ? "bad" : "info",
-      text: `평균 구위 ${total.stuff!.toFixed(1)} — 리그 투수(${league.minPitcherPitches}구 이상) 중 ${ord(overallPct)}.${
-        all.length < league.minPitcherPitches ? " 시즌 표본이 작아 해석에 주의." : ""
-      }`,
+      text: T.overall(total.stuff!.toFixed(1), league.minPitcherPitches, T.rank(overallPct)) + (all.length < league.minPitcherPitches ? T.smallSample : ""),
     });
   }
 
@@ -273,44 +271,36 @@ export function scoutingNotes(ps: Pitch[], all: Pitch[], league: League, pitchTy
   if (ranked.length) {
     const best = ranked.reduce((a, b) => (b.pctl > a.pctl ? b : a));
     const worst = ranked.reduce((a, b) => (b.pctl < a.pctl ? b : a));
-    const nm = (pt: string) => `${pitchNames[pt] ?? pt}(${pt})`;
+    const nm = (pt: string) => T.pitchName(pitchNames[pt] ?? pt, pt);
     notes.push({
       tone: "good",
-      text: `최고 구종 ${nm(best.pt)} : 구위 ${best.st.stuff!.toFixed(1)}, 리그 동일 구종 ${ord(best.pctl)}. Whiff ${pct(best.st.whiff)}, 구사율 ${pct(best.usage)}${
-        best.usage < 0.15 && best.pctl >= 70 ? " — 구사율을 늘릴 여지가 있음" : ""
-      }.`,
+      text: T.best(nm(best.pt), best.st.stuff!.toFixed(1), T.rank(best.pctl), pct(best.st.whiff), pct(best.usage)) + (best.usage < 0.15 && best.pctl >= 70 ? T.bestMore : ""),
     });
     if (worst.pt !== best.pt && worst.pctl <= 40) {
       notes.push({
         tone: "bad",
-        text: `약점 구종 ${nm(worst.pt)} : 리그 동일 구종 ${ord(worst.pctl)}, 피안타율 ${f3(worst.st.ba)}, xwOBAcon ${f3(worst.st.xwobacon)}${
-          worst.usage >= 0.3 ? ` — 구사율 ${pct(worst.usage)}로 의존도가 높아 리스크` : ""
-        }.`,
+        text: T.worst(nm(worst.pt), T.rank(worst.pctl), f3(worst.st.ba), f3(worst.st.xwobacon)) + (worst.usage >= 0.3 ? T.worstUsage(pct(worst.usage)) : ""),
       });
     }
   }
 
-  // 코스 : 피안타율 최고 존 / 헛스윙 최고 존
+  // 코스 : 피안타율 최고 존 / 헛스윙 최고 존 (포수 시점)
   const byZone = groupBy(ps.filter((p) => p.zone !== null && p.zone <= 9), (p) => p.zone as number);
-  const zoneName = (z: number) => {
-    const row = ["상단", "중단", "하단"][Math.floor((z - 1) / 3)];
-    const col = ["3루쪽", "가운데", "1루쪽"][(z - 1) % 3];
-    return z === 5 ? "한가운데" : `${row} ${col}`;
-  };
+  const zoneName = (z: number) => T.zones[z - 1];
   const zoneStats = [...byZone.entries()].map(([z, g]) => ({ z, st: stats(g) }));
   const hot = zoneStats.filter((r) => r.st.ab >= 15 && r.st.ba !== null).sort((a, b) => b.st.ba! - a.st.ba!)[0];
   if (hot && hot.st.ba! >= (league.overall.ba ?? 0.245) + 0.04) {
-    notes.push({ tone: "bad", text: `${zoneName(hot.z)} 코스 피안타율 ${f3(hot.st.ba)} (${hot.st.hits}/${hot.st.ab}) — 이 코스로 몰리는 공을 줄여야 함 (포수 시점).` });
+    notes.push({ tone: "bad", text: T.hot(zoneName(hot.z), f3(hot.st.ba), hot.st.hits, hot.st.ab) });
   }
   const whiffZone = zoneStats.filter((r) => r.st.swings >= 20 && r.st.whiff !== null).sort((a, b) => b.st.whiff! - a.st.whiff!)[0];
   if (whiffZone) {
-    notes.push({ tone: "good", text: `존 안 헛스윙 최다 코스는 ${zoneName(whiffZone.z)} : Whiff ${pct(whiffZone.st.whiff)} (스윙 ${whiffZone.st.swings}회).` });
+    notes.push({ tone: "good", text: T.whiffZone(zoneName(whiffZone.z), pct(whiffZone.st.whiff), whiffZone.st.swings) });
   }
   if (total.chase !== null) {
     const lgChase = 0.29;
     notes.push({
       tone: total.chase >= lgChase + 0.03 ? "good" : total.chase <= lgChase - 0.03 ? "bad" : "info",
-      text: `존 밖 공 스윙 유도(Chase) ${pct(total.chase)}, 존 투구 비율 ${pct(total.zonePct)}.`,
+      text: T.chase(pct(total.chase), pct(total.zonePct)),
     });
   }
 
@@ -319,14 +309,11 @@ export function scoutingNotes(ps: Pitch[], all: Pitch[], league: League, pitchTy
   const vsR = stats(ps.filter((p) => !p.lhb));
   if (vsL.pa >= 40 && vsR.pa >= 40 && vsL.xwoba !== null && vsR.xwoba !== null) {
     const diff = vsL.xwoba - vsR.xwoba;
-    if (Math.abs(diff) >= 0.03) {
-      notes.push({
-        tone: "bad",
-        text: `${diff > 0 ? "좌타자" : "우타자"} 상대로 약함 : 피xwOBA 좌 ${f3(vsL.xwoba)} / 우 ${f3(vsR.xwoba)}. 상대 타순 좌우 구성에 따라 매치업 관리 필요.`,
-      });
-    } else {
-      notes.push({ tone: "info", text: `좌우 스플릿 차이 작음 : 피xwOBA 좌 ${f3(vsL.xwoba)} / 우 ${f3(vsR.xwoba)}.` });
-    }
+    notes.push(
+      Math.abs(diff) >= 0.03
+        ? { tone: "bad", text: T.platoonWeak(diff > 0, f3(vsL.xwoba), f3(vsR.xwoba)) }
+        : { tone: "info", text: T.platoonEven(f3(vsL.xwoba), f3(vsR.xwoba)) },
+    );
   }
 
   // 2스트라이크 결정구
@@ -334,10 +321,7 @@ export function scoutingNotes(ps: Pitch[], all: Pitch[], league: League, pitchTy
   if (two.length >= 40) {
     const g = [...groupBy(two, (p) => p.pt).entries()].sort((a, b) => b[1].length - a[1].length)[0];
     const st = stats(g[1]);
-    notes.push({
-      tone: "info",
-      text: `2스트라이크 결정구는 ${pitchNames[g[0]] ?? g[0]} (구사율 ${pct(g[1].length / two.length)}, Whiff ${pct(st.whiff)}, 구위 ${st.stuff?.toFixed(1)}).`,
-    });
+    notes.push({ tone: "info", text: T.twoStrike(pitchNames[g[0]] ?? g[0], pct(g[1].length / two.length), pct(st.whiff), st.stuff?.toFixed(1) ?? "-") });
   }
 
   // 피로도 : 경기 내 1~25구 vs 76구 이후 (주 구종 기준)
@@ -350,9 +334,7 @@ export function scoutingNotes(ps: Pitch[], all: Pitch[], league: League, pitchTy
     const dv = (l.velo ?? 0) - (e.velo ?? 0);
     notes.push({
       tone: ds <= -2 ? "bad" : "info",
-      text: `${fb} 경기 내 1~25구 → 76구 이후 : 구위 ${e.stuff!.toFixed(1)} → ${l.stuff!.toFixed(1)} (${ds >= 0 ? "+" : ""}${ds.toFixed(1)}), 구속 ${dv >= 0 ? "+" : ""}${dv.toFixed(1)} mph.${
-        ds <= -2 ? " 후반 구위 저하가 뚜렷해 교체 타이밍 지표로 활용 가능." : ""
-      }`,
+      text: T.fatigue(fb, e.stuff!.toFixed(1), l.stuff!.toFixed(1), sgn(ds), sgn(dv)) + (ds <= -2 ? T.fatigueMore : ""),
     });
   }
 
@@ -361,10 +343,7 @@ export function scoutingNotes(ps: Pitch[], all: Pitch[], league: League, pitchTy
   if (months.length >= 2) {
     const a = stats(months[0][1]).stuff!, b = stats(months[months.length - 1][1]).stuff!;
     if (Math.abs(b - a) >= 1.5) {
-      notes.push({
-        tone: b > a ? "good" : "bad",
-        text: `시즌 추이 : ${months[0][0]}월 평균 구위 ${a.toFixed(1)} → ${months[months.length - 1][0]}월 ${b.toFixed(1)} (${b > a ? "상승" : "하락"}).`,
-      });
+      notes.push({ tone: b > a ? "good" : "bad", text: T.trend(months[0][0], a.toFixed(1), months[months.length - 1][0], b.toFixed(1), b > a) });
     }
   }
   return notes;

@@ -92,7 +92,7 @@ export const EXPLAIN_FEATS = ["v", "ivb", "hb", "spin", "axis", "vaa", "haa", "e
 /** 설명 페이지 : 투수 파일 + 설명 파일을 합쳐 투구별 기여·원값을 붙인다 */
 export async function loadExplainPitches(season: number, id: number): Promise<{ file: PitcherFile; pitches: ExplainPitch[] }> {
   const [{ file, pitches }, ex] = await Promise.all([loadPitches(season, id), getGzipJSON<ExplainFile>(`/data/${season}/e/${id}.json.gz`)]);
-  if (ex.n !== pitches.length) throw new Error(`설명 파일 투구 수 불일치 (${ex.n} / ${pitches.length})`);
+  if (ex.n !== pitches.length) throw new Error(`explain file pitch count mismatch (${ex.n} / ${pitches.length})`);
   const groups = Object.keys(ex.cols).filter((k) => /^c\d+$/.test(k)).length;
   return {
     file,
