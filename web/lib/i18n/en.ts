@@ -476,5 +476,163 @@ export const en: Dict = {
       c5: "The approach angle factor uses HAVAA: how much flatter (+) or steeper (−) a pitch comes in than the average pitch of its type thrown at the same height, so pitch height itself is taken out (Alex Chamberlain's VAA Above Average approach at FanGraphs). For left-handers, horizontal components are mirrored to a right-hander's view.",
       c6: "Balls well outside the zone and HBPs aren't graded, so there's no breakdown for them.",
     },
+    guide: {
+      summary: "Variable reading guide",
+      intro: [
+        "For left-handers, horizontal components (horizontal break, release side, spin axis, horizontal gap to the fastball) are mirrored to a right-hander's view. Positive horizontal break is glove side, negative is arm side.",
+        "'League average' is the 2025 league average for the same pitch type. The notes below describe general tendencies the model learned. The sign for a single pitch can flip depending on how its traits combine.",
+        "Initial trajectory terms and accelerations (vx0, vz0, ax, az, etc.) and raw VAA/HAA are left out: together with release point they reconstruct plate location almost exactly (R² 0.99998), which would leak location into the model. Pitch type was also dropped in v4, so two pitches with the same flight get the same grade whatever they're labeled.",
+      ],
+      groups: [
+        {
+          vars: [
+            {
+              name: "Velocity (release_speed)",
+              def: "Speed at release, mph. League avg FF 94.5 · SI 93.8 · FC 89.7 · SL 86.1 · CH 85.8 · CU 79.6",
+              read: [
+                "Read it relative to the pitch type. The model weighs velocity together with movement and release, so a hard pitch with ordinary shape gains less than its velocity alone suggests.",
+                "Breaking balls trade velocity for movement. Hard sliders and cutter-types often show + on velocity and − on movement, so read the two factors together.",
+                "This is release velocity, not perceived velocity. Perceived-velocity effects show up under extension.",
+              ],
+            },
+            {
+              name: "Velo gap to primary fastball (velo_diff)",
+              def: "This pitch's velocity − the pitcher's primary fastball average (most-thrown of FF/SI/FC, same regular season), mph. Near 0 for the fastball itself",
+              read: [
+                "Captures timing disruption on offspeed. Too small a gap and it gets hit on fastball timing; too large and velocity alone gives the pitch away. Pair it with movement separation (IVB and horizontal gaps).",
+                "It's anchored to the pitcher's own fastball: the same 86 mph changeup grades differently off a 97 mph arm than off a 92 mph arm.",
+                "During a season in progress, a shifting fastball average retroactively changes this value for earlier pitches.",
+              ],
+            },
+          ],
+        },
+        {
+          vars: [
+            {
+              name: "Induced vertical break, IVB (pfx_z)",
+              def: "Vertical movement from spin with gravity removed, in. + = less drop. League avg FF 15.8 · SI 7.4 · CH 4.6 · SL 1.9 · CU −9.9",
+              read: [
+                "Read it against arm angle. High IVB comes easier from higher slots, so high IVB from a lower slot is rarer and beats hitters' expectations.",
+                "For four-seamers, more IVB leans toward whiffs and fly balls, but it overlaps with approach angle: a high-IVB fastball from a high release with short extension still comes in steep and loses some of its edge.",
+                "Sinkers, changeups, splitters and curveballs generally benefit from less IVB (more drop). Flip the direction you read by pitch type.",
+              ],
+            },
+            {
+              name: "IVB gap to primary fastball (ivb_diff)",
+              def: "This pitch's IVB − primary fastball average IVB, in",
+              read: [
+                "Vertical separation. For splitters and curveballs that start on a fastball-like line and break down, this gap explains effectiveness better than raw IVB.",
+                "The bigger the pitcher's four-seam IVB, the more separation the same changeup gets. Pitches are graded in the context of the repertoire.",
+              ],
+            },
+          ],
+        },
+        {
+          vars: [
+            {
+              name: "Horizontal break (pfx_x)",
+              def: "Horizontal movement from spin, in. + = glove side, − = arm side (RHP view). League avg FF −7.8 · SI −15.2 · CH −14.3 · FC +2.1 · SL +4.5 · ST +13.7",
+              read: [
+                "The good direction depends on the pitch: more arm side (−) for sinkers and changeups, more glove side (+) for sweepers and sliders. Four-seamers lean on IVB more than horizontal; too much arm-side run pushes them toward a sinker shape.",
+                "Lower slots naturally produce more arm-side run, so the same run from an over-the-top pitcher is more unusual.",
+              ],
+            },
+            {
+              name: "Horizontal gap to primary fastball (hb_diff)",
+              def: "This pitch's horizontal break − primary fastball average horizontal break, in",
+              read: [
+                "Horizontal separation. Sweepers and sliders gain with a larger gap from the fastball; changeups work best when they stay with the fastball horizontally and split off vertically. Read it with the IVB gap as a 2-D picture.",
+                "For sinker-primary pitchers the reference point already sits far to the arm side, so their sliders get a larger gap automatically.",
+              ],
+            },
+          ],
+        },
+        {
+          vars: [
+            {
+              name: "HAVAA, height-adjusted VAA (vaa_aa)",
+              def: "Residual of VAA − (a + b·plate_z) by pitch type, °. + = flatter than average for that pitch type at that height, − = steeper. Raw VAA league avg FF −4.8 · SI −5.9 · SL −7.5 · CU −9.5. Pitch height is used only for the adjustment, never as a model input",
+              read: [
+                "The key read for four-seamers. Up in the zone, flatter fastballs ride over the bat path and miss more bats. Raw VAA gets flatter just from throwing higher, so the height-adjusted value isolates the pitcher's own flatness.",
+                "It's the product of low release, long extension, high IVB and velocity, so it splits credit with the vertical movement and release factors. A large + here with little elsewhere may mean credit pooled into this factor.",
+                "For breaking and offspeed pitches the model can learn a different direction. Check that pitch type's sign on the By pitch page.",
+              ],
+            },
+          ],
+        },
+        {
+          vars: [
+            {
+              name: "Release height (release_pos_z)",
+              def: "Height above the ground at release, ft. League avg FF 5.8",
+              read: [
+                "At the same IVB, a lower release makes the approach flatter; part of that effect is carried by the HAVAA factor.",
+                "It depends on height and delivery, so read it with arm angle. A release that's low for the pitcher's size is the meaningful signal.",
+              ],
+            },
+            {
+              name: "Release side (release_pos_x)",
+              def: "Horizontal position at release, ft. + = first-base side (RHP view). Right-handers are usually negative (third-base side); a larger magnitude means a wider release",
+              read: [
+                "A wider release creates more angle for the hitter, especially sweepers to same-handed hitters. Batter handedness isn't an input, so this only shows up as an average over both sides.",
+              ],
+            },
+            {
+              name: "Arm angle (arm_angle)",
+              def: "Savant arm angle, °. 0 = flat sidearm, 90 = straight over the top. League avg FF 39.8 · SI 32.5",
+              read: [
+                "Works more as a reference point than on its own: does this movement come from this slot? Movement that beats what the slot implies (high IVB from a low slot, big arm-side run from a high slot) is a high-grade pattern.",
+                "Extreme slots have small samples, so their contributions can be unstable.",
+              ],
+            },
+          ],
+        },
+        {
+          vars: [
+            {
+              name: "Extension (release_extension)",
+              def: "Distance from the rubber to the release point, ft. League avg FF 6.5",
+              read: [
+                "Longer extension releases the ball closer to the plate, cutting reaction time (higher perceived velocity) and flattening the approach. The velocity factor only sees release speed, so perceived-velocity differences land here.",
+                "Across the league its contribution is small. Large contributions usually come from extension near the ends of the league distribution.",
+              ],
+            },
+          ],
+        },
+        {
+          vars: [
+            {
+              name: "Spin rate (release_spin_rate)",
+              def: "Revolutions per minute, rpm. League avg FF 2,323 · SL 2,432 · ST 2,595 · CU 2,594 · CH 1,790 · FS 1,344",
+              read: [
+                "Spin efficiency isn't an input, and most of what spin rate does already shows up in movement. What's left in this factor is closer to how much spin it took to produce that movement.",
+                "Spin rises with velocity, so a spin-per-mph (Bauer Units) view is more useful than raw rpm.",
+                "For splitters and changeups, low spin ties to drop, so don't read higher as better.",
+              ],
+            },
+            {
+              name: "Spin axis (spin_axis)",
+              def: "Savant spin axis, °. Left-handers mirrored as 360 − value. 180 = pure backspin, 0/360 = pure topspin, around 90 = glove-side sidespin. League avg FF 215 · SI 226 · CH 241 · SL 117 · ST 64 · CU 43",
+              read: [
+                "This is the observed (Hawk-Eye) axis; the gap to the movement-inferred axis (seam-shifted wake) isn't a separate input. Since both axis and actual movement are inputs, the model can pick up that mismatch indirectly.",
+                "For four-seamers, closer to 180 (pure backspin) means more IVB, and toward 240 means more arm-side run. It overlaps with movement, so read the spin factor together with the movement factors.",
+              ],
+            },
+          ],
+        },
+        {
+          vars: [
+            {
+              name: "Throwing hand (p_throws)",
+              def: "L / R. Horizontal components are mirrored to a right-hander's view before input",
+              read: [
+                "Only carries the average left/right difference left after mirroring. Batter handedness isn't an input, so platoon effects aren't reflected.",
+                "Pitch type was dropped from the model in v4. Pitches are graded by flight, not label, so read borderline pitches (cutter vs slider, slider vs sweeper) by their physics rather than their name.",
+              ],
+            },
+          ],
+        },
+      ],
+    },
   },
 };

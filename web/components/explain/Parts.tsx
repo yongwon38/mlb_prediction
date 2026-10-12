@@ -81,6 +81,41 @@ export function PitchDetail({ p, lg }: { p: ExplainPitch; lg: LeagueExplain }) {
   );
 }
 
+/** 변수별 해석 가이드 : 요인 그룹 순서대로 변수 정의와 읽는 법 (기본 접힘) */
+export function VariableGuide({ lg }: { lg: LeagueExplain }) {
+  const t = useT();
+  const g = t.explain.guide;
+  const names = groupNames(t, lg.groups);
+  return (
+    <details className="card p-4 text-xs text-ink-2 leading-relaxed">
+      <summary className="cursor-pointer font-semibold text-ink text-sm">{g.summary}</summary>
+      <ul className="list-disc pl-5 mt-2 flex flex-col gap-1">
+        {g.intro.map((s) => (
+          <li key={s}>{s}</li>
+        ))}
+      </ul>
+      <div className="mt-3 grid gap-4 lg:grid-cols-2">
+        {g.groups.slice(0, names.length).map((grp, i) => (
+          <section key={names[i]} className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold text-ink border-b border-grid pb-1">{names[i]}</h3>
+            {grp.vars.map((v) => (
+              <div key={v.name}>
+                <p className="font-medium text-ink">{v.name}</p>
+                <p className="text-muted">{v.def}</p>
+                <ul className="list-disc pl-5 mt-1 flex flex-col gap-0.5">
+                  {v.read.map((s) => (
+                    <li key={s}>{s}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </section>
+        ))}
+      </div>
+    </details>
+  );
+}
+
 export function Caveats({ method }: { method: "shap" | "saabas" }) {
   const c = useT().explain.caveats;
   return (

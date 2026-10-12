@@ -2,7 +2,7 @@
 import BandPicker from "@/components/BandPicker";
 import SearchPanel from "@/components/SearchPanel";
 import { GameTypePicker, PitcherHeader, SeasonSelect, type PitcherTab } from "@/components/PageHeader";
-import { Caveats } from "@/components/explain/Parts";
+import { Caveats, VariableGuide } from "@/components/explain/Parts";
 import { pitchColor, useDarkMode } from "@/lib/colors";
 import type { ExplainState } from "@/lib/useExplain";
 import { useT } from "@/lib/i18n";
@@ -74,6 +74,7 @@ export default function ExplainShell({
           {(filters === "both" || filters === "band") && <BandPicker ps={byPt} band={band} setBand={setBand} showNone={false} note={note ?? ""} />}
           {children}
           <Caveats method={lg?.method ?? "saabas"} />
+          {lg && <VariableGuide lg={lg} />}
         </>
       )}
     </main>
