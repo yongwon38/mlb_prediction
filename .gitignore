@@ -13,6 +13,7 @@
 !/hofnet_r_experiment.py
 !/build_hof_web_model.py
 !/model_choice_analysis.py
+!/hofnet_diag_experiment.py
 !/stuff_pipeline_*.ipynb
 !/export_web_data.py
 !/compute_shap.py
@@ -51,6 +52,10 @@
 !/outputs/model_choice/*.csv
 !/outputs/model_choice/*.json
 !/outputs/model_choice/*_log.txt
+!/outputs/hofnet_diag/
+/outputs/hofnet_diag/*
+!/outputs/hofnet_diag/*.csv
+!/outputs/hofnet_diag/*_log.txt
 
 # 클라우드 운영 (GitHub Actions + HF 데이터셋 + Vercel)
 !/.github/
