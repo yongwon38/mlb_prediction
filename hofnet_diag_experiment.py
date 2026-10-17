@@ -30,7 +30,7 @@ import stuff_pipeline as sp
 
 warnings.filterwarnings('ignore')
 sys.stdout.reconfigure(encoding='utf-8')
-ALL_RUNS = ['base', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6']
+ALL_RUNS = ['base', 'h1', 'h2', 'h2b', 'h3', 'h4', 'h5', 'h6']
 ap = argparse.ArgumentParser()
 ap.add_argument('--runs', default=','.join(ALL_RUNS))
 ap.add_argument('--smoke', action='store_true')
@@ -342,19 +342,20 @@ def keep(name, rows, hist=None):
     RESULTS.extend(rows)
 
 
-def run_hof(name, desc, kind='hof', p=prep, tr=None, es=None, fit_kw=None, with_p4=True, y_target=None):
+def run_hof(name, desc, kind='hof', p=prep, tr=None, es=None, fit_kw=None, with_p4=True, y_target=None, epochs=None):
     """Stage I 학습 → P1 평가 (+ P4). y_target = (학습 타깃, 홀드아웃 타깃) 로 distillation"""
     if done(name):
         return
+    epochs = epochs or EPOCHS
     tr_, es_ = (tr, es) if tr is not None else split_t(p, y_target)
     y_mean, y_std = float(tr_[3].mean()), float(tr_[3].std())
     net = new_net(kind, p)
     t = time.time()
     log(f'=== {name} : {desc} (학습 {len(tr_[3]):,}구, 파라미터 {sum(q.numel() for q in net.parameters()):,})')
     if fit_kw is None:
-        hist = hr.fit_mean(net, tr_, es_, y_mean, y_std, epochs=EPOCHS, seed=SEED, log=lambda s: log('   ', s))
+        hist = hr.fit_mean(net, tr_, es_, y_mean, y_std, epochs=epochs, seed=SEED, log=lambda s: log('   ', s))
     else:
-        hist = fit_mean_ext(net, tr_, es_, y_mean, y_std, epochs=EPOCHS, **fit_kw)
+        hist = fit_mean_ext(net, tr_, es_, y_mean, y_std, epochs=epochs, **fit_kw)
     t1 = time.time() - t
     info = {'설명': desc, '모델': kind, '학습 투구': len(tr_[3]), 'epoch 수': len(hist), '학습 시간(초)': t1,
             '최적 epoch (홀드아웃 RMSE)': int(np.argmin([h['holdout_rmse'] for h in hist]) + 1), '파라미터 수': sum(q.numel() for q in net.parameters())}
@@ -404,6 +405,13 @@ if 'h2' in RUNS:
             fit_kw=dict(early_stop=True, patience=EPOCHS + 1, on_epoch=track))
     run_hof('h2_cos_swa', 'cosine 학습률 30 epoch + 마지막 10 epoch 가중치 평균 (SWA)',
             fit_kw=dict(early_stop=False, cosine=True, swa_last=2 if SMOKE else 10, on_epoch=track))
+
+if 'h2b' in RUNS:
+    # h2_cos_swa 는 epoch 7 이후 과적합 구간까지 평균 → 학습을 줄여 과적합 전 구간만 평균
+    track = lambda net: {'rho_whiff': rho_2025(hr.encode_all(net, season_t(prep, 2025), *NORM)[0])}
+    NORM = (float(y_tr.mean()), float(y_tr.std()))
+    run_hof('h2b_cos_swa15', 'cosine 학습률 15 epoch + 마지막 5 epoch 가중치 평균 (SWA)',
+            fit_kw=dict(early_stop=False, cosine=True, swa_last=2 if SMOKE else 5, on_epoch=track), epochs=EPOCHS if SMOKE else 15)
 
 if 'h3' in RUNS:
     run_hof('h3_pitch_type', '구종(pitch_type) 임베딩 입력', p=prep_pt)
