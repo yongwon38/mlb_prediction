@@ -45,7 +45,13 @@ MODELS = {
            'features': [f for f in _V3_BASE if f != 'pitch_type'] + ['vaa', 'plate_z', 'pitch_type'], 'drop_waste': True,
            'extra_feats': {'havaa': ('vaa_aa', 1)}, 'pitch_type_in_model': False},
 }
+# HOF-Net-R P4 (ZIB) 시드 앙상블 (build_hof_web_model.py). 입력은 v4 와 같고 근거는 요인 그룹 Shapley (hof_net_r.HOFNetRStuffModel)
+MODELS['hof_r'] = {**MODELS['v4'], 'dir': os.path.join('models', 'hof_r'), 'outputs': os.path.join('outputs', 'hof_r')}
 CFG = MODELS[MODEL_VERSION]
+# 웹에서 고를 수 있는 대체 모델 : 웹 id -> 버전. 주 모델(MODEL_VERSION)은 웹 id 'lgbm'
+# 대체 모델의 점수·근거는 같은 투수 파일에 접미사 필드로(p/ : sh, e/ : h0..), 집계 파일은 {이름}.{웹 id}.json 으로 저장
+ALT_MODELS = {'hof': 'hof_r'}
+ALT_FIELD = {'hof': 'h'}    # 투수 파일 필드 접두사 (점수 s -> sh, 기여 c0 -> h0)
 
 # 2024 ~ 현재 시즌 (3월 1일에 새 시즌 자동 추가). 로컬 pkl 이 없으면 온라인 저장소(data_store)에서 읽는다
 SEASONS = {y: 'games_25_final.pkl' if y == 2025 else f'games_{y % 100}.pkl'
@@ -136,15 +142,21 @@ EXPLAIN_FEATS = {'v': ('release_speed', 1), 'ivb': ('pfx_z', 1), 'hb': ('pfx_x',
                  'rz': ('release_pos_z', 1), 'arm': ('arm_angle', 0), **CFG.get('extra_feats', {})}
 
 
-SHAP_DIR = os.path.join(CFG['outputs'], 'shap')    # compute_shap.py 가 만드는 정확한 SHAP 캐시
+def shap_dir(ver=MODEL_VERSION):
+    """compute_shap.py 가 만드는 기여 캐시 폴더 (모델 버전별)"""
+    return os.path.join(MODELS[ver]['outputs'], 'shap')
+
+
+SHAP_DIR = shap_dir()
 KEY = ['game_pk', 'at_bat_number', 'pitch_number', 'pitcher']
 
 
-def load_shap_cache(season, keys):
-    """compute_shap.py 의 정확한 SHAP 캐시 (모든 투구가 있을 때만 사용). 반환 (contrib, base) 또는 None
+def load_shap_cache(season, keys, ver=MODEL_VERSION):
+    """compute_shap.py 의 기여 캐시 (모든 투구가 있을 때만 사용). 반환 (contrib, base, 근사 비율) 또는 None
 
-    shap_{season}.npz = 정규시즌, shap_{season}_extra.npz = 시범경기·포스트시즌 (있으면 합친다)"""
-    zs = [np.load(p) for p in (os.path.join(SHAP_DIR, f'shap_{season}{s}.npz') for s in ('', '_extra')) if os.path.exists(p)]
+    shap_{season}.npz = 정규시즌, shap_{season}_extra.npz = 시범경기·포스트시즌 (있으면 합친다).
+    'exact' 배열이 있으면 투구별 정확(True)/근사(False) 표시 (HOF : 매일 증분은 순열 표본 Shapley)"""
+    zs = [np.load(p) for p in (os.path.join(shap_dir(ver), f'shap_{season}{s}.npz') for s in ('', '_extra')) if os.path.exists(p)]
     if not zs:
         return None
     ref = pd.DataFrame(np.concatenate([z['keys'] for z in zs]), columns=KEY)
@@ -154,10 +166,12 @@ def load_shap_cache(season, keys):
         print(f'  SHAP 캐시 불완전 ({m["row"].isna().sum():,}구 없음) -> Saabas 사용')
         return None
     contrib = np.concatenate([z['contrib'] for z in zs])
-    return contrib[m['row'].astype(int).to_numpy()], float(zs[0]['base'])
+    rows = m['row'].astype(int).to_numpy()
+    exact = np.concatenate([z['exact'] if 'exact' in z else np.ones(len(z['keys']), bool) for z in zs])[rows]
+    return contrib[rows], float(zs[0]['base']), float(1 - exact.mean())
 
 
-def explain_contrib(model, scaler, X, pred, score, season, keys):
+def explain_contrib(model, scaler, X, pred, score, season, keys, ver=MODEL_VERSION):
     """투구별 요인 그룹 기여 (구위 점수 단위). 반환 : (n, 그룹 수) 배열, 기준 점수 S0, 방법(model.method)
 
     정확한 기여 캐시(compute_shap.py)가 있으면 그것을, 없으면 model.explain(X, exact=False) 근사를 쓴다 (stuff_model.py)
@@ -166,19 +180,22 @@ def explain_contrib(model, scaler, X, pred, score, season, keys):
     S0 + sum_j c_ij = s_i 가 정확히 성립하게 한다. pred 가 base 와 거의 같으면 스케일러 수치 미분을 쓴다
     """
     feats = list(X.columns)
-    cached = load_shap_cache(season, keys)
+    cached = load_shap_cache(season, keys, ver) if keys is not None else None
     if cached is not None and np.abs(cached[1] + cached[0].sum(axis=1) - pred).max() >= 1e-6:
-        print('  SHAP 캐시가 현재 모델·데이터와 맞지 않음 -> Saabas 사용')
+        print(f'  기여 캐시({ver})가 현재 모델·데이터와 맞지 않음 -> 근사 사용')
         cached = None
     if cached is not None:
-        contrib, base = cached
-        method = model.method(exact=True)
+        contrib, base, approx = cached
+        method = model.method(exact=True) + ('-mixed' if approx > 0 else '')    # 일부 투구만 근사 (HOF 매일 증분)
+        if approx > 0:
+            print(f'  근사 기여 비율 {approx:.1%}')
     else:
         contrib, base = model.explain(X, exact=False)
         method = model.method(exact=False)
     assert np.abs(base + contrib.sum(axis=1) - pred).max() < 1e-6, '기여 합 != 예측'
     S0 = float(scaler.transform([base])[0])
-    diff = pred - base
+    # 분모는 기여 합 자체 (= pred - base, 1e-6 이내). float32 모델(HOF)의 잔차가 k 로 증폭돼 점수 가법성이 깨지지 않게 한다
+    diff = contrib.sum(axis=1)
     h = 2e-3
     deriv = (scaler.transform(pred + h) - scaler.transform(pred - h)) / (2 * h)
     near = np.abs(diff) < 1e-4
@@ -219,13 +236,30 @@ def stuff_frame(raw, model):
     return d
 
 
-def score_season(df, model, scaler, season):
-    """전체 경기 유형 투구 -> 구위 피처 -> 3단계 예측 -> 20~80 score + 요인 기여 (구종 제외 대상은 행 제외). 반환 (d, 기준 점수 S0, 기여 방법)"""
+def alt_cols(key):
+    """대체 모델의 점수 열·기여 열 이름"""
+    return f'stuff_score_{key}', [f'{key}_{c}' for c in EXPLAIN_COLS]
+
+
+def score_season(df, model, scaler, season, alts=None):
+    """전체 경기 유형 투구 -> 구위 피처 -> 3단계 예측 -> 20~80 score + 요인 기여 (구종 제외 대상은 행 제외).
+
+    alts = {웹 id: (모델, 스케일러, 버전)} : 같은 투구에 대체 모델 점수·기여도 계산 (alt_cols 열).
+    반환 (d, {웹 id: (기준 점수 S0, 기여 방법)}) — 주 모델은 'lgbm'"""
     d = stuff_frame(df, model)
     pred = model.predict(d[CFG['features']])
     d['stuff_score'] = scaler.transform(pred)
     c, S0, method = explain_contrib(model, scaler, d[CFG['features']], pred, d['stuff_score'].to_numpy(), season, d[KEY])
     d[EXPLAIN_COLS] = c
+    info = {'lgbm': (S0, method)}
+    for key, (m_, sc_, ver) in (alts or {}).items():
+        scol, ecols = alt_cols(key)
+        p_ = m_.predict(d[MODELS[ver]['features']])
+        d[scol] = sc_.transform(p_)
+        c_, S0_, method_ = explain_contrib(m_, sc_, d[MODELS[ver]['features']], p_, d[scol].to_numpy(), season, d[KEY], ver)
+        d[ecols] = c_
+        info[key] = (S0_, method_)
+        print(f'  {key}({ver}) : 근거 {method_}, 기준 S0 {S0_:.2f}')
     if CFG['drop_waste']:
         scored = ~sp.is_unscored(d)
         for col in ('vaa_aa', 'haa_aa'):    # 보정 진입각은 점수가 있는 투구에서 결측이면 안 된다 (계수 누락 = 모델 파일 문제)
@@ -236,9 +270,13 @@ def score_season(df, model, scaler, season):
         print(f"  점수 제외 : waste 볼 {sp.is_waste_ball(d).sum():,} + 사구 {(d['description'] == 'hit_by_pitch').sum():,}"
               f" + 트래킹 없음 {sp.is_no_tracking(d).sum():,}")
         d.loc[~scored, EXPLAIN_COLS] = np.nan
+        for key in (alts or {}):
+            scol, ecols = alt_cols(key)
+            d[scol] = d[scol].where(scored)
+            d.loc[~scored, ecols] = np.nan
     for col in sp.STUFF_CAT_FEATURES:
         d[col] = d[col].astype(str)
-    return d, S0, method
+    return d, info
 
 
 def check_against_parquet(d):
@@ -377,6 +415,8 @@ def game_pa_tables(g):
         'i0': pos.groupby(pai).first(),
         's': by['stuff_score'].mean(),
         'smax': by['stuff_score'].max(),
+        **{f's{ALT_FIELD[k]}': by[alt_cols(k)[0]].mean() for k in ALT_MODELS if alt_cols(k)[0] in g.columns},
+        **{f's{ALT_FIELD[k]}max': by[alt_cols(k)[0]].max() for k in ALT_MODELS if alt_cols(k)[0] in g.columns},
     })
     pas['outs'] = pas['event'].map(OUTS_BY_EVENT).fillna(0).astype(int)
 
@@ -406,6 +446,9 @@ def game_pa_tables(g):
         'r': pg['runs'].sum(),
         's': byg['stuff_score'].mean(),
         's60': (g['stuff_score'] >= 60).groupby(gi).sum() / scored.groupby(gi).sum().replace(0, np.nan),
+        **{f's{ALT_FIELD[k]}': byg[alt_cols(k)[0]].mean() for k in ALT_MODELS if alt_cols(k)[0] in g.columns},
+        **{f's{ALT_FIELD[k]}60': (g[alt_cols(k)[0]] >= 60).groupby(gi).sum() / g[alt_cols(k)[0]].notna().groupby(gi).sum().replace(0, np.nan)
+           for k in ALT_MODELS if alt_cols(k)[0] in g.columns},
         'wpa': pg['wpa'].sum(),
         'imp': pg['wpa'].apply(lambda w: w.abs().sum()) * rd.map(IMPORTANCE_WEIGHT).to_numpy(),
         'i0': pos.groupby(gi).first(),
@@ -424,7 +467,7 @@ def records_json(df, nd):
     return out
 
 
-GAME_ND = {'s': 1, 's60': 3, 'wpa': 3, 'imp': 3}
+GAME_ND = {'s': 1, 's60': 3, 'wpa': 3, 'imp': 3, **{f's{f}': 1 for f in ALT_FIELD.values()}, **{f's{f}60': 3 for f in ALT_FIELD.values()}}
 PA_ND = {'wpa': 3, 're': 3, 's': 1, 'smax': 1}
 
 
@@ -438,7 +481,8 @@ def pas_json(pas, bat_idx):
         out.append({'g': int(r.g), 'ab': int(r.ab), 'inn': int(r.inn), 'o': _num(r.o, 0), 'on': int(r.on), 'sc': _num(r.sc, 0),
                     'bat': bat_idx[int(r.bat)], 'lhb': int(r.lhb), 'ev': int(r.ev), 'des': r.des if isinstance(r.des, str) else None,
                     'wpa': _num(r.wpa, 3), 're': _num(r.re, 3), 'runs': int(r.runs), 'n': int(r.n), 'i0': int(r.i0),
-                    's': _num(r.s, 1), 'smax': _num(r.smax, 1)})
+                    's': _num(r.s, 1), 'smax': _num(r.smax, 1),
+                    **{k: _num(getattr(r, k), 1) for f in ALT_FIELD.values() for k in (f's{f}', f's{f}max') if hasattr(r, k)}})
     return out
 
 
@@ -474,6 +518,7 @@ def pitcher_payload(g, season_start, pitch_types, teams, names):
             'tm': [tm_idx[t] for t in g['team']],
             'pt': [pt_idx[p] for p in g['pitch_type']],
             's': _arr(g['stuff_score'], 1),
+            **{f's{ALT_FIELD[k]}': _arr(g[alt_cols(k)[0]], 1) for k in ALT_MODELS if alt_cols(k)[0] in g.columns},
             'x': _arr(g['plate_x'], 2),
             'z': _arr(g['plate_z_norm'], 2),
             'zone': _arr(g['zone'], 0),
@@ -503,6 +548,9 @@ def explain_payload(g):
     """설명 페이지 전용 투수 파일 (투수 파일과 같은 투구 순서). 기여는 0.1점 단위 정수"""
     g = g.sort_values(SORT_KEY)
     cols = {f'c{j}': _arr(g[col] * 10, 0) for j, col in enumerate(EXPLAIN_COLS)}
+    for k in ALT_MODELS:
+        if alt_cols(k)[0] in g.columns:
+            cols.update({f'{ALT_FIELD[k]}{j}': _arr(g[col] * 10, 0) for j, col in enumerate(alt_cols(k)[1])})
     cols.update({k: _arr(g[src], nd) for k, (src, nd) in EXPLAIN_FEATS.items()})
     return {'id': int(g['pitcher'].iloc[0]), 'n': int(len(g)), 'cols': cols}
 
@@ -696,10 +744,12 @@ def summary_payload(d, pitchers, games, pas):
     return by_gt
 
 
-def export_season(season, path, model, scaler):
+def export_season(season, path, model, scaler, alts=None):
     print(f'[{season}] {path}')
     raw = sp.load_season(path, year=season)
-    d, S0, method = score_season(raw, model, scaler, season)
+    d, info = score_season(raw, model, scaler, season, alts)
+    S0, method = info['lgbm']
+    score_cols = {'lgbm': 'stuff_score', **{k: alt_cols(k)[0] for k in (alts or {})}}
     print(f'  전체 {len(raw):,}구 -> {len(d):,}구 (점수 없음 {d["stuff_score"].isna().sum():,}), '
           f'투수 {d["pitcher"].nunique():,}명, 유형별 ' +
           ', '.join(f'{k} {v:,}' for k, v in d['game_type'].value_counts().items()))
@@ -719,7 +769,7 @@ def export_season(season, path, model, scaler):
     names = player_names(d['batter'].dropna().unique())
     season_start = d['game_date'].min().strftime('%Y-%m-%d')
     valid_start = sp.split_last_month(raw[raw['game_type'] == 'R'])[2] if season == 2025 else None
-    pitchers, all_games, all_pas = [], [], []
+    pitchers, all_games, all_pas = {k: [] for k in score_cols}, [], []
     for pid, g in d.groupby('pitcher'):
         team_counts = g['team'].value_counts()
         teams = team_counts.index.tolist()    # 투구수 많은 팀 순
@@ -728,19 +778,20 @@ def export_season(season, path, model, scaler):
         payload, games, pas = pitcher_payload(g, season_start, pitch_types, teams, names)
         dump_gz(payload, os.path.join(out, 'p', f'{int(pid)}.json.gz'))
         dump_gz(explain_payload(g), os.path.join(out, 'e', f'{int(pid)}.json.gz'))
-        by_gt = []
-        for gt in range(len(GAME_TYPE_LABELS)):
-            s_ = g.loc[g['gt'] == gt, 'stuff_score']
-            by_gt.append([int(len(s_)), round(float(s_.mean()), 2) if s_.notna().any() else None] if len(s_) else None)
-        pitchers.append({
-            'id': int(pid),
-            'name': name,
-            'throws': g['p_throws'].iloc[0],
-            'teams': teams,
-            'n': by_gt[0][0] if by_gt[0] else 0,          # 정규시즌 투구 수 / 평균 구위 (기존 의미 유지)
-            'stuff': by_gt[0][1] if by_gt[0] else None,
-            'byGt': by_gt,                                 # [정규, 포스트, 시범] 별 [투구 수, 평균 구위] 또는 null
-        })
+        for key, scol in score_cols.items():
+            by_gt = []
+            for gt in range(len(GAME_TYPE_LABELS)):
+                s_ = g.loc[g['gt'] == gt, scol]
+                by_gt.append([int(len(s_)), round(float(s_.mean()), 2) if s_.notna().any() else None] if len(s_) else None)
+            pitchers[key].append({
+                'id': int(pid),
+                'name': name,
+                'throws': g['p_throws'].iloc[0],
+                'teams': teams,
+                'n': by_gt[0][0] if by_gt[0] else 0,          # 정규시즌 투구 수 / 평균 구위 (기존 의미 유지)
+                'stuff': by_gt[0][1] if by_gt[0] else None,
+                'byGt': by_gt,                                 # [정규, 포스트, 시범] 별 [투구 수, 평균 구위] 또는 null
+            })
         games = games.assign(pid=int(pid), name=name, gi=np.arange(len(games)))
         pas = pas.assign(pid=int(pid), name=name, pai=np.arange(len(pas)), gt=pas['g'].map(games['gt']),
                          date=pas['g'].map(games['date']), opp=pas['g'].map(games['opp']), team=pas['g'].map(games['team']),
@@ -751,24 +802,40 @@ def export_season(season, path, model, scaler):
     all_pas = pd.concat(all_pas, ignore_index=True)
 
     gt_counts = d['gt'].value_counts()
-    dump({
-        'season': season,
-        'outOfSample': season != 2025,
-        'validStart': valid_start.strftime('%Y-%m-%d') if valid_start is not None else None,
-        'seasonStart': season_start,
-        'seasonEnd': d['game_date'].max().strftime('%Y-%m-%d'),
-        'regularStart': reg['game_date'].min().strftime('%Y-%m-%d'),
-        'regularEnd': reg['game_date'].max().strftime('%Y-%m-%d'),
-        'pitches': int(len(reg)),
-        'gameTypes': [int(gt_counts.get(gt, 0)) for gt in range(len(GAME_TYPE_LABELS))],
-        'teams': {lg: {t: n for t, n in ts.items() if t in set(d['team'])} for lg, ts in TEAMS.items()},
-        'pitchers': sorted(pitchers, key=lambda p: p['name']),
-    }, os.path.join(out, 'index.json'))
-    lg = league_payload(reg, valid_start)
-    lg['explain'] = explain_league(reg, S0)
-    lg['explain']['method'] = method
-    dump(lg, os.path.join(out, 'league.json'))
-    dump({'byGt': summary_payload(d, pitchers, all_games, all_pas)}, os.path.join(out, 'summary.json'))
+    alt_game_cols = [c for c in all_games.columns if any(c.startswith(f's{f}') for f in ALT_FIELD.values())]
+    alt_pa_cols = [c for c in all_pas.columns if any(c.startswith(f's{f}') for f in ALT_FIELD.values())]
+    for key, scol in score_cols.items():
+        # 집계 파일 : 주 모델은 index.json, 대체 모델은 index.{웹 id}.json (점수 열만 바꿔 같은 함수로 계산)
+        sfx = '' if key == 'lgbm' else f'.{key}'
+        if key == 'lgbm':
+            dm, gm, pm = d, all_games.drop(columns=alt_game_cols), all_pas.drop(columns=alt_pa_cols)
+        else:
+            f = ALT_FIELD[key]
+            dm = d.assign(stuff_score=d[scol], **dict(zip(EXPLAIN_COLS, [d[c] for c in alt_cols(key)[1]])))
+            gm = all_games.assign(s=all_games[f's{f}'], s60=all_games[f's{f}60']).drop(columns=alt_game_cols)
+            pm = all_pas.assign(s=all_pas[f's{f}'], smax=all_pas[f's{f}max']).drop(columns=alt_pa_cols)
+        regm = dm[dm['gt'] == 0]
+        dump({
+            'season': season,
+            'outOfSample': season != 2025,
+            'validStart': valid_start.strftime('%Y-%m-%d') if valid_start is not None else None,
+            'seasonStart': season_start,
+            'seasonEnd': d['game_date'].max().strftime('%Y-%m-%d'),
+            'regularStart': reg['game_date'].min().strftime('%Y-%m-%d'),
+            'regularEnd': reg['game_date'].max().strftime('%Y-%m-%d'),
+            'pitches': int(len(reg)),
+            'gameTypes': [int(gt_counts.get(gt, 0)) for gt in range(len(GAME_TYPE_LABELS))],
+            'teams': {lg: {t: n for t, n in ts.items() if t in set(d['team'])} for lg, ts in TEAMS.items()},
+            'pitchers': sorted(pitchers[key], key=lambda p: p['name']),
+        }, os.path.join(out, f'index{sfx}.json'))
+        lg_m = league_payload(regm, valid_start)
+        lg_m['explain'] = explain_league(regm, info[key][0])
+        lg_m['explain']['method'] = info[key][1]
+        dump(lg_m, os.path.join(out, f'league{sfx}.json'))
+        dump({'byGt': summary_payload(dm, pitchers[key], gm, pm)}, os.path.join(out, f'summary{sfx}.json'))
+        if key == 'lgbm':
+            lg = lg_m
+    pitchers = pitchers['lgbm']
     stats = official_stats(season, f'{season}-02-01', d['game_date'].max().strftime('%Y-%m-%d'), [p['id'] for p in pitchers])
     if stats is not None:
         dump(stats, os.path.join(out, 'stats.json'))
@@ -788,24 +855,43 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--seasons', type=int, nargs='*', help='내보낼 시즌 (기본 : 전체)')
     ap.add_argument('--out', default=OUT_DIR, help='출력 폴더 (기본 : web/public/data)')
+    ap.add_argument('--no-alt', action='store_true', help='대체 모델(ALT_MODELS) 없이 주 모델만')
     args = ap.parse_args()
     OUT_DIR = args.out
     np.random.seed(sp.SEED)
     print(f'모델 {MODEL_VERSION} : {CFG["dir"]}')
     model = sm.load_model(CFG['dir'])
     scaler = joblib.load(os.path.join(CFG['dir'], 'stage4_stuff_scaler.joblib'))
+    alts = {} if args.no_alt else load_alt_models()
     os.makedirs(OUT_DIR, exist_ok=True)
     for season in args.seasons or SEASONS:
-        export_season(season, SEASONS[season], model, scaler)
-    write_meta()
+        export_season(season, SEASONS[season], model, scaler, alts)
+    write_meta(list(alts))
 
 
-def write_meta():
-    """web/public/data/meta.json (전체 시즌 목록, 표시 상수)"""
+def available_alts():
+    """ALT_MODELS 중 모델 파일이 있는 웹 id 목록"""
+    return [k for k, ver in ALT_MODELS.items() if os.path.exists(os.path.join(MODELS[ver]['dir'], sm.MODEL_FILE))]
+
+
+def load_alt_models():
+    """모델 파일이 있는 대체 모델 -> {웹 id: (모델, 스케일러, 버전)}"""
+    out = {}
+    for key in available_alts():
+        ver = ALT_MODELS[key]
+        dir_ = MODELS[ver]['dir']
+        print(f'대체 모델 {key} : {ver} ({dir_})')
+        out[key] = (sm.load_model(dir_), joblib.load(os.path.join(dir_, 'stage4_stuff_scaler.joblib')), ver)
+    return out
+
+
+def write_meta(alt_keys=()):
+    """web/public/data/meta.json (전체 시즌 목록, 표시 상수, 고를 수 있는 모델)"""
     dump({'seasons': sorted(SEASONS, reverse=True), 'resultLabels': RESULTS, 'paEvents': PA_EVENTS,
           'pitchNames': PITCH_NAMES, 'trainSeason': 2025, 'gameTypes': GAME_TYPE_LABELS, 'rounds': ROUND_LABELS,
           'importanceWeight': IMPORTANCE_WEIGHT,
-          'modelVersion': MODEL_VERSION},
+          'modelVersion': MODEL_VERSION,
+          'models': [{'id': 'lgbm', 'version': MODEL_VERSION}] + [{'id': k, 'version': ALT_MODELS[k]} for k in alt_keys]},
          os.path.join(OUT_DIR, 'meta.json'))
 
 

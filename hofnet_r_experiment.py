@@ -1,10 +1,13 @@
 """
 HOF-Net-R vs 기존 HOF-Net vs LGBM(v4, 웹 모델) 비교 — HOF_Net_Failure_Analysis_Revision_v1.pdf 의 P0~P4 + E1
 
-실행 : python hofnet_r_experiment.py --part synth|real [--smoke] [--threads 8]
+실행 : python hofnet_r_experiment.py --part synth|real [--smoke] [--threads 8] [--device auto|cpu|cuda] [--resume]
        synth : E1 합성 데이터 점검 (Gate 0)  -> outputs/hofnet_r/synth_*.csv
        real  : 2025 실데이터 P0~P4 (시드 42–46) -> outputs/hofnet_r/*.csv, summary.json
        --smoke : 표본 축소 · 2 epoch 코드 점검 (출력 outputs/hofnet_r/smoke/)
+       --device : 신경망 학습·추론 장치 (auto = CUDA 가 있으면 GPU). 데이터는 CPU 에 두고 배치마다 옮긴다
+       --resume : (real) 3절 학습 대신 저장된 hofnet_r_seed{s}.pt 를 불러 4절부터 실행.
+                  point_prob*.csv · train_history_*.csv · vi_vs_blr.csv 는 저장본을 읽고 덮어쓰지 않는다
 입력 : outputs/vaa_exp/cache/ (hofnet_experiment.py 와 같은 캐시), models/v4, outputs/hofnet_nopt/hof_*.pt (기존 HOF-Net, 구종 제외판)
 변수 : v4 14개 (구종 제외, HAVAA). split · 표본 · 구위 지표 정의는 hofnet_experiment.py 와 같다
 """
@@ -32,7 +35,10 @@ ap = argparse.ArgumentParser()
 ap.add_argument('--part', choices=['synth', 'real'], required=True)
 ap.add_argument('--smoke', action='store_true')
 ap.add_argument('--threads', type=int, default=8)
+ap.add_argument('--device', choices=['auto', 'cpu', 'cuda'], default='auto')
+ap.add_argument('--resume', action='store_true')
 ARGS = ap.parse_args()
+DEV = torch.device('cuda' if ARGS.device == 'cuda' or (ARGS.device == 'auto' and torch.cuda.is_available()) else 'cpu')
 SMOKE = ARGS.smoke
 SEEDS = [42, 43] if SMOKE else [42, 43, 44, 45, 46]
 EPOCHS = 2 if SMOKE else 30
@@ -46,6 +52,9 @@ LOG = open(os.path.join(OUT, f'{ARGS.part}_log.txt'), 'a', encoding='utf-8')
 def log(*a):
     s = f'[{time.time() - T0:6.0f}s] ' + ' '.join(str(x) for x in a)
     print(s, flush=True); LOG.write(s + '\n'); LOG.flush()
+
+
+log('시작', vars(ARGS), '장치', DEV, torch.cuda.get_device_name(0) if DEV.type == 'cuda' else '')
 
 
 def save(df, name, **kw):
@@ -63,7 +72,7 @@ def run_r(tr, es, cat_cards, n_num, seed, log_fn, epochs=EPOCHS, batch=1024, pat
     y_tr = tr[3]
     y_mean, y_std = float(y_tr.mean()), float(y_tr.std())
     torch.manual_seed(seed)
-    net = hr.HOFNetR(n_num, cat_cards)
+    net = hr.HOFNetR(n_num, cat_cards).to(DEV)
     hist = hr.fit_mean(net, tr, es, y_mean, y_std, epochs=epochs, batch=batch, patience=patience, seed=seed, log=log_fn)
     f_tr, z_tr = hr.encode_all(net, tr, y_mean, y_std)
     f_es, z_es = hr.encode_all(net, es, y_mean, y_std)
@@ -77,7 +86,7 @@ def run_r(tr, es, cat_cards, n_num, seed, log_fn, epochs=EPOCHS, batch=1024, pat
         if best is None or nll < best[0]:
             best = (nll, tau0, b)
     _, tau0, blr = best
-    vh = hr.fit_var_head(z_tr, r_tr, z_es, r_es, epochs=2 if SMOKE else 20, seed=seed, log=log_fn)
+    vh = hr.fit_var_head(z_tr, r_tr, z_es, r_es, epochs=2 if SMOKE else 20, seed=seed, log=log_fn, device=DEV)
     v_tr = hr.var_of(vh, z_tr)
     blr_h = hr.BLRHead(tau0).fit(z_tr, r_tr, v_tr)
     return {'net': net, 'y_mean': y_mean, 'y_std': y_std, 's2': s2, 'tau0': tau0, 'blr': blr, 'vh': vh, 'blr_h': blr_h,
@@ -129,7 +138,7 @@ if ARGS.part == 'synth':
                 quiet = lambda s: None
                 for name, kw, beta in (('기존 A0 (β=1)', dict(cov='full', latent=True), 1.0), ('기존 A5 (결정적)', dict(cov='full', latent=False), 1.0)):
                     torch.manual_seed(seed)
-                    net = hn.HOFNet(K, [], **kw)
+                    net = hn.HOFNet(K, [], **kw).to(DEV)
                     h = hn.fit(net, tr, es, beta=beta, seed=seed, **SYN, log=quiet)
                     p = hn.predict(net, te)
                     rec(name, p['mean'], p['var'] + p['u_lat'], kl_last=float(h['train_kl'].iloc[-1]), epochs=len(h))
@@ -252,9 +261,9 @@ lgbm_es_rmse = float(np.sqrt(np.mean((y_es - v4.predict(es_rows[v4.input_feature
 OLD = {}
 for k in ['A0', 'A0-β0.01', 'A5']:
     pth = os.path.join('outputs', 'hofnet_nopt', f'hof_{k}.pt')
-    ck = torch.load(pth, weights_only=False)
+    ck = torch.load(pth, map_location='cpu', weights_only=False)
     assert ck['num'] == NUM and ck['cat'] == CAT, '기존 HOF-Net 변수 순서 불일치'
-    net = hn.HOFNet(len(NUM), prep.cat_cards, **ck['kw']); net.load_state_dict(ck['state']); net.eval()
+    net = hn.HOFNet(len(NUM), prep.cat_cards, **ck['kw']); net.load_state_dict(ck['state']); net.to(DEV).eval()
     OLD[k] = net
     p = hn.predict(net, va_t)
     add_res(f'기존 HOF-Net {k}', 42, hr.gauss_metrics(y_va, p['mean'], p['var'] + p['u_lat']))
@@ -265,7 +274,35 @@ for k in ['A0', 'A0-β0.01', 'A5']:
 # 3. HOF-Net-R : P1 → P2 · P2h · P3(VI) · P4(ZIB), 시드 5개
 # ===========================================================================
 R, ZIB, hist_rows, vi_rows, zib_hist = {}, {}, [], [], []
-for seed in SEEDS:
+if ARGS.resume:    # 저장된 시드별 모델 복원 (학습 없음). z_tr · r_tr · v_tr · 검증 예측은 다시 계산
+    res_saved = pd.read_csv(os.path.join(OUT, 'point_prob_by_seed.csv'), encoding='utf-8-sig')
+    hist_saved = pd.read_csv(os.path.join(OUT, 'train_history_stage1.csv'), encoding='utf-8-sig')
+    for seed in SEEDS:
+        ck = torch.load(os.path.join(OUT, f'hofnet_r_seed{seed}.pt'), map_location='cpu', weights_only=False)
+        assert ck['num'] == NUM and ck['cat'] == CAT and ck['cats'] == prep.cats, f'seed {seed} 변수·범주 불일치'
+        assert np.allclose(pd.Series(ck['mean'])[NUM], prep.mean[NUM]) and np.allclose(pd.Series(ck['std'])[NUM], prep.std[NUM]), f'seed {seed} 표준화 상수 불일치'
+        net = hr.HOFNetR(len(NUM), prep.cat_cards); net.load_state_dict(ck['net']); net.to(DEV).eval()
+        vh = hr.VarHead(net.d_r); vh.load_state_dict(ck['vh']); vh.eval()
+        blr, blr_h = hr.BLRHead(ck['tau0']), hr.BLRHead(ck['tau0'])
+        blr.m, blr.S = ck['blr']
+        blr_h.m, blr_h.S = ck['blr_h']
+        f_tr, z_tr = hr.encode_all(net, tr_t, ck['y_mean'], ck['y_std'])
+        m = {'net': net, 'y_mean': ck['y_mean'], 'y_std': ck['y_std'], 's2': ck['s2'], 'tau0': ck['tau0'], 'blr': blr, 'vh': vh, 'blr_h': blr_h,
+             'hist': hist_saved[hist_saved['seed'] == seed].to_dict('records'), 'z_tr': z_tr, 'r_tr': tr_t[3].double().numpy() - f_tr,
+             'v_tr': hr.var_of(vh, z_tr), 'time_stage1_2': np.nan, 'time_zib': np.nan}
+        zh = hr.ZIBHead(net.K * net.w.shape[1], net.d_r); zh.load_state_dict(ck['zib']); zh.to(DEV).eval()
+        p = r_predict(m, va_t)
+        for k in ('P1', 'P2', 'P2h'):
+            preds_va[(f'HOF-Net-R {k}', seed)] = p[k][0]
+        zp = hr.zib_predict_net(net, zh, va_t, seed=seed, y=torch.tensor(y_va, dtype=torch.float32))
+        m['zib_u_va'] = zp['u_global']
+        preds_va[('HOF-Net-R P4 (ZIB)', seed)] = zp['mean']
+        R[seed], ZIB[seed] = m, zh
+        # 저장된 검증 RMSE 와 재계산값 비교 (GPU 추론 수치 차이 점검)
+        chk_ = {k: float(np.sqrt(np.mean((y_va - preds_va[(k, seed)]) ** 2))) - float(res_saved.query('model == @k and seed == @seed')['RMSE'].iloc[0])
+                for k in ('HOF-Net-R P1', 'HOF-Net-R P2h', 'HOF-Net-R P4 (ZIB)')}
+        log('resume seed', seed, 'τ0', m['tau0'], 'RMSE 재계산 − 저장값', {k: f'{v:.2e}' for k, v in chk_.items()})
+for seed in ([] if ARGS.resume else SEEDS):
     t = time.time()
     log(f'=== HOF-Net-R seed {seed}')
     m = run_r(tr_t, es_t, prep.cat_cards, len(NUM), seed, lambda s: log('  ', s))
@@ -278,7 +315,7 @@ for seed in SEEDS:
                                          'U_global 비중': float(ug.mean() / (va + ug).mean())})
         preds_va[(f'HOF-Net-R {k}', seed)] = mean
     # P3 : 같은 이분산 헤드를 변분 q(ω) 로 (KL/N) -> BLR 과 비교
-    vi, vh_hist = hr.fit_vi_head(m['z_tr'], m['r_tr'], m['v_tr'], m['tau0'], epochs=2 if SMOKE else 15, seed=seed)
+    vi, vh_hist = hr.fit_vi_head(m['z_tr'], m['r_tr'], m['v_tr'], m['tau0'], epochs=2 if SMOKE else 15, seed=seed, device=DEV)
     Zv = hr.add_bias(p['z'])
     vm, vs = vi.m.detach().numpy(), vi.s.detach().numpy()
     f_va = p['P1'][0]
@@ -295,7 +332,8 @@ for seed in SEEDS:
     _, z_tr_t, h_tr = hr.encode_all(m['net'], tr_t, m['y_mean'], m['y_std'], flat=True)
     _, z_es_t, h_es = hr.encode_all(m['net'], es_t, m['y_mean'], m['y_std'], flat=True)
     zh, zh_hist = hr.fit_zib_head(h_tr, torch.from_numpy(z_tr_t), tr_t[3], h_es, torch.from_numpy(z_es_t), es_t[3],
-                                  epochs=EPOCHS, seed=seed, log=lambda s: log('   ZIB', s))
+                                  epochs=EPOCHS, seed=seed, log=lambda s: log('   ZIB', s), device=DEV)
+    zh.to(DEV)
     del h_tr, h_es
     zib_hist += [{'seed': seed, **h} for h in zh_hist]
     zp = hr.zib_predict_net(m['net'], zh, va_t, seed=seed, y=torch.tensor(y_va, dtype=torch.float32))
@@ -312,16 +350,20 @@ for seed in SEEDS:
                os.path.join(OUT, f'hofnet_r_seed{seed}.pt'))
     log(pd.DataFrame(res_rows[-5:]).set_index('model')[['RMSE', 'R2', 'CRPS', '보정 오차']].round(5).to_string())
 
-res = pd.DataFrame(res_rows)
-save(res, 'point_prob_by_seed.csv', index=False)
-metric_cols = [c for c in res.columns if c not in ('model', 'seed')]
-agg = res.groupby('model', sort=False)[metric_cols].agg(['mean', 'std'])
-agg.columns = [f'{a} {b}' for a, b in agg.columns]
-save(agg, 'point_prob.csv')
+if ARGS.resume:
+    res = res_saved
+    vi_rows = pd.read_csv(os.path.join(OUT, 'vi_vs_blr.csv'), encoding='utf-8-sig').to_dict('records')
+else:
+    res = pd.DataFrame(res_rows)
+    save(res, 'point_prob_by_seed.csv', index=False)
+    metric_cols = [c for c in res.columns if c not in ('model', 'seed')]
+    agg = res.groupby('model', sort=False)[metric_cols].agg(['mean', 'std'])
+    agg.columns = [f'{a} {b}' for a, b in agg.columns]
+    save(agg, 'point_prob.csv')
+    save(pd.DataFrame(hist_rows), 'train_history_stage1.csv', index=False)
+    save(pd.DataFrame(zib_hist), 'train_history_zib.csv', index=False)
+    save(pd.DataFrame(vi_rows), 'vi_vs_blr.csv', index=False)
 log('점·확률 예측 (시드 평균)\n' + res.groupby('model', sort=False)[['RMSE', 'R2', 'CRPS', 'NLL (Gaussian)', '보정 오차', '0점 Brier', 'bin log score']].mean().round(5).to_string())
-save(pd.DataFrame(hist_rows), 'train_history_stage1.csv', index=False)
-save(pd.DataFrame(zib_hist), 'train_history_zib.csv', index=False)
-save(pd.DataFrame(vi_rows), 'vi_vs_blr.csv', index=False)
 
 # 분위별 실제값 (시드 42)
 dec = pd.DataFrame({k[0]: v for k, v in preds_va.items() if k[1] == 42} | {'actual': y_va})
@@ -364,17 +406,23 @@ _src = open('hofnet_experiment.py', encoding='utf-8').read()
 exec(_src[_src.index('def within_corr'):_src.index('scalers, stuff_cols, rows = {}, {}, {}')])
 
 
+T_season = {}    # 시즌 전체 입력 텐서 (연도별 1회만 생성)
+
+
 def season_pred(kind, seed):
     out = {}
     for y in fr:
         X = fr[y]
         if kind == 'LGBM v4':
             out[y] = LGBM[seed].predict(X[v4.input_features])
-        elif kind.startswith('기존'):
-            out[y] = hn.predict(OLD[kind.split()[-1]], T(X))['mean']
+            continue
+        if y not in T_season:
+            T_season[y] = T(X)
+        if kind.startswith('기존'):
+            out[y] = hn.predict(OLD[kind.split()[-1]], T_season[y])['mean']
         else:
             m = R[seed]
-            t_ = T(X)
+            t_ = T_season[y]
             if kind == 'HOF-Net-R P2h':
                 f, z = hr.encode_all(m['net'], t_, m['y_mean'], m['y_std'])
                 out[y] = f + m['blr_h'].shift(z)
@@ -470,11 +518,11 @@ size_curve = pd.DataFrame(size_rows)
 save(size_curve, 'uncertainty_size_curve.csv', index=False)
 log('표본 크기 곡선\n' + size_curve.to_string())
 
-p26 = r_predict(m, T(d26))
+p26 = r_predict(m, T_season[2026])
 v = d26['release_speed'].to_numpy('float64', na_value=np.nan)
 hi, lo = v > 98, v <= 95
 lab = np.r_[np.ones(hi.sum()), np.zeros(lo.sum())]
-zp26 = hr.zib_predict_net(m['net'], ZIB[42], T(d26), seed=42)
+zp26 = hr.zib_predict_net(m['net'], ZIB[42], T_season[2026], seed=42)
 ood = {}
 for k, u, u_va in (('HOF-Net-R P2h U_global', p26['P2h'][2], p_va['P2h'][2]), ('HOF-Net-R P2h U_alea', p26['P2h'][1], p_va['P2h'][1]),
                    ('HOF-Net-R P4 U_global', zp26['u_global'], m['zib_u_va'])):

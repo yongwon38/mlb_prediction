@@ -50,6 +50,10 @@ jobs:
           # 현재 시즌 SHAP 증분 계산 (새 투구 + 피처가 바뀐 투구, 하루 약 13만 구). 너무 많으면 건너뛰고 Saabas
           python compute_shap.py $C --incremental --max-rows 250000
           python ops.py push-shap $C
+          # 대체 모델 HOF-Net-R : 요인 그룹 Shapley 캐시. 매일은 바뀐 투구만 순열 표본 근사(--approx), 정확값은 shap 워크플로(매월)가 다시 계산
+          python ops.py pull-shap $S --model hof_r
+          python compute_shap.py $C --model hof_r --incremental --approx
+          python ops.py push-shap $C --model hof_r
           python export_web_data.py --seasons $S
           python ops.py push-web $S
 

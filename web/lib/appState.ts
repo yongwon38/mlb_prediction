@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { loadIndex, loadLeague, loadMeta, loadPitches } from "./data";
+import { DEFAULT_MODEL, getModel, parseModel, setModel, useModel, type ModelId } from "./model";
 import type { League, Meta, Pitch, PitcherFile, SeasonIndex } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -30,12 +31,13 @@ export function useNavCtx(): NavCtx {
   );
 }
 
-/** 맥락을 쿼리 문자열로 (extra 는 페이지 고유 키) */
+/** 맥락을 쿼리 문자열로 (extra 는 페이지 고유 키). 구위 모델은 현재 선택이 기본(lgbm)이 아닐 때만 model= 로 붙는다 */
 export function ctxHref(path: string, c: Partial<NavCtx>, extra: Record<string, string | number | null | undefined> = {}) {
   const q = new URLSearchParams();
   if (c.season) q.set("season", String(c.season));
   if (c.pitcher) q.set("pitcher", String(c.pitcher));
   if (c.gt && c.gt.join() !== DEFAULT_GT.join()) q.set("gt", c.gt.join(","));
+  if (getModel() !== DEFAULT_MODEL) q.set("model", getModel());
   for (const [k, v] of Object.entries(extra)) if (v !== null && v !== undefined && v !== "") q.set(k, String(v));
   const s = q.toString();
   return s ? `${path}?${s}` : path;
@@ -67,12 +69,15 @@ export function usePageState(extra: Record<string, string | number | null | unde
   const [index, setIndex] = useState<SeasonIndex | null>(null);
   const [league, setLeague] = useState<League | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const model = useModel();
 
   useEffect(() => {
     loadMeta()
       .then((m) => {
         const q = readQuery();
         const s = numParam(q, "season");
+        const md = parseModel(q.get("model"));
+        setModel(m.models?.some((x) => x.id === md) ? md : DEFAULT_MODEL); // 데이터에 없는 모델이면 기본
         setMeta(m);
         setSeason(s && m.seasons.includes(s) ? s : m.seasons[0]);
         setPitcherId(numParam(q, "pitcher"));
@@ -83,16 +88,17 @@ export function usePageState(extra: Record<string, string | number | null | unde
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 최초 1회만
   }, []);
 
+  const [loaded, setLoaded] = useState<ModelId | null>(null);
   useEffect(() => {
-    if (!season) return;
+    if (!season || !meta) return;
     let alive = true;
-    Promise.all([loadIndex(season), loadLeague(season)])
-      .then(([i, l]) => alive && (setIndex(i), setLeague(l)))
+    Promise.all([loadIndex(season, model), loadLeague(season, model)])
+      .then(([i, l]) => alive && (setIndex(i), setLeague(l), setLoaded(model)))
       .catch((e) => alive && setError(String(e)));
     return () => {
       alive = false;
     };
-  }, [season]);
+  }, [season, model, meta]);
 
   const extraKey = JSON.stringify(extra);
   useEffect(() => {
@@ -100,25 +106,26 @@ export function usePageState(extra: Record<string, string | number | null | unde
     const href = ctxHref(window.location.pathname, { season, pitcher: pitcherId, gt }, JSON.parse(extraKey));
     window.history.replaceState(null, "", href);
     setNavCtx({ season, pitcher: pitcherId, gt });
-  }, [season, pitcherId, gt, extraKey]);
+  }, [season, pitcherId, gt, extraKey, model]);
 
-  const ready = !!(index && league && meta && index.season === season);
+  const ready = !!(index && league && meta && index.season === season && loaded === model);
   const entry = ready ? (index!.pitchers.find((p) => p.id === pitcherId) ?? null) : null;
-  return { meta, season, setSeason, pitcherId, setPitcherId, gt, setGt, index: ready ? index : null, league: ready ? league : null, entry, error, setError };
+  return { meta, season, setSeason, pitcherId, setPitcherId, gt, setGt, model, index: ready ? index : null, league: ready ? league : null, entry, error, setError };
 }
 
 /** 투수 투구 파일 로드 (시즌·투수가 바뀌면 다시) */
 export function usePitcherData(season: number | null, entryId: number | null, setError: (e: string) => void) {
-  const [data, setData] = useState<{ file: PitcherFile; pitches: Pitch[]; season: number } | null>(null);
+  const model = useModel();
+  const [data, setData] = useState<{ file: PitcherFile; pitches: Pitch[]; season: number; model: ModelId } | null>(null);
   useEffect(() => {
     if (!season || !entryId) return;
     let alive = true;
-    loadPitches(season, entryId)
-      .then((d) => alive && setData({ ...d, season }))
+    loadPitches(season, entryId, model)
+      .then((d) => alive && setData({ ...d, season, model }))
       .catch((e) => alive && setError(String(e)));
     return () => {
       alive = false;
     };
-  }, [season, entryId, setError]);
-  return data && data.season === season && data.file.id === entryId ? data : null;
+  }, [season, entryId, setError, model]);
+  return data && data.season === season && data.file.id === entryId && data.model === model ? data : null;
 }

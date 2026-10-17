@@ -2,7 +2,7 @@
 import Waterfall from "@/components/explain/Waterfall";
 import { pitchColor } from "@/lib/colors";
 import { EXPLAIN_FEAT_KEYS, FEAT_INFO, GROUP_FEATS, fmtSigned, groupDetail, topReasons } from "@/lib/explain";
-import type { ExplainPitch, LeagueExplain } from "@/lib/types";
+import type { ExplainMethod, ExplainPitch, LeagueExplain } from "@/lib/types";
 import { groupNames, useT } from "@/lib/i18n";
 
 export function PtLabel({ pt, pitchTypes, dark, name }: { pt: string; pitchTypes: string[]; dark: boolean; name?: string }) {
@@ -116,18 +116,21 @@ export function VariableGuide({ lg }: { lg: LeagueExplain }) {
   );
 }
 
-export function Caveats({ method }: { method: "shap" | "saabas" }) {
+export function Caveats({ method }: { method: ExplainMethod }) {
   const c = useT().explain.caveats;
+  const hof = method.startsWith("shapley"); // HOF-Net-R : 요인 그룹 Shapley
+  const name = { shap: c.shap, saabas: c.saabas, shapley: c.shapley, "shapley-sampled": c.shapleySampled, "shapley-mixed": c.shapleyMixed }[method];
   return (
     <details className="card p-4 text-xs text-ink-2 leading-relaxed" open>
       <summary className="cursor-pointer font-semibold text-ink text-sm">{c.summary}</summary>
       <ul className="list-disc pl-5 mt-2 flex flex-col gap-1">
         <li>
-          {c.c1a}
-          <b>{method === "shap" ? c.shap : c.saabas}</b>.{method === "saabas" && c.saabasNote}
+          {hof ? c.c1aHof : c.c1a}
+          <b>{name}</b>.{method === "saabas" && c.saabasNote}
+          {hof && c.shapleyNote}
           {c.c1b}
           <b>{c.c1c}</b>
-          {c.c1d}
+          {hof ? c.c1dHof : c.c1d}
         </li>
         <li>{c.c2}</li>
         <li>{c.c3}</li>

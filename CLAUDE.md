@@ -40,6 +40,8 @@
   - 교체 지점은 `stuff_pipeline.fit_stuff_model(X_tr, y_tr, X_es, y_es) -> model(.predict)` 하나로 유지한다.
   - 웹·SHAP 캐시에 쓰려면 모델이 `stuff_model.py` 인터페이스(`predict`, `categories`, `explain(X, exact) -> (기여, 기준값)`, `method`)를 갖춰야 한다. `기준값 + 기여 합 = 예측`이 정확히 성립해야 구위 산출 근거가 표시된다. LGBM 은 불러올 때 `LGBMStuffModel` 로 감싸고(TreeSHAP / Saabas), 커스텀 모델(예 : HOF-Net)은 이 메서드를 갖춘 객체를 `stage3_stuff_lgbm.joblib` 로 저장하면 그대로 쓰인다
   - 새 모델과 비교할 때는 반드시 동일 split, 동일 표본, 동일 지표(RMSE/MAE/R², 분위별 실제값, 검증기간 whiff% 상관)를 사용한다.
+  - **대체 모델(웹에서 선택)** : `export_web_data.ALT_MODELS = {'hof': 'hof_r'}`. 같은 투수 파일에 접미사 필드(p/ `sh`, 경기·타석 `sh/sh60/shmax`, e/ `h0..h7`)로, 집계는 `index.hof.json`·`league.hof.json`·`summary.hof.json` 으로 저장. 웹은 URL `model=hof` + 상단 토글 (`web/lib/model.ts`)
+  - HOF-Net-R 근거 = 8개 요인 그룹 **interventional Shapley** (`hof_net_r.HOFNetRStuffModel`, 배경 리그 투구 8개). 정확값은 256 coalition 전부(GPU 약 100초/1만 구, CPU 4스레드 약 10배), 근사는 순열 4개 표본(같은 base, 약 1/9 계산량). 캐시는 `compute_shap.py --model hof_r` (`outputs/hof_r/shap/`, 투구별 `exact` 표시)
   - 튜닝은 학습셋 내부 홀드아웃(학습셋 마지막 2주)으로만 수행하고 검증셋은 최종 평가에만 사용한다.
 
 ### 4단계 — 최종 구위 score (20~80)
@@ -54,7 +56,8 @@
 | v2 | `stuff_pipeline_261005.ipynb` | `models/v2/`, `outputs/v2/` | VAA·HAA, 루킹삼진 제외, waste 볼 제외 (되돌리기용으로 보관) |
 | v3 | `stuff_pipeline_261010_v3.ipynb` (실험 `stuff_pipeline_261010*.ipynb`, 수정 `stuff_pipeline_261011_v3fix.ipynb`) | `models/v3/`, `outputs/v3/` | 궤적 초기값·가속도·원값 진입각 제외 + HAVAA (되돌리기용으로 보관) |
 | v3_h4 | 위와 같음 | `models/v3_h4/` | v3 + 보정 HAA. 예비 (미사용) |
-| v4 | `stuff_pipeline_261011_v4.ipynb` | `models/v4/`, `outputs/v4/` | v3 − 구종 변수. **웹 사용 중** (`export_web_data.MODEL_VERSION`) |
+| v4 | `stuff_pipeline_261011_v4.ipynb` | `models/v4/`, `outputs/v4/` | v3 − 구종 변수. **웹 기본 모델** (`export_web_data.MODEL_VERSION`, 웹 id `lgbm`) |
+| hof_r | `hofnet_r_experiment.py` → `build_hof_web_model.py` | `models/hof_r/`, `outputs/hof_r/` | HOF-Net-R P4(ZIB) 시드 5개 앙상블, v4 와 같은 입력. **웹 대체 모델** (`export_web_data.ALT_MODELS`, 웹 id `hof`). 검토 : `model_choice_analysis.py`, 업무일지 2026-10-16 |
 - 새 버전은 기존 산출물을 덮어쓰지 않고 `models/vN/`, `outputs/vN/` 에 저장
 
 ## 3. 데이터 규칙
@@ -111,11 +114,12 @@ data_status.json               데이터 기준일 (daily 가 커밋)
 
 ## 7. 클라우드 운영 (무료, 로컬 PC 없이 동작)
 - 구성 : GitHub Actions(공개 레포 무료) + Hugging Face 데이터셋 `elcax1/mlb-statcast`(공개) + Vercel Hobby(`stuff-lab`)
-- **daily** (매일 15:00 KST) : 현재 시즌 최근 3일 Statcast 재수집 -> 경기 단위 교체 -> 바뀌었으면 현재 시즌 SHAP 증분 계산 -> export -> 배포 -> `data_status.json` 커밋
+- **daily** (매일 15:00 KST) : 현재 시즌 최근 3일 Statcast 재수집 -> 경기 단위 교체 -> 바뀌었으면 현재 시즌 SHAP 증분 계산 + HOF 기여 증분(순열 표본 근사, `--approx`) -> export -> 배포 -> `data_status.json` 커밋
 - **deploy** (main push) : HF 의 웹 데이터 스냅샷(`web_data/{web_id}/`)으로 빌드·배포. `web_id` = 3·4단계 모델 + `export_web_data.py` + `stuff_pipeline.py` + `stuff_model.py` 해시 -> 모델·export 코드가 바뀌면 스냅샷이 없으므로 전 시즌 자동 재생성
 - **SHAP 캐시** = 투구 키 + 피처 해시(`compute_shap.feature_hash`). 키·해시가 같은 투구는 재사용, 새 투구와 피처가 바뀐 투구만 계산 (`--incremental`)
   - 진행 중 시즌은 새 투구가 들어오면 그 투수의 주 패스트볼 평균이 바뀌어 시즌 전체 피처가 바뀜 -> 하루 약 12~14만 구 재계산 (daily, 25만 구 초과면 건너뛰고 그날은 Saabas)
-  - **shap** (models push / 매월 / 수동) : 캐시 없는 시즌을 8조각 병렬 계산 -> 합치기 -> 해당 시즌 재생성. 처음 계산·모델 변경 후용
+  - **shap** (models push / 매월 / 수동) : 모델(`ops.py shap-plan` : LGBM + HOF) × 캐시 없는 시즌을 8조각 병렬 계산 -> 합치기 -> 해당 시즌 재생성. 처음 계산·모델 변경 후용. HOF 는 매월 현재 시즌의 근사 투구를 정확값으로 다시 계산
+  - 클라우드는 CPU torch(`requirements.txt` 의 `torch==2.5.1+cpu`)로 HOF 를 계산한다. HOF 모델 파일에는 sklearn·LightGBM 객체를 넣지 않는다 (HAVAA 계수만 담은 `AngleAdjustedStuffModel(None, …)`) — 로컬과 클라우드의 sklearn 버전이 달라도 로드되도록
 - Secrets : `HF_TOKEN`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` (`web/.vercel/project.json`)
 - 로컬에서 HF 데이터로 작업 : `MLB_DATA=store`, 캐시 위치 `MLB_CACHE`(기본 `data_cache/`), 테스트 저장소 `MLB_STORE=<폴더>`
 - `requirements.txt` 버전은 모델을 학습한 로컬 환경과 같게 유지한다 (joblib 호환)

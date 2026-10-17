@@ -14,6 +14,13 @@ export const en: Dict = {
   },
   langName: "English",
   langAria: "Language",
+  model: {
+    aria: "Stuff model",
+    names: { lgbm: "LGBM", hof: "HOF-Net" } as Record<string, string>,
+    titles: { lgbm: "LightGBM v4 (default model)", hof: "HOF-Net-R (experimental neural model)" } as Record<string, string>,
+    notice:
+      "You are viewing grades from the experimental HOF-Net-R model. Its pitch-level accuracy matches the default LightGBM model, but its Stuff ranking tracks whiff rate slightly less closely. Factor breakdowns are factor-group Shapley values.",
+  },
 
   nav: { home: "Home", pitcher: "Pitchers", games: "Games", explain: "Stuff breakdown" },
 
@@ -75,6 +82,8 @@ export const en: Dict = {
     summary: "How the model works: Stuff on the 20–80 scale",
     s1: "A random forest predicts the outcome of each batted ball (out, single, double/triple, home run) from spray angle, exit velocity, launch angle and attack angle.",
     s2: "The expected outcome goes through a gamma-to-beta transform to give a 0–1 contact quality score. Whiffs count as 0. Called third strikes are left out of training.",
+    s3aHof:
+      "The experimental HOF-Net-R model predicts the same score from the same pitch characteristics (velocity, movement, release point, extension, spin rate and axis, arm angle, fastball differences, HAVAA). It is a neural network that learns interactions between inputs with attention, models the many zero-valued outcomes with a zero-inflated Beta likelihood, and averages five training seeds. Raw release velocity and acceleration components are left out because they effectively tell the model where the pitch ended up.",
     s3a: "A LightGBM model then predicts that score from pitch characteristics: velocity, movement, release point, extension, spin rate and axis, arm angle, differences from the pitcher's primary fastball and height-adjusted vertical approach angle (HAVAA). Raw release velocity and acceleration components are left out because they effectively tell the model where the pitch ended up.",
     s3b: "Location, count, hitter and the pitch-type label are not inputs,",
     s3c: "so the same pitch gets the same grade wherever it's thrown.",
@@ -467,6 +476,12 @@ export const en: Dict = {
       shap: "SHAP (TreeSHAP, exact)",
       saabas: "Saabas (approximation from tree split paths)",
       saabasNote: " It switches to exact SHAP once that run finishes; at the factor-group level the two correlate at 0.83–0.98.",
+      c1aHof: "Each value is how many Stuff points the model (HOF-Net-R) credits to that factor. Method: ",
+      shapley: "factor-group Shapley (all 256 combinations of the 8 factors, evaluated against 8 league background pitches, exact)",
+      shapleySampled: "sampled Shapley (approximation from 4 factor orderings)",
+      shapleyMixed: "factor-group Shapley (some recently refreshed pitches use the sampled approximation)",
+      shapleyNote: " A neural network cannot split its prediction the way a tree can, so each factor gets the average change from swapping it from league background values to this pitch's value.",
+      c1dHof: ", exactly. The baseline is the average predicted grade of the 8 league background pitches.",
       c1b: " For every pitch, ",
       c1c: "baseline + factor contributions = that pitch's grade",
       c1d: ", exactly. The baseline is the grade a pitch gets when every factor is league average.",

@@ -9,6 +9,8 @@ on:
       - 'models/**'
       - 'stuff_pipeline.py'
       - 'stuff_model.py'
+      - 'hof_net.py'
+      - 'hof_net_r.py'
       - 'export_web_data.py'
       - 'data_store.py'
       - 'ops.py'
@@ -53,6 +55,7 @@ jobs:
             S="${{ steps.web.outputs.missing }}"
           fi
           python ops.py pull-shap
+          python ops.py pull-shap --model hof_r
           python export_web_data.py --seasons $S
           python ops.py push-web $S
 

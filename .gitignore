@@ -11,6 +11,8 @@
 !/hofnet_followup.py
 !/hof_net_r.py
 !/hofnet_r_experiment.py
+!/build_hof_web_model.py
+!/model_choice_analysis.py
 !/stuff_pipeline_*.ipynb
 !/export_web_data.py
 !/compute_shap.py
@@ -44,6 +46,11 @@
 !/outputs/hofnet_r/*.csv
 !/outputs/hofnet_r/*.json
 !/outputs/hofnet_r/*_log.txt
+!/outputs/model_choice/
+/outputs/model_choice/*
+!/outputs/model_choice/*.csv
+!/outputs/model_choice/*.json
+!/outputs/model_choice/*_log.txt
 
 # 클라우드 운영 (GitHub Actions + HF 데이터셋 + Vercel)
 !/.github/
@@ -69,3 +76,8 @@
 /models/v4/*
 !/models/v4/*.joblib
 !/models/v4/*.json
+# 대체 웹 모델 HOF-Net-R (웹에서 선택, 클라우드 배치가 점수·근거 계산)
+!/models/hof_r/
+/models/hof_r/*
+!/models/hof_r/*.joblib
+!/models/hof_r/*.json

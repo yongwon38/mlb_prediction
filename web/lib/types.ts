@@ -7,6 +7,7 @@ export interface Meta {
   gameTypes: string[]; // 경기 유형 이름 (0 정규시즌 / 1 포스트시즌 / 2 시범경기)
   rounds: Record<string, string>; // Statcast game_type -> 라운드 이름
   importanceWeight: Record<string, number>;
+  models?: { id: "lgbm" | "hof"; version: string }[]; // 고를 수 있는 구위 모델 (없으면 lgbm 만)
 }
 
 export interface PitcherEntry {
@@ -62,6 +63,9 @@ export interface League {
   explain?: LeagueExplain;
 }
 
+/** 기여 계산 방법 : LGBM = shap(TreeSHAP) / saabas(근사), HOF = shapley(요인 그룹 Shapley) / shapley-sampled(순열 표본 근사) / shapley-mixed(일부 근사) */
+export type ExplainMethod = "shap" | "saabas" | "shapley" | "shapley-sampled" | "shapley-mixed";
+
 /** 구위 산출 근거 : 리그 기준 */
 export interface LeagueExplain {
   base: number; // 기준 점수 S0 (모든 요인 기여가 0 일 때의 구위)
@@ -69,7 +73,7 @@ export interface LeagueExplain {
   groupFeatures: string[][];
   overall: number[]; // 리그 전체 평균 그룹 기여
   pitchTypes: Record<string, { n: number; feat: Record<string, number | null>; contrib: number[] }>;
-  method?: "shap" | "saabas"; // 기여 계산 방법
+  method?: ExplainMethod; // 기여 계산 방법
 }
 
 /** 설명 페이지 전용 투수 파일 (투수 파일과 같은 투구 순서) */

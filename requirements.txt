@@ -8,3 +8,6 @@ joblib==1.4.2
 pyarrow==14.0.2
 pybaseball==2.2.7
 huggingface_hub>=0.30
+# 대체 구위 모델 HOF-Net-R (hof_net_r.py) : CPU 빌드 (클라우드에는 GPU 가 없다)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1+cpu

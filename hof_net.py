@@ -33,9 +33,9 @@ class Block(nn.Module):
         self.ff = nn.Sequential(nn.Linear(d, 2 * d), nn.GELU(), nn.Dropout(dropout), nn.Linear(2 * d, d))
         self.drop = nn.Dropout(dropout)
 
-    def forward(self, x):
+    def forward(self, x, need_weights=True):
         h = self.ln1(x)
-        a, w = self.attn(h, h, h, need_weights=True, average_attn_weights=True)    # w : (B, K, K) 헤드 평균
+        a, w = self.attn(h, h, h, need_weights=need_weights, average_attn_weights=True)    # w : (B, K, K) 헤드 평균 (need_weights=False 면 None, 빠름)
         x = x + self.drop(a)
         x = x + self.drop(self.ff(self.ln2(x)))
         return x, w
@@ -160,6 +160,15 @@ class Prep:
     def cat_cards(self):
         return [len(c) for c in self.cats]
 
+    @classmethod
+    def from_state(cls, num_cols, cat_cols, mean, std, cats):
+        """저장된 표준화 상수·범주로 복원 (학습 데이터 없이)"""
+        p = cls.__new__(cls)
+        p.num_cols, p.cat_cols = list(num_cols), list(cat_cols)
+        p.mean, p.std = pd.Series(mean, dtype='float64')[p.num_cols], pd.Series(std, dtype='float64')[p.num_cols]
+        p.cats = [list(c) for c in cats]
+        return p
+
 
 def batches(n, size, shuffle, gen=None):
     idx = torch.randperm(n, generator=gen) if shuffle else torch.arange(n)
@@ -167,17 +176,27 @@ def batches(n, size, shuffle, gen=None):
         yield idx[i:i + size]
 
 
+def device_of(module):
+    """모듈 파라미터가 있는 장치. 데이터 텐서는 CPU 에 두고 배치마다 이 장치로 옮긴다"""
+    return next(module.parameters()).device
+
+
+def to_dev(dev, *ts):
+    return tuple(t.to(dev, non_blocking=True) for t in ts)
+
+
 @torch.no_grad()
 def predict(net, tensors, size=8192):
     net.eval()
+    dev = device_of(net)
     xn, miss, xc = tensors
     out = {k: [] for k in ('mean', 'var', 'u_lat', 'contrib', 'lam')}
     for b in batches(len(xn), size, False):
-        o = net(xn[b], miss[b], xc[b])
+        o = net(*to_dev(dev, xn[b], miss[b], xc[b]))
         mean, var, u = net.predictive(o)
         out['mean'].append(mean); out['var'].append(var); out['u_lat'].append(u)
         out['contrib'].append(o['mu'] * o['h']); out['lam'].append(o['lam'])
-    return {k: torch.cat(v).double().numpy() for k, v in out.items()} | {'base': float(net.bias.item())}
+    return {k: torch.cat(v).double().cpu().numpy() for k, v in out.items()} | {'base': float(net.bias.item())}
 
 
 def fit(net, tr, es, beta=1.0, lam_prior=1e-3, epochs=30, patience=4, batch=1024, lr=1e-3, lr_psi=1e-4,
@@ -188,6 +207,7 @@ def fit(net, tr, es, beta=1.0, lam_prior=1e-3, epochs=30, patience=4, batch=1024
     torch.manual_seed(seed)
     gen = torch.Generator().manual_seed(seed)
     (xn, miss, xc, y), (exn, emiss, exc, ey) = tr, es
+    dev = device_of(net)
     opt_a = torch.optim.AdamW(net.theta_phi(), lr=lr, weight_decay=1e-4)
     opt_b = torch.optim.AdamW(net.psi(), lr=lr_psi)
     best, best_state, bad, hist = np.inf, None, 0, []
@@ -195,21 +215,22 @@ def fit(net, tr, es, beta=1.0, lam_prior=1e-3, epochs=30, patience=4, batch=1024
         net.train()
         tot = {'nll': 0.0, 'kl': 0.0, 'n': 0, 'nan': 0, 'chol': 0}
         for b in batches(len(y), batch, True, gen):              # A단계 : θ·φ (ψ 고정)
-            o = net(xn[b], miss[b], xc[b])
+            bx, yb = to_dev(dev, xn[b], miss[b], xc[b]), y[b].to(dev)
+            o = net(*bx)
             if net.latent:
                 Sig = o['s'].unsqueeze(2) * o['R'] * o['s'].unsqueeze(1)
-                L, info = torch.linalg.cholesky_ex(Sig + 1e-8 * torch.eye(net.K))
+                L, info = torch.linalg.cholesky_ex(Sig + 1e-8 * torch.eye(net.K, device=dev))
                 tot['chol'] += int((info != 0).sum())
-                eps = torch.randn(4, *o['mu'].shape)
+                eps = torch.randn(4, *o['mu'].shape, device=dev)
                 W = o['mu'] + (L.unsqueeze(0) @ eps.unsqueeze(-1)).squeeze(-1)   # 재매개화 표본 4개
                 m = net.bias + (W * o['h']).sum(-1)
-                ll = -gauss_nll(y[b], m, o['var']).mean(0)
+                ll = -gauss_nll(yb, m, o['var']).mean(0)
                 kl = net.kl(o)
                 wt = (lambda w: w / w.mean())(o['var'].detach() ** nll_beta) if nll_beta else 1.0   # 배치 평균 1 로 정규화 (KL 과의 비중 유지)
                 loss = (-ll * wt + beta * kl).mean()
             else:
                 mean, var, _ = net.predictive(o)
-                ll, kl = -gauss_nll(y[b], mean, var), torch.zeros(len(b))
+                ll, kl = -gauss_nll(yb, mean, var), torch.zeros(len(b), device=dev)
                 wt = (lambda w: w / w.mean())(var.detach() ** nll_beta) if nll_beta else 1.0
                 loss = (-ll * wt).mean()
             if not torch.isfinite(loss):
@@ -224,7 +245,7 @@ def fit(net, tr, es, beta=1.0, lam_prior=1e-3, epochs=30, patience=4, batch=1024
                 if i >= b_frac * len(y) / batch:
                     break
                 with torch.no_grad():
-                    o = net(xn[b], miss[b], xc[b])
+                    o = net(*to_dev(dev, xn[b], miss[b], xc[b]))
                 lam = o['lam']
                 tau = TAU_MIN + F.softplus(F.softplus(net.prior_a) * lam * net.K + net.prior_b)
                 o = {**{k: v.detach() for k, v in o.items()}, 'tau': tau}
@@ -235,7 +256,7 @@ def fit(net, tr, es, beta=1.0, lam_prior=1e-3, epochs=30, patience=4, batch=1024
         es_nll = float(gauss_nll(ey.double(), torch.from_numpy(p['mean']), torch.from_numpy(p['var'] + p['u_lat'])).mean())
         es_rmse = float(np.sqrt(np.mean((ey.numpy() - p['mean']) ** 2)))
         with torch.no_grad():
-            tau_max = float(net(exn[:4096], emiss[:4096], exc[:4096])['tau'].max())
+            tau_max = float(net(*to_dev(dev, exn[:4096], emiss[:4096], exc[:4096]))['tau'].max())
         rec = {'epoch': ep + 1, 'train_nll': tot['nll'] / max(tot['n'], 1), 'train_kl': tot['kl'] / max(tot['n'], 1),
                'holdout_nll': es_nll, 'holdout_rmse': es_rmse, 'nan_batches': tot['nan'], 'chol_fail': tot['chol'], 'tau_max': tau_max}
         hist.append(rec)

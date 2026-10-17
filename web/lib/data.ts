@@ -1,4 +1,5 @@
 import type { ExplainFile, ExplainPitch, League, Meta, Pitch, PitcherFile, SeasonIndex, SeasonStats, SeasonSummary } from "./types";
+import { getModel, MODEL_FIELD, modelSuffix, type ModelId } from "./model";
 
 const cache = new Map<string, Promise<unknown>>();
 
@@ -15,9 +16,10 @@ function getJSON<T>(url: string): Promise<T> {
 }
 
 export const loadMeta = () => getJSON<Meta>("/data/meta.json");
-export const loadIndex = (season: number) => getJSON<SeasonIndex>(`/data/${season}/index.json`);
-export const loadLeague = (season: number) => getJSON<League>(`/data/${season}/league.json`);
-export const loadSummary = (season: number) => getJSON<SeasonSummary>(`/data/${season}/summary.json`);
+// 구위가 들어 있는 집계 파일은 모델별 (index.json / index.hof.json). 모델을 생략하면 현재 선택 모델
+export const loadIndex = (season: number, m: ModelId = getModel()) => getJSON<SeasonIndex>(`/data/${season}/index${modelSuffix(m)}.json`);
+export const loadLeague = (season: number, m: ModelId = getModel()) => getJSON<League>(`/data/${season}/league${modelSuffix(m)}.json`);
+export const loadSummary = (season: number, m: ModelId = getModel()) => getJSON<SeasonSummary>(`/data/${season}/summary${modelSuffix(m)}.json`);
 /** 공식 기록은 네트워크 실패 시 export 에서 생략될 수 있음 -> 없으면 null */
 export const loadStats = (season: number) => getJSON<SeasonStats>(`/data/${season}/stats.json`).catch(() => null);
 
@@ -40,9 +42,20 @@ async function getGzipJSON<T>(url: string): Promise<T> {
   return cache.get(url) as Promise<T>;
 }
 
-export async function loadPitches(season: number, id: number): Promise<{ file: PitcherFile; pitches: Pitch[] }> {
-  const file = await getGzipJSON<PitcherFile>(`/data/${season}/p/${id}.json.gz`);
+/** 투수 파일 하나에 두 모델의 점수가 함께 있다 (대체 모델은 접두사 필드 sh, 경기 sh·sh60, 타석 sh·shmax) -> 선택 모델 값을 s 로 */
+export async function loadPitches(season: number, id: number, m: ModelId = getModel()): Promise<{ file: PitcherFile; pitches: Pitch[] }> {
+  const raw = await getGzipJSON<PitcherFile>(`/data/${season}/p/${id}.json.gz`);
+  const f = MODEL_FIELD[m];
+  if (f && !raw.cols[`s${f}`]) throw new Error(`model ${m} : no scores in /data/${season}/p/${id}.json.gz`);
+  const file: PitcherFile = f
+    ? {
+        ...raw,
+        games: raw.games.map((g) => ({ ...g, s: g[`s${f}` as keyof typeof g] as number | null, s60: g[`s${f}60` as keyof typeof g] as number | null })),
+        pas: raw.pas.map((p) => ({ ...p, s: p[`s${f}` as keyof typeof p] as number | null, smax: p[`s${f}max` as keyof typeof p] as number | null })),
+      }
+    : raw;
   const c = file.cols;
+  const sc = c[`s${f}`];
   const base = new Date(file.d0 + "T00:00:00Z").getTime();
   const pitches: Pitch[] = c.s.map((_, i) => {
     const d = new Date(base + (c.day[i] as number) * 86400000);
@@ -61,7 +74,7 @@ export async function loadPitches(season: number, id: number): Promise<{ file: P
       inn: c.inn[i] as number,
       team: file.teams[c.tm[i] as number],
       pt: file.pitchTypes[c.pt[i] as number],
-      s: c.s[i],
+      s: sc[i],
       x: c.x[i],
       z: c.z[i],
       zone: c.zone[i],
@@ -90,15 +103,16 @@ export async function loadPitches(season: number, id: number): Promise<{ file: P
 export const EXPLAIN_FEATS = ["v", "ivb", "hb", "spin", "axis", "vaa", "haa", "havaa", "hahaa", "ext", "rz", "arm"] as const;
 
 /** 설명 페이지 : 투수 파일 + 설명 파일을 합쳐 투구별 기여·원값을 붙인다 */
-export async function loadExplainPitches(season: number, id: number): Promise<{ file: PitcherFile; pitches: ExplainPitch[] }> {
-  const [{ file, pitches }, ex] = await Promise.all([loadPitches(season, id), getGzipJSON<ExplainFile>(`/data/${season}/e/${id}.json.gz`)]);
+export async function loadExplainPitches(season: number, id: number, m: ModelId = getModel()): Promise<{ file: PitcherFile; pitches: ExplainPitch[] }> {
+  const [{ file, pitches }, ex] = await Promise.all([loadPitches(season, id, m), getGzipJSON<ExplainFile>(`/data/${season}/e/${id}.json.gz`)]);
   if (ex.n !== pitches.length) throw new Error(`explain file pitch count mismatch (${ex.n} / ${pitches.length})`);
-  const groups = Object.keys(ex.cols).filter((k) => /^c\d+$/.test(k)).length;
+  const pre = MODEL_FIELD[m] || "c"; // 기여 열 접두사 : 주 모델 c0.. / 대체 모델 h0..
+  const groups = Object.keys(ex.cols).filter((k) => new RegExp(`^${pre}\\d+$`).test(k)).length;
   return {
     file,
     pitches: pitches.map((p, i) => {
-      const c0 = ex.cols.c0[i];
-      const c = c0 === null ? null : Array.from({ length: groups }, (_, j) => (ex.cols[`c${j}`][i] as number) / 10);
+      const c0 = ex.cols[`${pre}0`][i];
+      const c = c0 === null ? null : Array.from({ length: groups }, (_, j) => (ex.cols[`${pre}${j}`][i] as number) / 10);
       const f = Object.fromEntries(EXPLAIN_FEATS.map((k) => [k, ex.cols[k]?.[i] ?? null]));
       return { ...p, c, f };
     }),

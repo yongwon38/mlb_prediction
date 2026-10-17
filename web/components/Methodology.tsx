@@ -1,9 +1,11 @@
 "use client";
 import { useT } from "@/lib/i18n";
+import { useModel } from "@/lib/model";
 
-/** 모델 설명 (모든 페이지 하단 공통) */
+/** 모델 설명 (모든 페이지 하단 공통). 3단계 설명은 선택한 구위 모델 기준 */
 export default function Methodology() {
   const m = useT().methodology;
+  const model = useModel();
   return (
     <details className="card p-4 text-xs text-ink-2 leading-relaxed">
       <summary className="cursor-pointer font-semibold text-ink text-sm">{m.summary}</summary>
@@ -11,7 +13,7 @@ export default function Methodology() {
         <li>{m.s1}</li>
         <li>{m.s2}</li>
         <li>
-          {m.s3a} <b>{m.s3b}</b> {m.s3c}
+          {model === "hof" ? m.s3aHof : m.s3a} <b>{m.s3b}</b> {m.s3c}
         </li>
         <li>{m.s4}</li>
         <li>{m.s5}</li>

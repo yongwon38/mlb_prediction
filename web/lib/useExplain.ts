@@ -17,21 +17,21 @@ export function useExplainState() {
     setBand(list(q.get("band")));
     setSel(numParam(q, "pitch"));
   });
-  const { season, entry, setError, gt } = base;
-  const [data, setData] = useState<{ file: PitcherFile; pitches: ExplainPitch[]; season: number } | null>(null);
+  const { season, entry, setError, gt, model } = base;
+  const [data, setData] = useState<{ file: PitcherFile; pitches: ExplainPitch[]; season: number; model: string } | null>(null);
 
   useEffect(() => {
     if (!season || !entry) return;
     let alive = true;
-    loadExplainPitches(season, entry.id)
-      .then((d) => alive && setData({ ...d, season }))
+    loadExplainPitches(season, entry.id, model)
+      .then((d) => alive && setData({ ...d, season, model }))
       .catch((e) => alive && setError(String(e)));
     return () => {
       alive = false;
     };
-  }, [season, entry, setError]);
+  }, [season, entry, setError, model]);
 
-  const cur = data && entry && data.season === season && data.file.id === entry.id ? data : null;
+  const cur = data && entry && data.season === season && data.file.id === entry.id && data.model === model ? data : null;
   const lg: LeagueExplain | null = base.league?.explain ?? null;
   const gtCounts = useMemo(() => {
     const c = [0, 0, 0];

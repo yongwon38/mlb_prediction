@@ -1,5 +1,7 @@
-# 정확한 SHAP 캐시 대량 계산 (처음 계산, 모델 변경 후) : 시즌별 8조각 병렬 -> 합치기 -> 해당 시즌 웹 데이터 재생성 -> 배포
+# 정확한 기여 캐시 대량 계산 (처음 계산, 모델 변경 후) : 모델 × 시즌별 8조각 병렬 -> 합치기 -> 해당 시즌 웹 데이터 재생성 -> 배포
+# 모델 = 웹 주 모델(LGBM, TreeSHAP) + 대체 모델(HOF-Net-R, 요인 그룹 Shapley). ops.py models 가 목록을 준다
 # 진행 중인 시즌의 매일 증분(새 투구 + 피처가 바뀐 투구)은 daily 가 계산한다. 같은 캐시 형식(키 + 피처 해시)이라 이어서 쓴다
+# HOF 는 daily 가 근사(순열 표본)로 채운 투구가 있으므로 매월 현재 시즌을 정확값으로 다시 계산한다 (shap-todo --model hof_r)
 name: shap
 
 on:
@@ -12,6 +14,9 @@ on:
     inputs:
       seasons:
         description: '계산할 시즌 JSON (예 [2025]) — 비우면 캐시 없는 시즌'
+        default: ''
+      models:
+        description: '모델 버전 JSON (예 ["hof_r"]) — 비우면 전체'
         default: ''
 
 env:
@@ -27,37 +32,39 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       seasons: ${{ steps.todo.outputs.seasons }}
+      jobs: ${{ steps.todo.outputs.jobs }}
+      plan: ${{ steps.todo.outputs.plan }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-python
       - id: todo
         env:
           INPUT_SEASONS: ${{ inputs.seasons }}
+          INPUT_MODELS: ${{ inputs.models }}
         run: |
-          if [ -n "$INPUT_SEASONS" ]; then echo "seasons=$INPUT_SEASONS" >> "$GITHUB_OUTPUT"
-          else python ops.py shap-todo; fi
+          python ops.py shap-plan --seasons "$INPUT_SEASONS" --models "$INPUT_MODELS" --shards $N_SHARDS
 
   shard:
     needs: plan
-    if: needs.plan.outputs.seasons != '[]' && needs.plan.outputs.seasons != ''
+    if: needs.plan.outputs.jobs != '[]' && needs.plan.outputs.jobs != ''
     runs-on: ubuntu-latest
     timeout-minutes: 355
     strategy:
       fail-fast: false
       matrix:
-        season: ${{ fromJSON(needs.plan.outputs.seasons) }}
-        shard: [0, 1, 2, 3, 4, 5, 6, 7]
+        job: ${{ fromJSON(needs.plan.outputs.jobs) }}
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/setup-python
       - run: |
-          python ops.py pull-shap ${{ matrix.season }}
-          python compute_shap.py ${{ matrix.season }} --incremental --shard ${{ matrix.shard }} --n-shards $N_SHARDS
-          D=$(python -c "import export_web_data as e; print(e.SHAP_DIR)")
-          mkdir -p shap_out && cp "$D"/shard_*.npz shap_out/
+          M=${{ matrix.job.model }}
+          python ops.py pull-shap ${{ matrix.job.season }} --model $M
+          python compute_shap.py ${{ matrix.job.season }} --model $M --incremental --shard ${{ matrix.job.shard }} --n-shards $N_SHARDS
+          D=$(python -c "import export_web_data as e; print(e.shap_dir('$M'))")
+          mkdir -p shap_out/$M && cp "$D"/shard_*.npz shap_out/$M/ || true
       - uses: actions/upload-artifact@v4
         with:
-          name: shap-${{ matrix.season }}-${{ matrix.shard }}
+          name: shap-${{ matrix.job.model }}-${{ matrix.job.season }}-${{ matrix.job.shard }}
           path: shap_out/
           retention-days: 3
 
@@ -75,25 +82,29 @@ jobs:
         env:
           SEASONS_JSON: ${{ needs.plan.outputs.seasons }}
         run: echo "S=$(python -c "import json, os; print(*json.loads(os.environ['SEASONS_JSON']))")" >> "$GITHUB_ENV"
-      - name: SHAP 폴더
-        id: dir
-        run: |
-          python ops.py pull-shap $S
-          echo "path=$(python -c "import export_web_data as e; print(e.SHAP_DIR)")" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
         with:
           pattern: shap-*
           merge-multiple: true
-          path: ${{ steps.dir.outputs.path }}
-      - name: 조각 합치기 (그사이 daily 로 바뀐 투구는 여기서 계산) + 업로드
+          path: shap_in/
+      - name: 조각 합치기 (그사이 daily 로 바뀐 투구는 여기서 계산) + 업로드 — 모델별
+        env:
+          PLAN_JSON: ${{ needs.plan.outputs.plan }}
         run: |
-          python compute_shap.py $S --incremental
-          python ops.py push-shap $S
+          python -c "import json, os; [print(m, *ss) for m, ss in json.loads(os.environ['PLAN_JSON']).items()]" | while read -r M SS; do
+            python ops.py pull-shap $SS --model $M
+            D=$(python -c "import export_web_data as e; print(e.shap_dir('$M'))")
+            mkdir -p "$D" && cp shap_in/$M/shard_*.npz "$D"/ 2>/dev/null || true
+            python compute_shap.py $SS --model $M --incremental
+            python ops.py push-shap $SS --model $M
+          done
       - name: 지난 시즌 웹 데이터 스냅샷
         id: web
         run: python ops.py pull-web --skip $S
       - name: 해당 시즌 웹 데이터 재생성 (SHAP 적용)
         run: |
+          python ops.py pull-shap ${{ steps.web.outputs.missing }}
+          python ops.py pull-shap ${{ steps.web.outputs.missing }} --model hof_r
           python export_web_data.py --seasons $S ${{ steps.web.outputs.missing }}
           python ops.py push-web $S ${{ steps.web.outputs.missing }}
       - uses: ./.github/actions/deploy-web

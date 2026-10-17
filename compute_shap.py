@@ -11,6 +11,9 @@ export_web_data.py 는 이 캐시(outputs/v2/shap/shap_{season}.npz)가 있으�
        python compute_shap.py 2026 --incremental [--max-rows N]      (클라우드 daily : 새 투구·피처가 바뀐 투구만 계산)
        python compute_shap.py 2026 --incremental --shard 3 --n-shards 8   (클라우드 병렬 : 남은 투구의 3번째 1/8 -> 조각 파일)
        python compute_shap.py 2026 --incremental                      (조각 파일이 있으면 합쳐서 shap_2026.npz)
+       python compute_shap.py 2026 --model hof_r --incremental [--approx]   (대체 모델 HOF-Net-R : 요인 그룹 Shapley -> outputs/hof_r/shap/)
+       --approx : 계산할 투구를 빠른 근사(model.explain(exact=False), HOF 는 순열 표본 Shapley)로 계산해 'exact'=False 로 표시.
+                  근사 없이 다시 돌리면 근사 투구만 정확값으로 다시 계산 (shap 워크플로)
 끝나면 : python export_web_data.py -> web/ 에서 재배포
 증분 캐시는 키 + 피처 해시(소수 6자리 반올림)로 재사용한다. 해시 방식을 바꾸면 한 번은 전체 재계산 (shap 워크플로)
 """
@@ -26,6 +29,8 @@ import stuff_pipeline as sp
 import export_web_data as ew
 
 CHUNK = 20000
+SHAP_DIR = ew.SHAP_DIR              # main 에서 --model 로 바뀐다
+FEATURES = ew.CFG['features']
 
 
 def season_frame(season, path, model):
@@ -35,7 +40,7 @@ def season_frame(season, path, model):
     for col, cats in zip(sp.STUFF_CAT_FEATURES, model.categories):
         d[col] = pd.Categorical(d[col].astype(str), categories=cats)
     d = d[d['pitch_type'].notna()]
-    return d[ew.CFG['features']], d[ew.KEY].astype('int64').to_numpy()
+    return d[FEATURES], d[ew.KEY].astype('int64').to_numpy()
 
 
 def extra_frame(season, path, model):
@@ -43,16 +48,16 @@ def extra_frame(season, path, model):
     raw = sp.load_season(path, year=season)
     d = ew.stuff_frame(raw, model)
     d = d[d['game_type'] != 'R']
-    return d[ew.CFG['features']], d[ew.KEY].astype('int64').to_numpy()
+    return d[FEATURES], d[ew.KEY].astype('int64').to_numpy()
 
 
 def compute(season, path, model, extra=False):
     tag = f'{season}_extra' if extra else f'{season}'
-    out = os.path.join(ew.SHAP_DIR, f'shap_{tag}.npz')
+    out = os.path.join(SHAP_DIR, f'shap_{tag}.npz')
     if os.path.exists(out):
         print(f'[{tag}] 이미 있음 : {out}')
         return
-    part_dir = os.path.join(ew.SHAP_DIR, f'parts_{tag}')
+    part_dir = os.path.join(SHAP_DIR, f'parts_{tag}')
     os.makedirs(part_dir, exist_ok=True)
     X, keys = (extra_frame if extra else season_frame)(season, path, model)
     n_chunks = (len(X) + CHUNK - 1) // CHUNK
@@ -70,11 +75,14 @@ def compute(season, path, model, extra=False):
         print(f'  {done}/{n_chunks} ({el / 60:.1f}분 경과)', flush=True)
     c = np.concatenate([np.load(os.path.join(part_dir, f'{k:04d}.npy')) for k in range(n_chunks)])
     base = float(c[0, -1])
-    np.savez(out, contrib=c[:, :-1], base=base, keys=keys)
+    np.savez(out, contrib=c[:, :-1], base=base, keys=keys, exact=np.ones(len(keys), bool))
     print(f'[{tag}] 저장 : {out}')
     for f in os.listdir(part_dir):
         os.remove(os.path.join(part_dir, f))
-    os.rmdir(part_dir)
+    try:
+        os.rmdir(part_dir)
+    except OSError:    # OneDrive 등 동기화 폴더가 빈 폴더를 잠깐 잡고 있을 때 (결과는 이미 저장됨)
+        pass
 
 
 def feature_hash(X):
@@ -85,10 +93,10 @@ def feature_hash(X):
 
 
 def shard_path(tag, k, n):
-    return os.path.join(ew.SHAP_DIR, f'shard_{tag}_{k:02d}of{n:02d}.npz')
+    return os.path.join(SHAP_DIR, f'shard_{tag}_{k:02d}of{n:02d}.npz')
 
 
-def update(season, path, model, extra=False, shard=None, n_shards=1, max_rows=None):
+def update(season, path, model, extra=False, shard=None, n_shards=1, max_rows=None, approx=False):
     """증분 계산 : 캐시(shap_{tag}.npz + 있으면 조각 파일들)에서 키·피처 해시가 같은 투구는 재사용, 나머지만 계산
 
     진행 중인 시즌은 새 투구가 들어오면 그 투수의 주 패스트볼 평균이 바뀌어 시즌 전체 피처가 바뀐다 (하루 약 12~14만 구)
@@ -96,24 +104,31 @@ def update(season, path, model, extra=False, shard=None, n_shards=1, max_rows=No
     - shard 없음 : 조각까지 합쳐 남은 투구를 계산하고 shap_{tag}.npz 저장 (조각 합치기 겸용)
     - max_rows : 계산할 투구가 이보다 많으면 저장하지 않고 건너뜀 (export 는 Saabas 사용)"""
     tag = f'{season}_extra' if extra else f'{season}'
-    out = os.path.join(ew.SHAP_DIR, f'shap_{tag}.npz')
+    out = os.path.join(SHAP_DIR, f'shap_{tag}.npz')
     X, keys = (extra_frame if extra else season_frame)(season, path, model)
     if not len(X):
         return 0
     fh = feature_hash(X)
     contrib = np.full((len(X), X.shape[1]), np.nan)
+    exact = np.zeros(len(X), bool)
     todo = np.ones(len(X), bool)
     base = None
     # 조각 계산은 본 캐시만 기준으로 (모든 조각이 같은 계산 대상 목록을 나눠 갖도록)
-    shards = [] if shard is not None else sorted(f for f in os.listdir(ew.SHAP_DIR) if f.startswith(f'shard_{tag}_'))
-    for f in ([out] if os.path.exists(out) else []) + [os.path.join(ew.SHAP_DIR, f) for f in shards]:
+    shards = [] if shard is not None else sorted(f for f in os.listdir(SHAP_DIR) if f.startswith(f'shard_{tag}_'))
+    for f in ([out] if os.path.exists(out) else []) + [os.path.join(SHAP_DIR, f) for f in shards]:
         with np.load(f) as z:
             if 'fh' not in z or not len(z['keys']):
                 continue
             old = pd.DataFrame(z['keys'], columns=ew.KEY).assign(fh=z['fh'], row=np.arange(len(z['keys'])))
             m = pd.DataFrame(keys, columns=ew.KEY).assign(fh=fh).merge(old, on=ew.KEY + ['fh'], how='left')
             hit = m['row'].notna().to_numpy() & todo
-            contrib[hit] = z['contrib'][m.loc[hit, 'row'].astype(int).to_numpy()]
+            src = m.loc[hit, 'row'].astype(int).to_numpy()
+            ex = z['exact'][src] if 'exact' in z else np.ones(len(src), bool)
+            if not approx:    # 정확 모드 : 근사로 저장된 투구는 다시 계산
+                hit[np.flatnonzero(hit)[~ex]] = False
+                src, ex = src[ex], ex[ex]
+            contrib[hit] = z['contrib'][src]
+            exact[hit] = ex
             todo &= ~hit
             base = float(z['base'])
     idx = np.flatnonzero(todo)
@@ -126,15 +141,16 @@ def update(season, path, model, extra=False, shard=None, n_shards=1, max_rows=No
     t0 = time.time()
     for a in range(0, len(idx), CHUNK):
         rows = idx[a:a + CHUNK]
-        contrib[rows], base = model.explain(X.iloc[rows], exact=True)
+        contrib[rows], base = model.explain(X.iloc[rows], exact=not approx)
+        exact[rows] = not approx
         print(f'  {a + len(rows):,}/{len(idx):,} ({(time.time() - t0) / 60:.1f}분 경과)', flush=True)
     if shard is not None:
         np.savez(shard_path(tag, shard, n_shards), contrib=contrib[idx], base=base if base is not None else np.nan,
-                 keys=keys[idx], fh=fh[idx])
+                 keys=keys[idx], fh=fh[idx], exact=exact[idx])
         return len(idx)
-    np.savez(out, contrib=contrib, base=base, keys=keys, fh=fh)
+    np.savez(out, contrib=contrib, base=base, keys=keys, fh=fh, exact=exact)
     for f in shards:
-        os.remove(os.path.join(ew.SHAP_DIR, f))
+        os.remove(os.path.join(SHAP_DIR, f))
     print(f'[{tag}] 저장 : {out}')
     return len(idx)
 
@@ -147,10 +163,14 @@ def main():
     ap.add_argument('--shard', type=int, help='(증분) 조각 번호 0 ~ n-1')
     ap.add_argument('--n-shards', type=int, default=1)
     ap.add_argument('--max-rows', type=int, help='(증분) 계산할 투구가 이보다 많으면 건너뜀')
+    ap.add_argument('--model', default=ew.MODEL_VERSION, choices=sorted(ew.MODELS), help='모델 버전 (기본 : 웹 주 모델)')
+    ap.add_argument('--approx', action='store_true', help='(증분) 빠른 근사로 계산하고 근사로 표시')
     args = ap.parse_args()
-    model = sm.load_model(ew.CFG['dir'])
-    os.makedirs(ew.SHAP_DIR, exist_ok=True)
-    kw = dict(shard=args.shard, n_shards=args.n_shards, max_rows=args.max_rows)
+    global SHAP_DIR, FEATURES
+    SHAP_DIR, FEATURES = ew.shap_dir(args.model), ew.MODELS[args.model]['features']
+    model = sm.load_model(ew.MODELS[args.model]['dir'])
+    os.makedirs(SHAP_DIR, exist_ok=True)
+    kw = dict(shard=args.shard, n_shards=args.n_shards, max_rows=args.max_rows, approx=args.approx)
     for season in args.seasons or list(ew.SEASONS):
         if args.incremental:
             update(season, ew.SEASONS[season], model, extra=True, **kw)

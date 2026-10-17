@@ -19,8 +19,8 @@ const SECTIONS = ["pitcher", "games", "explain"] as const;
 /** 홈 : 시즌 요약 (리그 지표, 구위 리더, 승부처, 구위 하이라이트) */
 export default function Home() {
   const router = useRouter();
-  const { meta, season, setSeason, gt, setGt, index, error, setError } = usePageState();
-  const [summary, setSummary] = useState<{ season: number; s: SeasonSummary } | null>(null);
+  const { meta, season, setSeason, gt, setGt, index, error, setError, model } = usePageState();
+  const [summary, setSummary] = useState<{ season: number; s: SeasonSummary; model: string } | null>(null);
   const dark = useDarkMode();
   const tt = useT();
   const t = tt.home;
@@ -31,18 +31,18 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!season) return;
+    if (!season || !index) return; // index 가 준비된 뒤 = 모델이 URL 에서 복원된 뒤
     let alive = true;
-    loadSummary(season)
-      .then((s) => alive && setSummary({ season, s }))
+    loadSummary(season, model)
+      .then((s) => alive && setSummary({ season, s, model }))
       .catch((e) => alive && setError(String(e)));
     return () => {
       alive = false;
     };
-  }, [season, setError]);
+  }, [season, setError, model, index]);
 
   const g = gt[0] ?? 0;
-  const sm = summary?.season === season ? (summary.s.byGt[String(g)] ?? null) : null;
+  const sm = summary?.season === season && summary.model === model ? (summary.s.byGt[String(g)] ?? null) : null;
   const go = (path: string, pitcher: number, extra: Record<string, number> = {}) => ctxHref(path, { season, pitcher, gt: [g] }, extra);
 
   return (
