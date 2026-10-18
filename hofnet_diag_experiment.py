@@ -30,7 +30,7 @@ import stuff_pipeline as sp
 
 warnings.filterwarnings('ignore')
 sys.stdout.reconfigure(encoding='utf-8')
-ALL_RUNS = ['base', 'h1', 'h2', 'h2b', 'h3', 'h4', 'h5', 'h6']
+ALL_RUNS = ['base', 'h1', 'h2', 'h2b', 'h3', 'h4', 'h5', 'h6', 'h7']
 ap = argparse.ArgumentParser()
 ap.add_argument('--runs', default=','.join(ALL_RUNS))
 ap.add_argument('--smoke', action='store_true')
@@ -299,6 +299,53 @@ def fit_zib_e2e(net, tr, es, tau0=1.0, epochs=EPOCHS, patience=4, batch=1024, lr
     return head.eval(), hist
 
 
+def fit_mean_mt(net, aux, tr, wh, es, wh_es, y_mean, y_std, lam, epochs, patience=4, batch=1024, lr=1e-3, seed=SEED):
+    """H7 : Stage I + 보조 과제. 손실 = 마스크 MSE(y3 있는 행, 표준화) + λ·BCE(헛스윙, 전체 스윙). 조기 종료 = 홀드아웃 y3 RMSE"""
+    from sklearn.metrics import roc_auc_score
+    torch.manual_seed(seed)
+    gen = torch.Generator().manual_seed(seed)
+    (xn, miss, xc, y), (exn, emiss, exc, ey) = tr, es
+    dev = hn.device_of(net)
+    ys = (y - y_mean) / y_std    # 파울은 NaN
+    params = list(net.parameters()) + list(aux.parameters())
+    opt = torch.optim.AdamW(params, lr=lr, weight_decay=1e-4)
+    ey_np, wh_es_np = ey.double().numpy(), wh_es.numpy()
+    best, best_state, bad, hist = np.inf, None, 0, []
+    for ep in range(epochs):
+        net.train(); aux.train()
+        tot_m, tot_b, n = 0.0, 0.0, 0
+        for b in hn.batches(len(y), batch, True, gen):
+            f, z = net(*hn.to_dev(dev, xn[b], miss[b], xc[b]))
+            yb, wb = ys[b].to(dev), wh[b].to(dev)
+            m = torch.isfinite(yb)
+            mse = F.mse_loss(f[m], yb[m]) if m.any() else f.sum() * 0
+            bce = F.binary_cross_entropy_with_logits(aux(z).squeeze(-1), wb)
+            loss = mse + lam * bce
+            opt.zero_grad(); loss.backward()
+            nn.utils.clip_grad_norm_(params, 5.0)
+            opt.step()
+            tot_m += float(mse) * len(b); tot_b += float(bce) * len(b); n += len(b)
+        net.eval(); aux.eval()
+        with torch.no_grad():
+            fz = [net(*hn.to_dev(dev, exn[b], emiss[b], exc[b])) for b in hn.batches(len(ey), 8192, False)]
+            f_es = torch.cat([f for f, _ in fz]).double().cpu().numpy() * y_std + y_mean
+            lg_es = torch.cat([aux(z).squeeze(-1) for _, z in fz]).cpu().numpy()
+        rmse = float(np.sqrt(np.mean((ey_np - f_es) ** 2)))
+        rec = {'epoch': ep + 1, 'train_mse_std': tot_m / n, 'train_bce': tot_b / n, 'holdout_rmse': rmse,
+               'holdout_r2': 1 - np.mean((ey_np - f_es) ** 2) / np.var(ey_np), 'holdout_whiff_auc': float(roc_auc_score(wh_es_np, lg_es))}
+        hist.append(rec)
+        log('   ', ' '.join(f'{k} {v:.5f}' if isinstance(v, float) else f'{k} {v}' for k, v in rec.items()))
+        if rmse < best - 1e-6:
+            best, bad = rmse, 0
+            best_state = {k: v.detach().clone() for k, v in net.state_dict().items()}
+        else:
+            bad += 1
+            if bad >= patience:
+                break
+    net.load_state_dict(best_state)
+    return hist
+
+
 def new_net(kind, p):
     torch.manual_seed(SEED)
     if kind == 'mlp':
@@ -439,6 +486,34 @@ if 'h6' in RUNS:
     tr_big = (*prep(big_rows[FEATS]), soft(big_rows))
     run_hof('h6b_distill_all', f'distillation : 학습기간 비-waste 전체 투구 {len(big_rows):,}구', tr=tr_big, es=(*tensors(prep, 'es', es_rows), soft_es),
             y_target=(tr_big[3], soft_es))
+
+if 'h7' in RUNS:
+    # 보조 과제 : 학습기간 전체 스윙(파울 포함)의 헛스윙 여부. y3 학습 행은 기준선과 같은 tr_rows
+    is_sw = d25['description'].isin(ew.SWING_DESC).to_numpy()
+    foul = d25[is_tr & is_sw & d25['y3'].isna().to_numpy() & ~waste[2025]]
+    sw_rows = pd.concat([tr_rows, foul])
+    wh_of = lambda df: torch.tensor(df['description'].isin(sp.WHIFF_DESC).to_numpy(np.float32))
+    tr_mt = (*tensors(prep, 'sw', sw_rows), torch.tensor(sw_rows['y3'].to_numpy(np.float32)))
+    es_mt = split_t(prep)[1]
+    y_mean, y_std = float(y_tr.mean()), float(y_tr.std())
+    for lam in (0.5, 1.0):
+        name = f'h7_mt_l{str(lam).replace(".", "")}'
+        if done(name):
+            continue
+        desc = f'다중 과제 : y3 MSE + {lam}·헛스윙 BCE (학습기간 스윙 {len(sw_rows):,}구, 파울 {len(foul):,}구 추가)'
+        net = new_net('hof', prep)
+        aux = nn.Linear(net.d_r, 1).to(DEV)
+        log(f'=== {name} : {desc}')
+        t = time.time()
+        hist = fit_mean_mt(net, aux, tr_mt, wh_of(sw_rows), es_mt, wh_of(es_rows), y_mean, y_std, lam, EPOCHS)
+        info = {'설명': desc, '모델': 'hof', '학습 투구': len(sw_rows), 'epoch 수': len(hist), '학습 시간(초)': time.time() - t,
+                '최적 epoch (홀드아웃 RMSE)': int(np.argmin([h['holdout_rmse'] for h in hist]) + 1),
+                '홀드아웃 whiff AUC (최종 epoch)': hist[-1]['holdout_whiff_auc']}
+        rows = [evaluate(f'{name} P1', p1_season(net, prep, y_mean, y_std), {**info, '헤드': 'P1 (MSE 평균)'})]
+        rows.append(evaluate(f'{name} P4', p4(net, prep, *split_t(prep), y_mean, y_std), {**info, '헤드': 'P4 (ZIB)'}))
+        keep(name, rows, hist)
+        del net, aux
+        torch.cuda.empty_cache()
 
 # ---------------------------------------------------------------------------
 # 5. 정리
