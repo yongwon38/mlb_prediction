@@ -14,6 +14,7 @@ export const en: Dict = {
   },
   langName: "English",
   langAria: "Language",
+  theme: { aria: "Theme", system: "System", light: "Light", dark: "Dark" } as Record<string, string>,
   model: {
     aria: "Stuff model",
     names: { lgbm: "LGBM", hof: "HOF-Net" } as Record<string, string>,
@@ -134,6 +135,12 @@ export const en: Dict = {
 
   home: {
     tagline: "MLB pitchers graded on pitch physics alone, on the 20–80 scale",
+    eyebrow: "MLB pitcher Stuff grades",
+    heroTitle: "How nasty is each pitch?",
+    highlights: "Games and plate appearances to watch",
+    highlightsAria: "Highlight type",
+    tabs: { imp: "High-leverage games", stuff: "Best Stuff outings", pa: "Biggest plate appearances" } as Record<string, string>,
+    explore: "Explore",
     cards: {
       pitcher: "Location, batted balls, arsenal and season stats for any pitcher.",
       games: "Jump to high-leverage or standout outings, or pick a game and go pitch by pitch.",
@@ -167,7 +174,7 @@ export const en: Dict = {
     loading: (name) => `Loading ${name}'s pitches…`,
     nonRegular: "League comparisons (percentiles, averages, band results) are based on the regular season. Spring training and postseason pitches are graded with the same regular-season model.",
     loc: "Pitch location & Stuff",
-    locSub: "Catcher's view, with height scaled to each hitter's zone. Redder means higher Stuff; shape shows the result. Click a pitch to see how it was graded.",
+    locSub: "Catcher's view, with height scaled to each hitter's zone. Red is above league average (50) Stuff, blue is below; shape shows the result. Click a pitch to see how it was graded.",
     spray: "Spray chart",
     spraySub: "Where balls in play landed. Color and shape show the result; hover for details.",
     summary: "Summary",
@@ -194,6 +201,8 @@ export const en: Dict = {
     minPitches: "Min. pitches",
     boardSmall: (_gt, min) => `Smaller sample here, so the minimum drops to ${n(min)} pitches.`,
     top: (p) => `Top ${p}%`,
+    boardCols: ["Pitcher", "Team", "Pitches", "Avg Stuff", "Rank among pitchers"],
+    otherPitcher: "Search another pitcher",
   },
 
   tiles: {
@@ -258,6 +267,8 @@ export const en: Dict = {
     validOnly: (d) => `Validation only (${d} on)`,
     shown: (a, b) => `${n(a)} / ${n(b)} pitches`,
     reset: "Reset filters",
+    moreBtn: (k) => (k ? `More filters · ${k} on` : "More filters"),
+    lessBtn: "Fewer filters",
   },
 
   band: {
@@ -345,6 +356,7 @@ export const en: Dict = {
     loading: (name) => `Loading ${name}'s games…`,
     pick: "Pick a game",
     pickBody: "Click a suggested game or PA on the left, or switch to \"Choose\" and find one by date or opponent.",
+    firstRec: "Start with the biggest game",
     gameDist: "Pitch locations",
     gameDistSub: "Redder means higher Stuff. Click a pitch to see how it was graded.",
     seq: "Stuff, pitch by pitch",

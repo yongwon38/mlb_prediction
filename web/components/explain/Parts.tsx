@@ -88,7 +88,7 @@ export function VariableGuide({ lg }: { lg: LeagueExplain }) {
   const names = groupNames(t, lg.groups);
   return (
     <details className="card p-4 text-xs text-ink-2 leading-relaxed">
-      <summary className="cursor-pointer font-semibold text-ink text-sm">{g.summary}</summary>
+      <summary className="cursor-pointer font-semibold text-ink text-sm flex items-center gap-2"><span className="chev text-muted">›</span>{g.summary}</summary>
       <ul className="list-disc pl-5 mt-2 flex flex-col gap-1">
         {g.intro.map((s) => (
           <li key={s}>{s}</li>
@@ -122,7 +122,7 @@ export function Caveats({ method }: { method: ExplainMethod }) {
   const name = { shap: c.shap, saabas: c.saabas, shapley: c.shapley, "shapley-sampled": c.shapleySampled, "shapley-mixed": c.shapleyMixed }[method];
   return (
     <details className="card p-4 text-xs text-ink-2 leading-relaxed" open>
-      <summary className="cursor-pointer font-semibold text-ink text-sm">{c.summary}</summary>
+      <summary className="cursor-pointer font-semibold text-ink text-sm flex items-center gap-2"><span className="chev text-muted">›</span>{c.summary}</summary>
       <ul className="list-disc pl-5 mt-2 flex flex-col gap-1">
         <li>
           {hof ? c.c1aHof : c.c1a}

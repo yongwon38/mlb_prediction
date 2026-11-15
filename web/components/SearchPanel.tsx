@@ -16,14 +16,24 @@ interface Props {
   index: SeasonIndex | null;
   selectedId: number | null;
   onSelect: (id: number, team?: string) => void;
+  compact?: boolean; // 머리 오른쪽에 넣는 작은 이름 검색창
+  hero?: boolean; // 홈 첫 화면의 큰 검색창
+  placeholder?: string;
 }
 
-export default function SearchPanel({ index, selectedId, onSelect }: Props) {
+export default function SearchPanel({ index, selectedId, onSelect, compact = false, hero = false, placeholder }: Props) {
   const [mode, setMode] = useState<"name" | "team">("name");
   const t = useT().search;
 
+  if (compact)
+    return (
+      <div className="w-full sm:w-64">
+        {index ? <NameSearch pitchers={index.pitchers} onSelect={onSelect} small placeholder={placeholder} /> : <div className="skeleton h-9" />}
+      </div>
+    );
+
   return (
-    <div className="card p-4">
+    <div className={hero ? "" : "card p-4"}>
       <div role="tablist" aria-label={t.modeAria} className="flex gap-1 mb-3 text-sm">
         {(
           [
@@ -36,7 +46,7 @@ export default function SearchPanel({ index, selectedId, onSelect }: Props) {
             role="tab"
             aria-selected={mode === key}
             onClick={() => setMode(key)}
-            className={`px-3 py-1.5 rounded-lg ${mode === key ? "bg-ink text-surface font-medium" : "text-ink-2 hover:bg-surface-2"}`}
+            className={`px-3 py-1.5 rounded-lg transition-colors ${mode === key ? "bg-ink text-surface font-medium" : "text-ink-2 hover:bg-surface-2"}`}
           >
             {label}
           </button>
@@ -45,7 +55,7 @@ export default function SearchPanel({ index, selectedId, onSelect }: Props) {
       {!index ? (
         <div className="h-10 text-sm text-muted flex items-center">{t.loading}</div>
       ) : mode === "name" ? (
-        <NameSearch pitchers={index.pitchers} onSelect={onSelect} />
+        <NameSearch pitchers={index.pitchers} onSelect={onSelect} large={hero} />
       ) : (
         <TeamSearch index={index} selectedId={selectedId} onSelect={onSelect} />
       )}
@@ -53,7 +63,7 @@ export default function SearchPanel({ index, selectedId, onSelect }: Props) {
   );
 }
 
-function NameSearch({ pitchers, onSelect }: { pitchers: PitcherEntry[]; onSelect: Props["onSelect"] }) {
+function NameSearch({ pitchers, onSelect, small = false, large = false, placeholder }: { pitchers: PitcherEntry[]; onSelect: Props["onSelect"]; small?: boolean; large?: boolean; placeholder?: string }) {
   const [q, setQ] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -81,7 +91,7 @@ function NameSearch({ pitchers, onSelect }: { pitchers: PitcherEntry[]; onSelect
 
   const pick = (p: PitcherEntry) => {
     onSelect(p.id);
-    setQ(p.name);
+    setQ(small ? "" : p.name);
     setOpen(false);
   };
 
@@ -93,8 +103,8 @@ function NameSearch({ pitchers, onSelect }: { pitchers: PitcherEntry[]; onSelect
         aria-expanded={open && results.length > 0}
         aria-controls="pitcher-results"
         aria-label={t.nameAria}
-        placeholder={t.placeholder}
-        className="w-full"
+        placeholder={placeholder ?? t.placeholder}
+        className={`w-full ${small ? "!min-h-9 !py-1.5 !text-sm" : ""} ${large ? "!min-h-12 !text-base !px-4 !rounded-xl" : ""}`}
         value={q}
         onChange={(e) => (setQ(e.target.value), setOpen(true), setActive(0))}
         onFocus={() => setOpen(true)}
@@ -110,7 +120,7 @@ function NameSearch({ pitchers, onSelect }: { pitchers: PitcherEntry[]; onSelect
         }}
       />
       {open && q && (
-        <ul id="pitcher-results" role="listbox" className="absolute z-30 mt-1 w-full card shadow-lg max-h-80 overflow-auto py-1">
+        <ul id="pitcher-results" role="listbox" className={`absolute z-40 mt-1 card !shadow-xl max-h-80 overflow-auto py-1 ${small ? "right-0 w-[min(92vw,380px)]" : "w-full"}`}>
           {results.length === 0 && <li className="px-3 py-2 text-sm text-muted">{t.none}</li>}
           {results.map((p, i) => (
             <li

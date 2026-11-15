@@ -1,6 +1,7 @@
 "use client";
 import BandPicker from "@/components/BandPicker";
 import SearchPanel from "@/components/SearchPanel";
+import { EmptyState, LoadingBlock } from "@/components/Panels";
 import { GameTypePicker, PitcherHeader, SeasonSelect, type PitcherTab } from "@/components/PageHeader";
 import { Caveats, VariableGuide } from "@/components/explain/Parts";
 import { pitchColor, useDarkMode } from "@/lib/colors";
@@ -28,16 +29,24 @@ export default function ExplainShell({
   const ready = !!(file && lg && meta);
 
   return (
-    <main className="mx-auto w-full max-w-[1280px] px-4 py-6 flex flex-col gap-4">
+    <main className="mx-auto w-full max-w-[1280px] px-4 pt-6 pb-10 flex flex-col gap-5">
       <PitcherHeader
         title={t.titles[active]}
         name={entry?.name ?? null}
         info={entry ? `${tt.common.throws(entry.throws)} · ${entry.teams.join(" → ")} · ${t.info(season)}` : t.idle}
+        stuff={entry?.stuff}
         season={season}
         pitcherId={entry ? pitcherId : null}
         gt={gt}
         active={active}
-        right={<SeasonSelect meta={meta} season={season} onChange={(s) => (setSeason(s), setSel(null))} />}
+        right={
+          <div className="flex flex-wrap items-center gap-2">
+            {entry && pitcherId && (
+              <SearchPanel key={season ?? 0} index={index} selectedId={pitcherId} onSelect={(id) => (setPitcherId(id), setSel(null), setPts([]), setBand([]))} compact placeholder={tt.pitcherPage.otherPitcher} />
+            )}
+            <SeasonSelect meta={meta} season={season} onChange={(s) => (setSeason(s), setSel(null))} />
+          </div>
+        }
       />
 
       {error && <div className="card p-3 text-sm text-bad">{tt.common.loadError(error)}</div>}
@@ -45,15 +54,15 @@ export default function ExplainShell({
       {(!entry || !pitcherId) && (
         <>
           <SearchPanel key={season ?? 0} index={index} selectedId={pitcherId} onSelect={(id) => (setPitcherId(id), setSel(null), setPts([]), setBand([]))} />
-          {pitcherId && index && !entry && <div className="card p-10 text-center text-sm text-muted">{tt.common.noRecord}</div>}
+          {pitcherId && index && !entry && <EmptyState title={tt.common.noRecord} />}
         </>
       )}
-      {entry && !ready && <div className="card p-10 text-center text-sm text-muted">{t.loading(entry.name)}</div>}
+      {entry && !ready && <LoadingBlock label={t.loading(entry.name)} rows={3} />}
 
       {ready && (
         <>
           {filters !== "none" && (
-            <div className="card p-3 flex flex-col gap-2 text-xs">
+            <div className="card p-3 flex flex-col gap-3 text-xs">
               <GameTypePicker value={effGt} onChange={setGt} counts={gtCounts} />
               {(filters === "both" || filters === "pt") && (
                 <div className="flex flex-wrap items-center gap-1.5">
@@ -69,9 +78,13 @@ export default function ExplainShell({
                   ))}
                 </div>
               )}
+              {(filters === "both" || filters === "band") && (
+                <div className="border-t border-line pt-3">
+                  <BandPicker ps={byPt} band={band} setBand={setBand} showNone={false} note={note ?? ""} bare />
+                </div>
+              )}
             </div>
           )}
-          {(filters === "both" || filters === "band") && <BandPicker ps={byPt} band={band} setBand={setBand} showNone={false} note={note ?? ""} />}
           {children}
           <Caveats method={lg?.method ?? "saabas"} />
           {lg && <VariableGuide lg={lg} />}

@@ -6,7 +6,7 @@ import StrikeZone from "@/components/StrikeZone";
 import SprayChart from "@/components/SprayChart";
 import BandPicker from "@/components/BandPicker";
 import FilterBar, { EMPTY_FILTERS, type Filters, applyFilters } from "@/components/FilterBar";
-import { ArsenalTable, NotesList, Section, SummaryTiles } from "@/components/Panels";
+import { ArsenalTable, LoadingBlock, NotesList, Section, StuffBadge, SummaryTiles } from "@/components/Panels";
 import { BucketChart, CountMix, PlatoonTable, StuffDistribution, TrendCharts, ZoneHeatmap } from "@/components/Charts";
 import { GameTypePicker, PitcherHeader, SeasonSelect } from "@/components/PageHeader";
 import SeasonStatsCard from "@/components/SeasonStatsCard";
@@ -79,7 +79,7 @@ export default function PitcherPage() {
   const nonRegular = effGt.some((g) => g !== 0);
 
   return (
-    <main className="mx-auto w-full max-w-[1280px] px-4 py-6 flex flex-col gap-4">
+    <main className="mx-auto w-full max-w-[1280px] px-4 pt-6 pb-10 flex flex-col gap-5">
       <PitcherHeader
         title={t.title}
         name={entry?.name ?? null}
@@ -95,39 +95,47 @@ export default function PitcherPage() {
             t.idle
           )
         }
+        stuff={entry?.stuff}
         season={season}
         pitcherId={entry ? pitcherId : null}
         gt={gt}
         active="pitcher"
-        right={<SeasonSelect meta={meta} season={season} onChange={changeSeason} />}
+        right={
+          <div className="flex flex-wrap items-center gap-2">
+            {entry && <SearchPanel key={season ?? 0} index={index} selectedId={pitcherId} onSelect={selectPitcher} compact placeholder={t.otherPitcher} />}
+            <SeasonSelect meta={meta} season={season} onChange={changeSeason} />
+          </div>
+        }
       />
 
       {error && <div className="card p-3 text-sm text-bad">{tt.common.loadError(error)}</div>}
 
-      <SearchPanel key={season ?? 0} index={index} selectedId={pitcherId} onSelect={selectPitcher} />
+      {!entry && <SearchPanel key={season ?? 0} index={index} selectedId={pitcherId} onSelect={selectPitcher} />}
 
       {index && <SeasonNotice index={index} trainSeason={meta?.trainSeason ?? 2025} />}
 
       {!index || !league ? (
-        <div className="card p-10 text-center text-sm text-muted">{tt.common.seasonLoading}</div>
+        <LoadingBlock label={tt.common.seasonLoading} rows={6} />
       ) : !entry ? (
         <Leaderboard index={index} league={league} gt={gt} onSelect={selectPitcher} missing={!!pitcherId} setGt={setGt} />
       ) : !ready ? (
-        <div className="card p-10 text-center text-sm text-muted">{t.loading(entry.name)}</div>
+        <LoadingBlock label={t.loading(entry.name)} rows={4} />
       ) : (
         <>
-          <SeasonStatsCard stats={statsFile?.season === season ? statsFile.s : undefined} pitcherId={entry.id} gt={effGt} />
+          <FilterBar
+            filters={filters}
+            setFilters={setFilters}
+            pitchTypes={data!.file.pitchTypes}
+            teams={data!.file.teams}
+            validStart={validStart}
+            shown={ps.length}
+            total={all!.length}
+            lead={<GameTypePicker value={effGt} onChange={setGt} counts={gtCounts} label={false} />}
+            below={<BandPicker ps={ps} band={band} setBand={setBand} ghost={ghost} setGhost={setGhost} bare />}
+          />
+          {nonRegular && <p className="text-xs text-muted -mt-2">{t.nonRegular}</p>}
 
-          <div className="card p-3 flex flex-col gap-1.5">
-            <GameTypePicker value={effGt} onChange={setGt} counts={gtCounts} />
-            {nonRegular && <p className="text-xs text-muted">{t.nonRegular}</p>}
-          </div>
-
-          <FilterBar filters={filters} setFilters={setFilters} pitchTypes={data!.file.pitchTypes} teams={data!.file.teams} validStart={validStart} shown={ps.length} total={all!.length} />
-
-          <BandPicker ps={ps} band={band} setBand={setBand} ghost={ghost} setGhost={setGhost} />
-
-          <div className="grid gap-4 lg:grid-cols-2">
+          <div className="grid gap-5 lg:grid-cols-2">
             <Section title={t.loc} sub={t.locSub}>
               <StrikeZone
                 pitches={bandPs}
@@ -141,7 +149,7 @@ export default function PitcherPage() {
             </Section>
           </div>
 
-          <div className="grid gap-4 items-start lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
+          <div className="grid gap-5 items-start lg:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
             <Section title={t.summary} sub={t.summarySub}>
               <SummaryTiles st={st} league={league} />
             </Section>
@@ -154,7 +162,9 @@ export default function PitcherPage() {
             <ArsenalTable ps={ps} pitchTypes={data!.file.pitchTypes} league={league} pitchNames={meta!.pitchNames} />
           </Section>
 
-          <div className="grid gap-4 lg:grid-cols-2">
+          <SeasonStatsCard stats={statsFile?.season === season ? statsFile.s : undefined} pitcherId={entry.id} gt={effGt} />
+
+          <div className="grid gap-5 lg:grid-cols-2">
             <Section title={t.dist} sub={t.distSub}>
               <StuffDistribution ps={ps} pitchTypes={data!.file.pitchTypes} league={league} />
             </Section>
@@ -233,26 +243,44 @@ function Leaderboard({
       }
     >
       {g !== 0 && <p className="text-xs text-muted mb-2">{t.boardSmall(labels[g], n0)}</p>}
-      <ol className="grid sm:grid-cols-2 gap-x-6 text-sm">
-        {top.map(({ p, v }, i) => (
-          <li key={p.id}>
-            <button onClick={() => onSelect(p.id)} className="w-full flex items-center gap-3 py-1.5 border-b border-grid hover:bg-surface-2 rounded px-1 text-left">
-              <span className="w-5 text-muted tnum text-right">{i + 1}</span>
-              <span className="flex-1 min-w-0 truncate">
-                <span className="font-medium text-ink">{p.name}</span>
-                <span className="text-muted ml-2 text-xs">
-                  {p.throws}HP · {p.teams.join("/")}
-                </span>
-              </span>
-              <span className="text-xs text-muted tnum">{tt.common.pitches(v![0])}</span>
-              <span className="w-12 text-right font-semibold tnum text-ink">{v![1]?.toFixed(1) ?? "-"}</span>
-              <span className="w-16 text-right text-xs text-muted tnum">
-                {g === 0 && v![0] >= league.minPitcherPitches ? t.top(100 - (percentileOf(league.pitcherPercentiles, v![1]) ?? 0)) : ""}
-              </span>
-            </button>
-          </li>
-        ))}
-      </ol>
+      <div className="overflow-x-auto -mx-5 px-5">
+        <table className="w-full text-sm tnum min-w-[560px]">
+          <thead>
+            <tr className="text-xs text-muted border-b border-line">
+              <th className="w-10 text-right py-2 pr-3">#</th>
+              <th className="text-left py-2">{t.boardCols[0]}</th>
+              <th className="text-left py-2">{t.boardCols[1]}</th>
+              <th className="text-right py-2 pr-4">{t.boardCols[2]}</th>
+              <th className="text-left py-2">{t.boardCols[3]}</th>
+              <th className="text-left py-2">{g === 0 ? t.boardCols[4] : ""}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {top.map(({ p, v }, i) => {
+              const pc = g === 0 && v![0] >= league.minPitcherPitches ? percentileOf(league.pitcherPercentiles, v![1]) : null;
+              return (
+                <tr key={p.id} onClick={() => onSelect(p.id)} className="border-b border-grid last:border-0 cursor-pointer hover:bg-surface-2 transition-colors">
+                  <td className="text-right py-2.5 pr-3 text-muted">{i + 1}</td>
+                  <td className="py-2.5">
+                    <button onClick={() => onSelect(p.id)} className="font-medium text-ink hover:underline underline-offset-2 text-left">
+                      {p.name}
+                    </button>
+                    <span className="text-muted ml-2 text-xs">{p.throws}HP</span>
+                  </td>
+                  <td className="py-2.5 text-ink-2 text-xs">{p.teams.join(" / ")}</td>
+                  <td className="py-2.5 pr-4 text-right text-ink-2 text-xs">{tt.common.pitches(v![0])}</td>
+                  <td className="py-2.5">
+                    <StuffBadge v={v![1]} size="sm" />
+                  </td>
+                  <td className="py-2.5">
+                    {pc !== null && <span className="text-xs text-ink-2">{t.top(100 - pc)}</span>}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </Section>
   );
 }

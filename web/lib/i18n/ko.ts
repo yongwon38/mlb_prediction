@@ -7,6 +7,7 @@ export const ko = {
   },
   langName: "한국어",
   langAria: "언어",
+  theme: { aria: "화면 테마", system: "시스템 설정", light: "라이트", dark: "다크" } as Record<string, string>,
   model: {
     aria: "구위 모델",
     names: { lgbm: "LGBM", hof: "HOF-Net" } as Record<string, string>,
@@ -130,6 +131,12 @@ export const ko = {
 
   home: {
     tagline: "공의 물리량만으로 매긴 MLB 투수 구위(Stuff) 점수, 20–80 스케일",
+    eyebrow: "MLB 투수 구위 분석",
+    heroTitle: "공 하나의 위력을 숫자로",
+    highlights: "주목할 경기와 타석",
+    highlightsAria: "하이라이트 종류",
+    tabs: { imp: "승부처 경기", stuff: "구위 하이라이트", pa: "승부처 타석" } as Record<string, string>,
+    explore: "둘러보기",
     cards: {
       pitcher: "투구 위치, 타구 분포, 구종 구성, 시즌 공식 기록까지 투수 한 명을 자세히 봅니다.",
       games: "승부처나 구위가 좋았던 경기·타석을 추천받거나, 직접 골라 공 하나씩 봅니다.",
@@ -163,7 +170,7 @@ export const ko = {
     loading: (name: string) => `${name} 투구 데이터를 불러오는 중…`,
     nonRegular: "리그 비교값(퍼센타일, 리그 평균, 구간별 결과)은 정규시즌 기준입니다. 시범경기와 포스트시즌 투구도 정규시즌으로 학습한 모델로 점수를 매겼습니다.",
     loc: "투구 위치와 구위",
-    locSub: "포수 시점이며 존 높이는 타자별로 정규화했습니다. 빨갈수록 구위가 높고, 모양은 결과입니다. 점을 클릭하면 그 공의 구위 산출 근거로 이동합니다.",
+    locSub: "포수 시점이며 존 높이는 타자별로 정규화했습니다. 빨강은 리그 평균(50)보다 높은 구위, 파랑은 낮은 구위이고 모양은 결과입니다. 점을 클릭하면 그 공의 구위 산출 근거로 이동합니다.",
     spray: "타구 분포",
     spraySub: "인플레이 타구가 떨어진 위치입니다. 색과 모양은 결과이고, 점에 마우스를 올리면 자세히 볼 수 있습니다.",
     summary: "요약",
@@ -190,6 +197,8 @@ export const ko = {
     minPitches: "최소 투구",
     boardSmall: (gt: string, min: number) => `${gt} 기록은 표본이 적어 최소 투구를 ${n(min)}구로 낮췄습니다.`,
     top: (p: number) => `상위 ${p}%`,
+    boardCols: ["투수", "구단", "투구", "평균 구위", "리그 투수 중 위치"],
+    otherPitcher: "다른 투수 검색",
   },
 
   tiles: {
@@ -255,6 +264,8 @@ export const ko = {
     validOnly: (d: string) => `검증 기간만 (${d}~)`,
     shown: (a: number, b: number) => `${n(a)} / ${n(b)}구`,
     reset: "필터 초기화",
+    moreBtn: (k: number) => (k ? `필터 더보기 · ${k}개 적용` : "필터 더보기"),
+    lessBtn: "필터 접기",
   },
 
   band: {
@@ -344,6 +355,7 @@ export const ko = {
     loading: (name: string) => `${name} 경기 데이터를 불러오는 중…`,
     pick: "경기를 고르세요",
     pickBody: "왼쪽에서 추천 경기나 타석을 누르거나, '직접 선택'에서 날짜나 상대 팀으로 경기를 찾으세요.",
+    firstRec: "가장 중요한 경기부터 보기",
     gameDist: "경기 투구 분포",
     gameDistSub: "빨갈수록 구위가 높습니다. 점을 클릭하면 그 공의 구위 산출 근거로 이동합니다.",
     seq: "투구 순서별 구위",

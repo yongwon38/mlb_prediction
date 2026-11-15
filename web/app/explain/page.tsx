@@ -30,7 +30,7 @@ export default function ExplainOverview() {
     <ExplainShell st={st} active="explain" note={t.overviewNote}>
       {lg && (
         <>
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-start">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-start">
             <Section
               title={t.byFactor}
               sub={t.byFactorSub(avg?.toFixed(1) ?? "-", lg.base.toFixed(1), avg !== null ? fmtSigned(avg - lg.base, 1) : "-", scored(ps).length)}
