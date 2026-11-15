@@ -164,6 +164,7 @@ for k in VARIANTS:
     yk = d25['y3'].copy()
     yk[samp_mask & inplay] = hit_score[k].reindex(d25.index[samp_mask & inplay]).to_numpy()
     y3[k] = yk
+pd.DataFrame({f'y3_{k}': y3[k] for k in VARIANTS}).to_parquet(os.path.join(OUT, 'y3_ab.parquet'))    # barrel_out_hof_experiment.py 입력
 if not SMOKE:
     ok = samp_mask & inplay
     diff = (y3['A'][ok] - d25.loc[ok, 'y3']).abs()

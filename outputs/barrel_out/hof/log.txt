@@ -1,0 +1,58 @@
+[      0s] 시작 full device cuda
+[      6s] 표본 train 151051 holdout 15845 | 시즌 {2025: 708593, 2026: 713177}
+[      8s]     epoch 1 train_mse_std 0.98974 holdout_rmse 0.16932 train_r2 0.01303 holdout_r2 0.01347 var_pred_holdout 0.00032 var_y_holdout 0.02906 grad_norm_mean 0.12788 nan_batches 0
+[      9s]     epoch 2 train_mse_std 0.98521 holdout_rmse 0.16905 train_r2 0.01762 holdout_r2 0.01656 var_pred_holdout 0.00047 var_y_holdout 0.02906 grad_norm_mean 0.13199 nan_batches 0
+[     10s]     epoch 3 train_mse_std 0.98293 holdout_rmse 0.16922 train_r2 0.01776 holdout_r2 0.01469 var_pred_holdout 0.00046 var_y_holdout 0.02906 grad_norm_mean 0.13477 nan_batches 0
+[     11s]     epoch 4 train_mse_std 0.98143 holdout_rmse 0.16900 train_r2 0.02081 holdout_r2 0.01716 var_pred_holdout 0.00072 var_y_holdout 0.02906 grad_norm_mean 0.13766 nan_batches 0
+[     12s]     epoch 5 train_mse_std 0.98041 holdout_rmse 0.16892 train_r2 0.02293 holdout_r2 0.01807 var_pred_holdout 0.00059 var_y_holdout 0.02906 grad_norm_mean 0.14633 nan_batches 0
+[     13s]     epoch 6 train_mse_std 0.97926 holdout_rmse 0.16898 train_r2 0.02476 holdout_r2 0.01740 var_pred_holdout 0.00066 var_y_holdout 0.02906 grad_norm_mean 0.14718 nan_batches 0
+[     14s]     epoch 7 train_mse_std 0.97892 holdout_rmse 0.16876 train_r2 0.02517 holdout_r2 0.01996 var_pred_holdout 0.00060 var_y_holdout 0.02906 grad_norm_mean 0.15086 nan_batches 0
+[     15s]     epoch 8 train_mse_std 0.97799 holdout_rmse 0.16887 train_r2 0.02781 holdout_r2 0.01873 var_pred_holdout 0.00076 var_y_holdout 0.02906 grad_norm_mean 0.15681 nan_batches 0
+[     16s]     epoch 9 train_mse_std 0.97710 holdout_rmse 0.16895 train_r2 0.02818 holdout_r2 0.01781 var_pred_holdout 0.00067 var_y_holdout 0.02906 grad_norm_mean 0.16587 nan_batches 0
+[     17s]     epoch 10 train_mse_std 0.97586 holdout_rmse 0.16908 train_r2 0.02904 holdout_r2 0.01627 var_pred_holdout 0.00075 var_y_holdout 0.02906 grad_norm_mean 0.17036 nan_batches 0
+[     18s]     epoch 11 train_mse_std 0.97533 holdout_rmse 0.16905 train_r2 0.03142 holdout_r2 0.01666 var_pred_holdout 0.00060 var_y_holdout 0.02906 grad_norm_mean 0.17206 nan_batches 0
+[     27s] [A] 학습 21초, epoch 11, 최적 홀드아웃 RMSE 0.16876
+[     28s]     epoch 1 train_mse_std 0.99042 holdout_rmse 0.20168 train_r2 0.01258 holdout_r2 0.01256 var_pred_holdout 0.00041 var_y_holdout 0.04119 grad_norm_mean 0.12422 nan_batches 0
+[     29s]     epoch 2 train_mse_std 0.98627 holdout_rmse 0.20143 train_r2 0.01615 holdout_r2 0.01499 var_pred_holdout 0.00075 var_y_holdout 0.04119 grad_norm_mean 0.12522 nan_batches 0
+[     30s]     epoch 3 train_mse_std 0.98445 holdout_rmse 0.20162 train_r2 0.01641 holdout_r2 0.01314 var_pred_holdout 0.00055 var_y_holdout 0.04119 grad_norm_mean 0.12927 nan_batches 0
+[     31s]     epoch 4 train_mse_std 0.98295 holdout_rmse 0.20149 train_r2 0.01951 holdout_r2 0.01437 var_pred_holdout 0.00096 var_y_holdout 0.04119 grad_norm_mean 0.13100 nan_batches 0
+[     32s]     epoch 5 train_mse_std 0.98187 holdout_rmse 0.20137 train_r2 0.02140 holdout_r2 0.01550 var_pred_holdout 0.00082 var_y_holdout 0.04119 grad_norm_mean 0.13745 nan_batches 0
+[     33s]     epoch 6 train_mse_std 0.98084 holdout_rmse 0.20140 train_r2 0.02335 holdout_r2 0.01523 var_pred_holdout 0.00088 var_y_holdout 0.04119 grad_norm_mean 0.14002 nan_batches 0
+[     34s]     epoch 7 train_mse_std 0.98019 holdout_rmse 0.20119 train_r2 0.02386 holdout_r2 0.01731 var_pred_holdout 0.00077 var_y_holdout 0.04119 grad_norm_mean 0.14415 nan_batches 0
+[     35s]     epoch 8 train_mse_std 0.97962 holdout_rmse 0.20137 train_r2 0.02611 holdout_r2 0.01553 var_pred_holdout 0.00100 var_y_holdout 0.04119 grad_norm_mean 0.15151 nan_batches 0
+[     36s]     epoch 9 train_mse_std 0.97872 holdout_rmse 0.20138 train_r2 0.02657 holdout_r2 0.01546 var_pred_holdout 0.00086 var_y_holdout 0.04119 grad_norm_mean 0.15918 nan_batches 0
+[     37s]     epoch 10 train_mse_std 0.97752 holdout_rmse 0.20137 train_r2 0.02855 holdout_r2 0.01556 var_pred_holdout 0.00085 var_y_holdout 0.04119 grad_norm_mean 0.16291 nan_batches 0
+[     38s]     epoch 11 train_mse_std 0.97722 holdout_rmse 0.20136 train_r2 0.02837 holdout_r2 0.01562 var_pred_holdout 0.00067 var_y_holdout 0.04119 grad_norm_mean 0.16624 nan_batches 0
+[     47s] [B] 학습 20초, epoch 11, 최적 홀드아웃 RMSE 0.20119
+[     61s] 구위 지표 (투수×구종 341개, bootstrap 1000회)
+헤드                             지표       A       B   B − A   CI 하한   CI 상한 좋은 방향
+P1         검증 투수×구종 ρ(구위, whiff%)  0.6809  0.6580 -0.0228 -0.0447 -0.0054     +
+P1       검증 투수×구종 ρ(구위, xwOBAcon) -0.2660 -0.2675 -0.0015 -0.0193  0.0167     −
+P1       검증 투수×구종 ρ(구위, 배럴%/인플레이) -0.2666 -0.2806 -0.0140 -0.0335  0.0033     −
+P1      검증 투수×구종 ρ(구위, 하드힛%/인플레이) -0.4618 -0.4631 -0.0013 -0.0175  0.0154     −
+P1    예측력 ρ(구위 2025, whiff% 2026)  0.7372  0.7075 -0.0298     NaN     NaN     +
+P1  예측력 ρ(구위 2025, xwOBAcon 2026) -0.2382 -0.2398 -0.0016     NaN     NaN     −
+P1  예측력 ρ(구위 2025, 배럴%/인플레이 2026) -0.2129 -0.2288 -0.0159     NaN     NaN     −
+P1 예측력 ρ(구위 2025, 하드힛%/인플레이 2026) -0.4359 -0.4184  0.0175     NaN     NaN     −
+P1         A·B 투구 구위 점수 상관 (2025)  1.0000  0.9685     NaN     NaN     NaN   NaN
+P4         검증 투수×구종 ρ(구위, whiff%)  0.7041  0.7067  0.0026 -0.0126  0.0181     +
+P4       검증 투수×구종 ρ(구위, xwOBAcon) -0.2233 -0.2359 -0.0126 -0.0309  0.0043     −
+P4       검증 투수×구종 ρ(구위, 배럴%/인플레이) -0.2297 -0.2485 -0.0188 -0.0346 -0.0035     −
+P4      검증 투수×구종 ρ(구위, 하드힛%/인플레이) -0.4223 -0.4317 -0.0095 -0.0245  0.0052     −
+P4    예측력 ρ(구위 2025, whiff% 2026)  0.7480  0.7476 -0.0004     NaN     NaN     +
+P4  예측력 ρ(구위 2025, xwOBAcon 2026) -0.2320 -0.2353 -0.0033     NaN     NaN     −
+P4  예측력 ρ(구위 2025, 배럴%/인플레이 2026) -0.1796 -0.1940 -0.0144     NaN     NaN     −
+P4 예측력 ρ(구위 2025, 하드힛%/인플레이 2026) -0.4088 -0.4092 -0.0005     NaN     NaN     −
+P4         A·B 투구 구위 점수 상관 (2025)  1.0000  0.9781     NaN     NaN     NaN   NaN
+[     61s] B − A 비교 (LGBM vs HOF)
+                                LGBM v4  HOF P1  HOF P4
+지표                                                     
+검증 투수×구종 ρ(구위, whiff%)          -0.0193 -0.0228  0.0026
+검증 투수×구종 ρ(구위, xwOBAcon)        -0.0208 -0.0015 -0.0126
+검증 투수×구종 ρ(구위, 배럴%/인플레이)        -0.0391 -0.0140 -0.0188
+검증 투수×구종 ρ(구위, 하드힛%/인플레이)       -0.0087 -0.0013 -0.0095
+예측력 ρ(구위 2025, whiff% 2026)     -0.0134 -0.0298 -0.0004
+예측력 ρ(구위 2025, xwOBAcon 2026)   -0.0166 -0.0016 -0.0033
+예측력 ρ(구위 2025, 배럴%/인플레이 2026)   -0.0285 -0.0159 -0.0144
+예측력 ρ(구위 2025, 하드힛%/인플레이 2026)  -0.0122  0.0175 -0.0005
+[     61s] 끝 61s
