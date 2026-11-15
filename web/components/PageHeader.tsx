@@ -96,7 +96,7 @@ export function PitcherHeader({
     <header className="flex flex-col gap-4 pt-2">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          {title && <p className="eyebrow mb-1.5">{title}</p>}
+          {title && name && <p className="eyebrow mb-1.5">{title}</p>}
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-bold tracking-tight text-ink">{name ?? t.pickPitcher}</h1>
             {pitcherId && stuff !== undefined && stuff !== null && <StuffBadge v={stuff} size="md" />}

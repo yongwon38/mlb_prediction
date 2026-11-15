@@ -52,7 +52,7 @@ export default function Home() {
       <section className="relative overflow-hidden rounded-b-3xl -mx-4 px-4 sm:mx-0 sm:px-8 pt-10 pb-8 sm:rounded-3xl sm:mt-5 bg-surface border-b sm:border border-line">
         <HeroArt />
         <div className="relative max-w-[640px]">
-          <p className="eyebrow mb-3">{t.eyebrow}</p>
+          {t.eyebrow && <p className="eyebrow mb-3">{t.eyebrow}</p>}
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-ink leading-[1.1]">{t.heroTitle}</h1>
           <p className="text-base text-ink-2 mt-3">{t.tagline}</p>
         </div>
