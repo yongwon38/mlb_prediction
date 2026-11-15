@@ -16,6 +16,7 @@
 !/hofnet_diag_experiment.py
 !/barrel_out_experiment.py
 !/barrel_out_hof_experiment.py
+!/hofnet_review_experiment.py
 !/stuff_pipeline_*.ipynb
 !/export_web_data.py
 !/compute_shap.py
@@ -67,6 +68,10 @@
 /outputs/barrel_out/hof/*
 !/outputs/barrel_out/hof/*.csv
 !/outputs/barrel_out/hof/log.txt
+!/outputs/hofnet_review/
+/outputs/hofnet_review/*
+!/outputs/hofnet_review/results.csv
+!/outputs/hofnet_review/log.txt
 
 # 클라우드 운영 (GitHub Actions + HF 데이터셋 + Vercel)
 !/.github/
