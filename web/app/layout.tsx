@@ -6,7 +6,7 @@ import { LANG_INIT_SCRIPT } from "@/lib/i18n/init";
 
 export const metadata: Metadata = {
   title: "Stuff Lab · MLB Stuff grades",
-  description: "MLB pitchers graded on pitch physics alone (20–80 Stuff). 투구 물리량만으로 매긴 MLB 투수 구위 분석.",
+  description: "MLB pitch grades from pitch physics (20–80 Stuff). 투구 물리량 기반 MLB 구위 지표."
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
