@@ -1,6 +1,6 @@
 "use client";
 import { useMemo } from "react";
-import { Section } from "@/components/Panels";
+import { EmptyState, Section } from "@/components/Panels";
 import ContribBars from "@/components/explain/ContribBars";
 import ContribMatrix, { type MatrixRow } from "@/components/explain/ContribMatrix";
 import ExplainShell from "@/components/explain/ExplainShell";
@@ -44,7 +44,7 @@ export default function ExplainPitchTypes() {
             <ContribMatrix groups={groups} rows={rows} base={lg.base} active={one} onRow={(k) => setPts(one === k ? [] : [k])} />
           </Section>
           {one ? (
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-start">
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)] items-start">
               <Section
                 title={t.ptDetail(one, meta?.pitchNames[one] ?? "")}
                 sub={t.ptDetailSub(avg?.toFixed(1) ?? "-", lg.base.toFixed(1), avg !== null ? fmtSigned(avg - lg.base, 1) : "-", one)}
@@ -56,7 +56,7 @@ export default function ExplainPitchTypes() {
               </Section>
             </div>
           ) : (
-            <p className="text-sm text-muted px-1">{t.ptEmpty}</p>
+            <EmptyState title={t.ptEmpty} />
           )}
         </>
       )}

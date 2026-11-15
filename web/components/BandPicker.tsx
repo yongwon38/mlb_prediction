@@ -16,10 +16,11 @@ interface Props {
   setGhost?: (g: boolean) => void; // 없으면 '나머지 흐리게' 토글을 숨김
   note?: string; // 없으면 기본 안내
   showNone?: boolean; // '점수 제외' 칩 표시 여부
+  bare?: boolean; // 카드 없이 (다른 툴바 안에 넣을 때)
 }
 
 /** 투구 분포·타구 분포 공용 구위 구간 선택기 (다른 패널에는 영향 없음) */
-export default function BandPicker({ ps, band, setBand, ghost, setGhost, note, showNone = true }: Props) {
+export default function BandPicker({ ps, band, setBand, ghost, setGhost, note, showNone = true, bare = false }: Props) {
   const dark = useDarkMode();
   const tt = useT();
   const t = tt.band;
@@ -35,7 +36,7 @@ export default function BandPicker({ ps, band, setBand, ghost, setGhost, note, s
   const toggle = (k: string) => setBand(band.includes(k) ? band.filter((v) => v !== k) : [...band, k]);
 
   return (
-    <div className="card p-3 flex flex-wrap items-center gap-1.5 text-xs">
+    <div className={`${bare ? "" : "card p-3"} flex flex-wrap items-center gap-1.5 text-xs`}>
       <span className="text-muted mr-1">{t.label}</span>
       <button className="chip" aria-pressed={!band.length} onClick={() => setBand([])}>
         {tt.common.all} <span className="tnum text-muted">{ps.length.toLocaleString()}</span>
@@ -61,7 +62,7 @@ export default function BandPicker({ ps, band, setBand, ghost, setGhost, note, s
           {t.ghost}
         </label>
       )}
-      {shownNote && <span className="basis-full text-muted">{shownNote}</span>}
+      {shownNote && <span className="basis-full text-muted text-[11px]">{shownNote}</span>}
     </div>
   );
 }

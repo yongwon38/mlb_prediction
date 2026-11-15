@@ -7,8 +7,11 @@ export default function Methodology() {
   const m = useT().methodology;
   const model = useModel();
   return (
-    <details className="card p-4 text-xs text-ink-2 leading-relaxed">
-      <summary className="cursor-pointer font-semibold text-ink text-sm">{m.summary}</summary>
+    <details className="card px-5 py-4 text-xs text-ink-2 leading-relaxed">
+      <summary className="cursor-pointer font-semibold text-ink text-sm flex items-center gap-2">
+        <span className="chev text-muted">›</span>
+        {m.summary}
+      </summary>
       <ol className="list-decimal pl-5 mt-2 flex flex-col gap-1">
         <li>{m.s1}</li>
         <li>{m.s2}</li>

@@ -1,7 +1,7 @@
 "use client";
 import { useMemo } from "react";
 import Link from "next/link";
-import { Section } from "@/components/Panels";
+import { EmptyState, Section } from "@/components/Panels";
 import ExplainShell from "@/components/explain/ExplainShell";
 import PitchList from "@/components/explain/PitchList";
 import { PitchDetail } from "@/components/explain/Parts";
@@ -37,16 +37,14 @@ export default function ExplainPitch() {
   return (
     <ExplainShell st={st} active="explain/pitch" note={t.pitchNote}>
       {lg && file && meta && (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] items-start">
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,0.85fr)_minmax(0,1.15fr)] items-start">
           <Section title={t.list} sub={t.listSub}>
             <PitchList ps={ps} pitchTypes={file.pitchTypes} groups={groupNames(tt, lg.groups)} selected={sel} onSelect={setSel} />
           </Section>
 
-          <div className="flex flex-col gap-4 min-w-0">
+          <div className="flex flex-col gap-5 min-w-0">
             {!selPitch ? (
-              <Section title={t.process}>
-                <p className="text-sm text-muted">{t.pickPitch}</p>
-              </Section>
+              <EmptyState className="lg:min-h-[420px]" title={t.process} body={t.pickPitch} />
             ) : (
               <>
                 <Section

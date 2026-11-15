@@ -1,5 +1,4 @@
 "use client";
-import { useEffect, useState } from "react";
 
 // 데이터 시각화 팔레트 (dataviz 기준 팔레트 : 카테고리 8색 고정 순서, 단일 색상 순차 램프)
 export const CATEGORICAL = {
@@ -23,11 +22,11 @@ function ramp(stops: string[], t: number) {
   return `rgb(${a.map((v, k) => Math.round(v + (b[k] - v) * f)).join(",")})`;
 }
 
-// 구위 웜 램프 (노랑 -> 빨강). 라이트 : 명도 감소·표면 대비 1.6 -> 7.6 / 다크 : 채도 0.07 -> 0.23 증가, 대비 2.4 이상
-const WARM = ["#f2c13b", "#f5a031", "#f07a2b", "#e45127", "#cc2e20", "#a50f15"];
-const WARM_DARK = ["#6b5326", "#a87a1e", "#d98a1f", "#ee6a2a", "#f6472f", "#ff3b30"];
+// 구위 diverging 램프 (파랑 = 낮음 -> 회색 = 리그 평균 50 -> 빨강 = 높음). 도메인 30~70 의 가운데가 50
+const STUFF_LIGHT = ["#1f5fb4", "#4f8ad4", "#9bb8da", "#bdbbb4", "#eba487", "#df5f3f", "#b3221a"];
+const STUFF_DARK = ["#4b93ea", "#5b86bd", "#6e7f96", "#7d7c78", "#c4775a", "#ec5b3f", "#ff4a3a"];
 
-/** 구위 색 도메인 : 30 이하 가장 옅고 작게, 70 이상 가장 진하고 크게 */
+/** 구위 색 도메인 : 30 이하 가장 진한 파랑, 50 회색, 70 이상 가장 진한 빨강 */
 export const STUFF_DOMAIN: [number, number] = [30, 70];
 
 export function sequential(t: number, dark: boolean) {
@@ -36,33 +35,34 @@ export function sequential(t: number, dark: boolean) {
 
 const stuffT = (s: number) => Math.min(1, Math.max(0, (s - STUFF_DOMAIN[0]) / (STUFF_DOMAIN[1] - STUFF_DOMAIN[0])));
 
-/** 구위 마커 색 : 낮은 구위 = 노랑(옅게), 높은 구위 = 진한 빨강 (라이트·다크 모두 빨강이 가장 강함) */
+/** 구위 색 : 낮은 구위 = 파랑, 평균 = 회색, 높은 구위 = 빨강 */
 export function stuffColor(s: number, dark: boolean) {
-  return ramp(dark ? WARM_DARK : WARM, stuffT(s));
+  return ramp(dark ? STUFF_DARK : STUFF_LIGHT, stuffT(s));
 }
 
-/** 웜 램프 직접 접근 (t = 0~1). 히트맵처럼 도메인을 따로 쓰는 곳용 */
-export function warmRamp(t: number, dark: boolean) {
-  return ramp(dark ? WARM_DARK : WARM, t);
+/** 구위 램프 직접 접근 (t = 0~1, 0.5 = 평균). 히트맵처럼 도메인을 따로 쓰는 곳용 */
+export function stuffRamp(t: number, dark: boolean) {
+  return ramp(dark ? STUFF_DARK : STUFF_LIGHT, t);
 }
 
-/** 구위 마커 불투명도 : 0.45 -> 1 */
+/** 구위 마커 불투명도 : 평균 근처 0.5 -> 양 끝 1 (평균에서 먼 공이 눈에 띄게) */
 export function stuffOpacity(s: number) {
-  return 0.45 + 0.55 * stuffT(s);
+  return 0.5 + 0.5 * Math.abs(2 * stuffT(s) - 1);
 }
 
-
-export function useDarkMode() {
-  const [dark, setDark] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-color-scheme: dark)");
-    const update = () => setDark(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
-  }, []);
-  return dark;
+/** 배경색(rgb(...) 또는 #hex) 위에 올릴 글자색 : 휘도 기준 검정/흰색 */
+export function inkOn(bg: string) {
+  const v = bg.startsWith("#") ? hex(bg) : bg.slice(bg.indexOf("(") + 1, -1).split(",").map(Number);
+  const l = (0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]) / 255;
+  return l > 0.55 ? "#111110" : "#ffffff";
 }
+
+/** 구위 배지 배경 : 램프 색을 반투명으로 */
+export function stuffTint(s: number, dark: boolean, alpha = 0.16) {
+  return stuffColor(s, dark).replace("rgb(", "rgba(").replace(")", `,${alpha})`);
+}
+
+export { useDarkMode } from "./theme";
 
 /** 투수 구종 순서(구사율 순)대로 카테고리 슬롯 고정 -> 필터해도 색이 바뀌지 않는다 */
 export function pitchColor(pitchTypes: string[], pt: string, dark: boolean) {

@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import SearchPanel from "@/components/SearchPanel";
 import StrikeZone from "@/components/StrikeZone";
 import PitchSequence from "@/components/games/PitchSequence";
-import { Section, Toggle } from "@/components/Panels";
+import { EmptyState, LoadingBlock, Section, Toggle } from "@/components/Panels";
 import { GameTypePicker, PitcherHeader, SeasonSelect } from "@/components/PageHeader";
 import Methodology from "@/components/Methodology";
 import { ctxHref, numParam, usePageState, usePitcherData } from "@/lib/appState";
@@ -54,16 +54,22 @@ export default function GamesPage() {
   const toExplain = (x: Pitch) => router.push(ctxHref("/explain/pitch", c, { pitch: x.i }));
 
   return (
-    <main className="mx-auto w-full max-w-[1280px] px-4 py-6 flex flex-col gap-4">
+    <main className="mx-auto w-full max-w-[1280px] px-4 pt-6 pb-10 flex flex-col gap-5">
       <PitcherHeader
         title={t.title}
         name={entry?.name ?? null}
         info={entry ? `${tt.common.throws(entry.throws)} · ${entry.teams.join(" → ")} · ${t.info(season, file ? file.games.length : null)}` : t.idle}
+        stuff={entry?.stuff}
         season={season}
         pitcherId={entry ? pitcherId : null}
         gt={gt}
         active="games"
-        right={<SeasonSelect meta={meta} season={season} onChange={(s) => (setSeason(s), pickGame(null))} />}
+        right={
+          <div className="flex flex-wrap items-center gap-2">
+            {entry && <SearchPanel key={season ?? 0} index={index} selectedId={pitcherId} onSelect={(id) => (setPitcherId(id), pickGame(null))} compact placeholder={tt.pitcherPage.otherPitcher} />}
+            <SeasonSelect meta={meta} season={season} onChange={(s) => (setSeason(s), pickGame(null))} />
+          </div>
+        }
       />
 
       {error && <div className="card p-3 text-sm text-bad">{tt.common.loadError(error)}</div>}
@@ -71,25 +77,35 @@ export default function GamesPage() {
       {!entry && (
         <>
           <SearchPanel key={season ?? 0} index={index} selectedId={pitcherId} onSelect={(id) => (setPitcherId(id), pickGame(null))} />
-          {pitcherId && index && <div className="card p-10 text-center text-sm text-muted">{tt.common.noRecord}</div>}
+          {pitcherId && index && <EmptyState title={tt.common.noRecord} />}
         </>
       )}
-      {entry && !data && <div className="card p-10 text-center text-sm text-muted">{t.loading(entry.name)}</div>}
+      {entry && !data && <LoadingBlock label={t.loading(entry.name)} rows={4} />}
 
       {data && meta && file && (
         <>
-          <div className="card p-3">
-            <GameTypePicker value={effGt} onChange={(v) => (setGt(v), pickGame(null))} counts={gtCounts} />
-          </div>
+          <GameTypePicker value={effGt} onChange={(v) => (setGt(v), pickGame(null))} counts={gtCounts} />
 
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] items-start">
+          <div className="grid gap-5 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] items-start">
             <Picker file={file} meta={meta} gts={effGt} game={game} pa={pa} onPick={pickGame} />
 
-            <div className="flex flex-col gap-4 min-w-0">
+            <div className="flex flex-col gap-5 min-w-0">
               {!g ? (
-                <Section title={t.pick}>
-                  <p className="text-sm text-muted">{t.pickBody}</p>
-                </Section>
+                <EmptyState
+                  className="lg:min-h-[420px]"
+                  title={t.pick}
+                  body={t.pickBody}
+                  action={
+                    (() => {
+                      const top = file.games.map((x, gi) => ({ x, gi })).filter(({ x }) => effGt.includes(x.gt)).sort((a, b) => b.x.imp - a.x.imp)[0];
+                      return top ? (
+                        <button className="mt-3 rounded-lg bg-ink text-surface text-sm font-medium px-4 py-2 hover:opacity-90" onClick={() => pickGame(top.gi)}>
+                          {t.firstRec}
+                        </button>
+                      ) : null;
+                    })()
+                  }
+                />
               ) : (
                 <>
                   <GameSummary g={g} />
@@ -181,8 +197,8 @@ function Picker({ file, meta, gts, game, pa, onPick }: { file: PitcherFile; meta
 function RecGroup({ title, note, children }: { title: string; note: string; children: React.ReactNode }) {
   return (
     <div>
-      <h3 className="text-xs font-semibold text-ink">{title}</h3>
-      <p className="text-xs text-muted mb-1">{note}</p>
+      <h3 className="text-sm font-semibold text-ink">{title}</h3>
+      <p className="text-xs text-muted mt-0.5 mb-2">{note}</p>
       <ul className="border-t border-grid">{children}</ul>
     </div>
   );
@@ -191,13 +207,13 @@ function RecGroup({ title, note, children }: { title: string; note: string; chil
 function RecItem({ main, sub, value, valueLabel, active, onClick, tone }: { main: string; sub: string; value: string; valueLabel: string; active: boolean; onClick: () => void; tone?: "good" | "bad" }) {
   return (
     <li>
-      <button onClick={onClick} aria-pressed={active} className={`w-full text-left flex items-center gap-2 px-1.5 py-1.5 border-b border-grid hover:bg-surface-2 ${active ? "bg-surface-2" : ""}`}>
+      <button onClick={onClick} aria-pressed={active} className={`w-full text-left flex items-center gap-2 px-2 py-2 border-b border-grid hover:bg-surface-2 transition-colors ${active ? "bg-accent-soft shadow-[inset_2px_0_0_var(--accent)]" : ""}`}>
         <span className="flex-1 min-w-0">
           <span className="block truncate text-ink">{main}</span>
           <span className="block truncate text-xs text-muted">{sub}</span>
         </span>
         <span className="text-right shrink-0">
-          <span className={`block font-semibold tnum ${tone === "good" ? "text-good" : tone === "bad" ? "text-bad" : "text-ink"}`}>{value}</span>
+          <span className={`block num text-sm ${tone === "good" ? "text-good" : tone === "bad" ? "text-bad" : "text-ink"}`}>{value}</span>
           <span className="block text-[10px] text-muted">{valueLabel}</span>
         </span>
       </button>
@@ -263,9 +279,9 @@ function GameSummary({ g }: { g: GameRow }) {
     >
       <dl className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         {cells.map(([l, v]) => (
-          <div key={l} className="rounded-lg bg-surface-2 px-3 py-2">
+          <div key={l} className="rounded-xl bg-surface-2 px-3.5 py-2.5">
             <dt className="text-xs text-muted">{l}</dt>
-            <dd className="text-base font-semibold text-ink tnum mt-0.5">{v}</dd>
+            <dd className="text-lg num text-ink mt-0.5">{v}</dd>
           </div>
         ))}
       </dl>

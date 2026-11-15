@@ -3,14 +3,15 @@ import Link from "next/link";
 import { ctxHref } from "@/lib/appState";
 import { useT } from "@/lib/i18n";
 import type { Meta } from "@/lib/types";
+import { StuffBadge } from "@/components/Panels";
 
 /** 시즌 선택 */
 export function SeasonSelect({ meta, season, onChange }: { meta: Meta | null; season: number | null; onChange: (s: number) => void }) {
   const t = useT().header;
   return (
-    <label className="flex items-center gap-2 text-sm text-ink-2">
+    <label className="flex items-center gap-2 text-xs text-muted shrink-0">
       {t.season}
-      <select value={season ?? ""} onChange={(e) => onChange(Number(e.target.value))} aria-label={t.seasonAria}>
+      <select value={season ?? ""} onChange={(e) => onChange(Number(e.target.value))} aria-label={t.seasonAria} className="!text-sm font-medium">
         {meta?.seasons.map((s) => (
           <option key={s} value={s}>
             {s}
@@ -28,11 +29,13 @@ export function GameTypePicker({
   onChange,
   counts,
   single = false,
+  label = true,
 }: {
   value: number[];
   onChange: (v: number[]) => void;
   counts?: (number | null | undefined)[];
   single?: boolean;
+  label?: boolean;
 }) {
   const t = useT();
   const toggle = (g: number) => {
@@ -42,7 +45,7 @@ export function GameTypePicker({
   };
   return (
     <div className="flex flex-wrap items-center gap-1.5 text-xs" role="group" aria-label={t.header.gameType}>
-      <span className="text-muted mr-1">{t.header.gameType}</span>
+      {label && <span className="text-muted mr-1">{t.header.gameType}</span>}
       {t.gameTypes.map((l, g) => {
         const n = counts?.[g];
         const disabled = counts !== undefined && !n;
@@ -59,20 +62,15 @@ export function GameTypePicker({
 
 export type PitcherTab = "pitcher" | "games" | "explain" | "explain/pitch-types" | "explain/bands" | "explain/pitch";
 
-const TABS: { key: PitcherTab; explain?: boolean }[] = [
-  { key: "pitcher" },
-  { key: "games" },
-  { key: "explain", explain: true },
-  { key: "explain/pitch-types", explain: true },
-  { key: "explain/bands", explain: true },
-  { key: "explain/pitch", explain: true },
-];
+const MAIN_TABS: PitcherTab[] = ["pitcher", "games", "explain"];
+const EXPLAIN_TABS: PitcherTab[] = ["explain", "explain/pitch-types", "explain/bands", "explain/pitch"];
 
-/** 투수 페이지 공통 머리 : 이름·정보 + 하위 페이지 탭 */
+/** 투수 페이지 공통 머리 : 이름·구위 배지·정보 + 1단 탭(분석 / 경기·타석 / 구위 산출 근거) + 근거 하위 탭 */
 export function PitcherHeader({
   title,
   name,
   info,
+  stuff,
   season,
   pitcherId,
   gt,
@@ -82,39 +80,64 @@ export function PitcherHeader({
   title?: string;
   name: string | null;
   info?: React.ReactNode;
+  stuff?: number | null;
   season: number | null;
   pitcherId: number | null;
   gt: number[];
   active: PitcherTab;
   right?: React.ReactNode;
 }) {
-  const t = useT().header;
+  const tt = useT();
+  const t = tt.header;
   const c = { season, pitcher: pitcherId, gt };
+  const inExplain = active.startsWith("explain");
+  const mainLabel = (k: PitcherTab) => (k === "explain" ? t.explainGroup : t.tabs[k]);
   return (
-    <header className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-end justify-between gap-3">
+    <header className="flex flex-col gap-4 pt-2">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div className="min-w-0">
-          {title && <p className="text-xs text-muted">{title}</p>}
-          <h1 className="text-2xl font-bold tracking-tight text-ink">{name ?? t.pickPitcher}</h1>
-          {info && <div className="text-sm text-ink-2 mt-0.5">{info}</div>}
+          {title && <p className="eyebrow mb-1.5">{title}</p>}
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="text-3xl font-bold tracking-tight text-ink">{name ?? t.pickPitcher}</h1>
+            {pitcherId && stuff !== undefined && stuff !== null && <StuffBadge v={stuff} size="md" />}
+          </div>
+          {info && <div className="text-sm text-ink-2 mt-1.5">{info}</div>}
         </div>
         {right}
       </div>
       {pitcherId && (
-        <div className="flex flex-wrap items-center gap-1 text-sm border-b border-line" role="tablist" aria-label={t.tabsAria}>
-          {TABS.map((tab, i) => (
-            <span key={tab.key} className="flex items-center">
-              {tab.explain && !TABS[i - 1]?.explain && <span className="text-xs text-muted ml-3 mr-1">{t.explainGroup}</span>}
-              <Link
-                href={ctxHref(`/${tab.key}`, c)}
-                role="tab"
-                aria-selected={active === tab.key}
-                className={`px-2.5 py-2 border-b-2 -mb-px ${active === tab.key ? "border-accent text-ink font-semibold" : "border-transparent text-ink-2 hover:text-ink"}`}
-              >
-                {t.tabs[tab.key]}
-              </Link>
-            </span>
-          ))}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-1 border-b border-line overflow-x-auto no-scrollbar" role="tablist" aria-label={t.tabsAria}>
+            {MAIN_TABS.map((k) => {
+              const on = k === "explain" ? inExplain : active === k;
+              return (
+                <Link
+                  key={k}
+                  href={ctxHref(`/${k}`, c)}
+                  role="tab"
+                  aria-selected={on}
+                  className={`shrink-0 px-3 py-2.5 text-sm border-b-2 -mb-px transition-colors ${on ? "border-ink text-ink font-semibold" : "border-transparent text-ink-2 hover:text-ink"}`}
+                >
+                  {mainLabel(k)}
+                </Link>
+              );
+            })}
+          </div>
+          {inExplain && (
+            <div className="flex flex-wrap items-center gap-1" role="tablist" aria-label={t.explainGroup}>
+              {EXPLAIN_TABS.map((k) => (
+                <Link
+                  key={k}
+                  href={ctxHref(`/${k}`, c)}
+                  role="tab"
+                  aria-selected={active === k}
+                  className={`px-3 py-1 rounded-full text-xs transition-colors ${active === k ? "bg-ink text-surface font-semibold" : "text-ink-2 hover:bg-surface-2 hover:text-ink"}`}
+                >
+                  {t.tabs[k]}
+                </Link>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </header>
