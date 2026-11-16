@@ -1,0 +1,48 @@
+{
+ "date": "2026-11-17",
+ "aa": false,
+ "decision": "keep",
+ "checks": {
+  "rhoWhiffCILowerAboveZero": false,
+  "rmseNotWorse": true
+ },
+ "dataThrough": "2026-09-27",
+ "holdout": [
+  "2026-08-31",
+  "2026-09-27"
+ ],
+ "holdoutGroups": 242,
+ "trainPeriod": [
+  "2025-03-18",
+  "2026-08-30"
+ ],
+ "trainRows": 372549,
+ "champion": {
+  "groups": 242,
+  "rhoWhiff": 0.7277,
+  "rhoXwoba": -0.1318,
+  "rmse": 0.1648,
+  "rmseN": 31027
+ },
+ "challenger": {
+  "groups": 242,
+  "rhoWhiff": 0.7422,
+  "rhoXwoba": -0.1637,
+  "rmse": 0.16459,
+  "rmseN": 31027
+ },
+ "delta": {
+  "rhoWhiff": 0.0145,
+  "rhoWhiffCI": [
+   -0.0119,
+   0.0426
+  ],
+  "rhoXwoba": -0.0319,
+  "rhoXwobaCI": [
+   -0.0667,
+   0.0018
+  ],
+  "rmse": -0.00021
+ },
+ "elapsedSec": 38
+}

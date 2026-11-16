@@ -222,3 +222,59 @@ export interface Pitch {
   hx: number | null; // 타구 좌표 (ft, 홈 = 0,0 / +x = 1루 쪽)
   hy: number | null;
 }
+
+// ---------------------------------------------------------------------------
+// 모델 모니터링 (monitor.py -> /data/monitor.json)
+// ---------------------------------------------------------------------------
+export interface MonitorMetrics {
+  groups: number;
+  rhoWhiff: number | null;
+  rhoXwoba: number | null;
+  rhoWhiffCI?: [number | null, number | null];
+  rhoXwobaCI?: [number | null, number | null];
+  rmse: number | null;
+  rmseN: number;
+}
+
+export interface MonitorWeek {
+  week: string; // ISO 주 (2026-W14)
+  start: string;
+  end: string;
+  pitches: number;
+  cum: MonitorMetrics; // 시즌 누적 (투수×구종 n >= 100)
+  wk: MonitorMetrics; // 그 주만 (n >= 30, 참고)
+  psi: Record<string, number | null>;
+  psiMax: number | null;
+  stuffMean: number | null;
+  share60: number | null;
+}
+
+export interface GateResult {
+  date: string;
+  decision: "keep" | "replace";
+  holdout: [string, string];
+  champion: MonitorMetrics;
+  challenger: MonitorMetrics;
+  delta: { rhoWhiff: number | null; rhoWhiffCI: [number | null, number | null]; rhoXwoba: number | null; rhoXwobaCI: [number | null, number | null]; rmse: number | null };
+}
+
+export interface Monitor {
+  generatedAt: string;
+  season: number;
+  model: string;
+  dataThrough: string;
+  status: "ok" | "warn" | "insufficient";
+  offseason: boolean;
+  reasons: { code: "rho" | "psi"; feature?: string; value: number; limit: number }[];
+  thresholds: { psiWarn: number; psiWatch: number; minN: number; minNWeek: number; minGroups: number; bootstrap: number };
+  ref: {
+    trainPeriod: [string, string];
+    validPeriod: [string, string];
+    trainPitches: number;
+    features: string[];
+    baseline: MonitorMetrics & { stuffMean: number; share60: number };
+  };
+  weeks: MonitorWeek[];
+  psiSeason: Record<string, number | null>;
+  gate: GateResult | null;
+}

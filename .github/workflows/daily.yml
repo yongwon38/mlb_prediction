@@ -57,6 +57,12 @@ jobs:
           python export_web_data.py --seasons $S
           python ops.py push-web $S
 
+      # 운영 모델(v4) 성능·드리프트 (monitor.py, 약 1~2분). 실패해도 점수·배포는 진행하고 직전 결과(pull-web 이 복원)를 유지
+      - name: 모델 모니터링
+        if: steps.update.outputs.changed == 'true'
+        continue-on-error: true
+        run: python monitor.py --season ${{ steps.update.outputs.season }} --push
+
       - name: 배포
         if: steps.update.outputs.changed == 'true'
         uses: ./.github/actions/deploy-web

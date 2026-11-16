@@ -1,0 +1,53 @@
+# 매월 : 재학습 게이트 (retrain_gate.py) -> 판정 리포트 커밋 + 웹 모니터링 갱신
+# challenger(v4 레시피 재학습)가 홀드아웃(현재 시즌 마지막 4주)에서 확실히 나을 때만 '교체 권고'. 모델 파일은 바꾸지 않는다 (교체는 수동)
+name: gate
+
+on:
+  schedule:
+    - cron: '0 18 2 * *'    # 매월 2일 03:00 KST (매월 1일 shap 워크플로와 겹치지 않게)
+  workflow_dispatch:
+    inputs:
+      force:
+        description: 데이터 기준일이 지난 판정과 같아도 다시 판정
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pipeline
+  cancel-in-progress: false
+
+env:
+  HF_TOKEN: ${{ secrets.HF_TOKEN }}
+  HF_DATASET: ${{ vars.HF_DATASET || 'elcax1/mlb-statcast' }}
+  MLB_DATA: store
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-python
+
+      - name: 재학습 게이트 판정
+        id: gate
+        run: |
+          python retrain_gate.py --push ${{ inputs.force && '--force' || '' }}
+          # 판정이 새로 나왔으면 웹 모니터링에도 반영 (다음 배포 때 pull-web 이 복원)
+          if ! git diff --quiet -- outputs/gate || [ -n "$(git ls-files --others --exclude-standard outputs/gate)" ]; then
+            echo "new=true" >> "$GITHUB_OUTPUT"
+            python monitor.py --push
+          fi
+
+      - name: 판정 리포트 커밋
+        if: steps.gate.outputs.new == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add outputs/gate
+          git commit -m "gate: $(date -u +%F) [skip ci]"
+          git pull --rebase
+          git push

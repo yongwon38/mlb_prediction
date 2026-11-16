@@ -15,6 +15,7 @@ const ITEMS = [
   { href: "/pitcher", key: "pitcher", match: (p: string) => p.startsWith("/pitcher") },
   { href: "/games", key: "games", match: (p: string) => p.startsWith("/games") },
   { href: "/explain", key: "explain", match: (p: string) => p.startsWith("/explain") },
+  { href: "/model", key: "model", match: (p: string) => p.startsWith("/model") },
 ] as const;
 
 const LANGS: [Lang, string][] = [

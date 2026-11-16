@@ -1,4 +1,4 @@
-import type { ExplainFile, ExplainPitch, League, Meta, Pitch, PitcherFile, SeasonIndex, SeasonStats, SeasonSummary } from "./types";
+import type { ExplainFile, ExplainPitch, League, Meta, Monitor, Pitch, PitcherFile, SeasonIndex, SeasonStats, SeasonSummary } from "./types";
 import { getModel, MODEL_FIELD, modelSuffix, type ModelId } from "./model";
 
 const cache = new Map<string, Promise<unknown>>();
@@ -22,6 +22,8 @@ export const loadLeague = (season: number, m: ModelId = getModel()) => getJSON<L
 export const loadSummary = (season: number, m: ModelId = getModel()) => getJSON<SeasonSummary>(`/data/${season}/summary${modelSuffix(m)}.json`);
 /** 공식 기록은 네트워크 실패 시 export 에서 생략될 수 있음 -> 없으면 null */
 export const loadStats = (season: number) => getJSON<SeasonStats>(`/data/${season}/stats.json`).catch(() => null);
+/** 운영 모델 모니터링 (monitor.py). 아직 생성 전이면 null */
+export const loadMonitor = () => getJSON<Monitor>("/data/monitor.json").catch(() => null);
 
 /** 투수별 파일은 .json.gz. 서버가 Content-Encoding 으로 이미 풀어 준 경우(gzip 매직넘버 없음)는 그대로 파싱 */
 async function getGzipJSON<T>(url: string): Promise<T> {

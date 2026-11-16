@@ -76,11 +76,15 @@ outputs/                       예측 결과, 지표, 그림
 업무일지/업무일지_YYYYMMDD.md    일일 업무일지
 export_web_data.py             웹용 데이터 export (시즌별 구위 score -> web/public/data/{season}/ : index·league·summary·stats(MLB 공식 기록).json, p/ e/ 투수별 .json.gz(경기·타석 표 포함))
 compute_shap.py                정확한 SHAP 캐시 계산 (outputs/{모델 버전}/shap/, 약 12시간 : 정규 shap_{season}.npz + 시범·포스트 shap_{season}_extra.npz). 없으면 export 가 Saabas 기여 사용
-web/                           Next.js 분석 페이지 (static export, Vercel 배포) : / 홈, /pitcher, /games, /explain(/pitch-types, /bands, /pitch)
+web/                           Next.js 분석 페이지 (static export, Vercel 배포) : / 홈, /pitcher, /games, /explain(/pitch-types, /bands, /pitch), /model(모니터링)
 data_store.py                  온라인 데이터 저장소 (HF Datasets : statcast 월별 parquet, SHAP 캐시, 웹 데이터 스냅샷)
 ops.py                         클라우드 운영 명령 (update / bootstrap / pull-web / push-web / pull-shap / push-shap / shap-todo)
-.github/workflows/             daily(매일 갱신·배포) / deploy(push 시 배포) / shap(끝난 시즌 SHAP) / bootstrap(처음 적재)
+.github/workflows/             daily(매일 갱신·모니터링·배포) / deploy(push 시 배포) / shap(끝난 시즌 SHAP) / bootstrap(처음 적재) / gate(매월 재학습 게이트)
 data_status.json               데이터 기준일 (daily 가 커밋)
+mlops_common.py                모니터링·게이트 공통 (점수·y3·투수×구종 ρ·투수 군집 bootstrap·PSI)
+monitor.py                     운영 모델(v4) ISO 주별 성능·드리프트 -> web/public/data/monitor.json (+ HF monitor/monitor.json)
+retrain_gate.py                재학습 게이트 : v4 레시피 challenger vs champion, 홀드아웃 마지막 4주 -> outputs/gate/{날짜}.md, gate.json
+build_monitor_ref.py           1회성 : v4 2단계 보정기 복원(monitoring/stage12/, git 미추적 -> HF models/stage12/) + 기준 monitoring/v4_ref.json
 ```
 - 웹 데이터 갱신 : **`git push` 하면 자동** (7절). `web/public/data/` 는 커밋하지 않는다
 - 데이터 로드 순서 : 로컬 pkl -> 없거나 `MLB_DATA=store` 면 HF 데이터셋 -> 둘 다 없으면 pybaseball (`stuff_pipeline._read_raw`)
@@ -120,6 +124,11 @@ data_status.json               데이터 기준일 (daily 가 커밋)
   - 진행 중 시즌은 새 투구가 들어오면 그 투수의 주 패스트볼 평균이 바뀌어 시즌 전체 피처가 바뀜 -> 하루 약 12~14만 구 재계산 (daily, 25만 구 초과면 건너뛰고 그날은 Saabas)
   - **shap** (models push / 매월 / 수동) : 모델(`ops.py shap-plan` : LGBM + HOF) × 캐시 없는 시즌을 8조각 병렬 계산 -> 합치기 -> 해당 시즌 재생성. 처음 계산·모델 변경 후용. HOF 는 매월 현재 시즌의 근사 투구를 정확값으로 다시 계산
   - 클라우드는 CPU torch(`requirements.txt` 의 `torch==2.5.1+cpu`)로 HOF 를 계산한다. HOF 모델 파일에는 sklearn·LightGBM 객체를 넣지 않는다 (HAVAA 계수만 담은 `AngleAdjustedStuffModel(None, …)`) — 로컬과 클라우드의 sklearn 버전이 달라도 로드되도록
+- **모니터링** (daily, 데이터가 바뀐 날) : `monitor.py --push` -> HF `monitor/monitor.json` -> `ops.py pull-web` 이 웹 데이터 폴더로 복원 (web_id 와 무관, 실패해도 배포는 진행)
+  - 지표 : 누적 투수×구종(n≥100) ρ(구위, whiff%)·ρ(구위, xwOBAcon) + 투수 군집 bootstrap CI, 3단계 RMSE, 14개 피처 PSI(2025 학습 10분위). 경보 = 누적 ρ whiff < 2025 검증 CI 하한 또는 최근 주 PSI > 0.2 (웹 배지만)
+  - y3 는 1단계 RF + v4 학습 때의 2단계 보정기(OOF 재적합이 sklearn 버전 차이로 1e-4 달라 v4 캐시 y3 에서 4개 모수를 최소제곱 복원, 오차 5e-15)
+  - 모니터링 아티팩트는 `models/` 밖(`monitoring/`)에 둔다 : `models/**` push 는 shap·deploy 를 트리거
+- **gate** (매월 2일 / 수동) : `retrain_gate.py --push` -> Δρ(whiff) CI 하한 > 0 이고 RMSE 악화 없음이면 '교체 권고', 아니면 '유지'. 데이터 기준일이 지난 판정과 같으면 건너뜀(비시즌). 모델 파일은 자동으로 바꾸지 않는다 (교체는 사용자 승인 후 수동). 판정 리포트 `outputs/gate/` 커밋
 - Secrets : `HF_TOKEN`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` (`web/.vercel/project.json`)
 - 로컬에서 HF 데이터로 작업 : `MLB_DATA=store`, 캐시 위치 `MLB_CACHE`(기본 `data_cache/`), 테스트 저장소 `MLB_STORE=<폴더>`
 - `requirements.txt` 버전은 모델을 학습한 로컬 환경과 같게 유지한다 (joblib 호환)

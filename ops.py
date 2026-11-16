@@ -3,7 +3,7 @@
 
     python ops.py update [--days 3]          현재 시즌 최근 N일 Statcast 갱신 -> data_status.json
     python ops.py bootstrap 2025 [--pkl games_25_final.pkl]   시즌 전체 적재 (pkl 없으면 Savant 에서 수집)
-    python ops.py pull-web [--skip 2026]     웹 데이터 스냅샷 -> web/public/data (없는 시즌은 missing 으로 출력)
+    python ops.py pull-web [--skip 2026]     웹 데이터 스냅샷 -> web/public/data (없는 시즌은 missing 으로 출력) + 모니터링 결과(monitor.json)
     python ops.py push-web 2026 ...          web/public/data/{season} -> 스냅샷 업로드
     python ops.py pull-shap [2026] / push-shap 2025 ...   SHAP 캐시 (outputs/{ver}/shap) 내려받기 / 올리기
     python ops.py shap-todo                  적재된 시즌 중 현재 모델 SHAP 캐시가 없는 시즌 (JSON 목록)
@@ -83,6 +83,18 @@ def cmd_bootstrap(args):
     ds.bootstrap_season(args.season, pkl=args.pkl)
 
 
+def pull_monitor(out_dir):
+    """모델 모니터링 결과(monitor.py, 저장소 monitor/monitor.json) -> 웹 데이터 폴더. web_id 와 무관한 경로라 모델이 바뀌어도 유지. 없으면 건너뜀"""
+    import shutil
+    try:
+        src = ds.store().download('monitor/monitor.json')
+    except Exception as e:
+        print(f'  모니터링 결과 없음 ({type(e).__name__})')
+        return
+    shutil.copyfile(src, os.path.join(out_dir, 'monitor.json'))
+    print('  모니터링 결과 복원')
+
+
 def cmd_pull_web(args):
     ew = _ew()
     wid = web_id()
@@ -100,6 +112,7 @@ def cmd_pull_web(args):
             t.extractall(ew.OUT_DIR, filter='data')
         print(f'  스냅샷 {season} 풀기 완료')
     ew.write_meta(ew.available_alts())
+    pull_monitor(ew.OUT_DIR)
     print(f'web_id {wid}, 스냅샷 없음 : {missing}')
     _out(missing=' '.join(map(str, missing)), web_id=wid)
 

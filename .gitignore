@@ -72,11 +72,24 @@
 /outputs/hofnet_review/*
 !/outputs/hofnet_review/results.csv
 !/outputs/hofnet_review/log.txt
+# 재학습 게이트 판정 (gate 워크플로가 커밋)
+!/outputs/gate/
+/outputs/gate/*
+!/outputs/gate/*.md
+!/outputs/gate/*.json
 
 # 클라우드 운영 (GitHub Actions + HF 데이터셋 + Vercel)
 !/.github/
 !/data_store.py
 !/ops.py
+# 모델 모니터링·재학습 게이트 (1·2단계 아티팩트 monitoring/stage12/ 는 git 미추적 -> HF models/stage12/)
+!/mlops_common.py
+!/monitor.py
+!/retrain_gate.py
+!/build_monitor_ref.py
+!/monitoring/
+/monitoring/*
+!/monitoring/*.json
 !/requirements.txt
 !/data_status.json
 # 모델 : 웹 모델(v3) + 예비(v3_h4) + 직전 웹 모델(v2, 되돌리기용) 추적 (클라우드 배치가 git 의 모델로 점수 계산)
