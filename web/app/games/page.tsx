@@ -12,6 +12,8 @@ import { pitchColor, stuffColor, useDarkMode } from "@/lib/colors";
 import { batterName, gameLabel, ipText, paResult, runnersText, scoreText, signedPct, situation } from "@/lib/games";
 import { useT } from "@/lib/i18n";
 import type { GameRow, Meta, PaRow, Pitch, PitcherFile } from "@/lib/types";
+import Icon from "@/components/Icon";
+import { TeamLogo } from "@/components/Avatar";
 
 const MIN_GAME_PITCHES = 15; // 구위 하이라이트 경기 최소 투구
 const MIN_PA_PITCHES = 3; // 구위 하이라이트 타석 최소 투구
@@ -58,7 +60,8 @@ export default function GamesPage() {
       <PitcherHeader
         title={t.title}
         name={entry?.name ?? null}
-        info={entry ? `${tt.common.throws(entry.throws)} · ${entry.teams.join(" → ")} · ${t.info(season, file ? file.games.length : null)}` : t.idle}
+        info={entry ? `${tt.common.throws(entry.throws)} · ${t.info(season, file ? file.games.length : null)}` : t.idle}
+        teams={entry?.teams}
         stuff={entry?.stuff}
         season={season}
         pitcherId={entry ? pitcherId : null}
@@ -99,7 +102,7 @@ export default function GamesPage() {
                     (() => {
                       const top = file.games.map((x, gi) => ({ x, gi })).filter(({ x }) => effGt.includes(x.gt)).sort((a, b) => b.x.imp - a.x.imp)[0];
                       return top ? (
-                        <button className="mt-3 rounded-lg bg-ink text-surface text-sm font-medium px-4 py-2 hover:opacity-90" onClick={() => pickGame(top.gi)}>
+                        <button className="mt-3 rounded-xl bg-accent text-white text-[15px] font-semibold px-5 py-2.5 hover:brightness-95 transition" onClick={() => pickGame(top.gi)}>
                           {t.firstRec}
                         </button>
                       ) : null;
@@ -207,7 +210,7 @@ function RecGroup({ title, note, children }: { title: string; note: string; chil
 function RecItem({ main, sub, value, valueLabel, active, onClick, tone }: { main: string; sub: string; value: string; valueLabel: string; active: boolean; onClick: () => void; tone?: "good" | "bad" }) {
   return (
     <li>
-      <button onClick={onClick} aria-pressed={active} className={`w-full text-left flex items-center gap-2 px-2 py-2 border-b border-grid hover:bg-surface-2 transition-colors ${active ? "bg-accent-soft shadow-[inset_2px_0_0_var(--accent)]" : ""}`}>
+      <button onClick={onClick} aria-pressed={active} className={`w-full text-left flex items-center gap-2 px-3 py-2.5 rounded-xl transition-colors ${active ? "bg-accent-soft" : "hover:bg-surface-2"}`}>
         <span className="flex-1 min-w-0">
           <span className="block truncate text-ink">{main}</span>
           <span className="block truncate text-xs text-muted">{sub}</span>
@@ -229,10 +232,11 @@ function ManualPicker({ games, game, onPick }: { games: { g: GameRow; gi: number
   return (
     <div className="flex flex-col gap-2 text-sm">
       <input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder={t.searchPh} aria-label={t.searchAria} />
-      <ul className="max-h-[560px] overflow-y-auto border-t border-grid">
+      <ul className="max-h-[560px] overflow-y-auto">
         {shown.map(({ g, gi }) => (
           <li key={gi}>
-            <button onClick={() => onPick(gi)} aria-pressed={game === gi} className={`w-full text-left grid grid-cols-[1fr_auto_auto] items-center gap-x-3 px-1.5 py-1.5 border-b border-grid hover:bg-surface-2 ${game === gi ? "bg-surface-2" : ""}`}>
+            <button onClick={() => onPick(gi)} aria-pressed={game === gi} className={`w-full text-left grid grid-cols-[auto_1fr_auto_auto] items-center gap-x-3 px-2.5 py-2 rounded-xl transition-colors ${game === gi ? "bg-accent-soft" : "hover:bg-surface-2"}`}>
+              <TeamLogo abbr={g.opp} size={20} />
               <span className="truncate">
                 <span className="text-ink">{gameLabel(g, tt)}</span>
                 <span className="text-xs text-muted ml-2">{g.st ? t.starter : t.reliever}</span>
@@ -272,14 +276,15 @@ function GameSummary({ g }: { g: GameRow }) {
       title={`${gameLabel(g, tt, false)} · ${tt.rounds[g.rd] ?? g.rd}`}
       sub={t.summarySub}
       right={
-        <a className="text-xs text-accent-ink underline underline-offset-2" href={`https://baseballsavant.mlb.com/gamefeed?gamePk=${g.pk}`} target="_blank" rel="noreferrer">
+        <a className="inline-flex items-center gap-0.5 text-[13px] font-medium text-accent-ink hover:underline underline-offset-2" href={`https://baseballsavant.mlb.com/gamefeed?gamePk=${g.pk}`} target="_blank" rel="noreferrer">
           {tt.common.savantFeed}
+          <Icon name="arrowUpRight" size={14} />
         </a>
       }
     >
       <dl className="grid grid-cols-2 sm:grid-cols-5 gap-2">
         {cells.map(([l, v]) => (
-          <div key={l} className="rounded-xl bg-surface-2 px-3.5 py-2.5">
+          <div key={l} className="rounded-2xl bg-surface-2 px-4 py-3">
             <dt className="text-xs text-muted">{l}</dt>
             <dd className="text-lg num text-ink mt-0.5">{v}</dd>
           </div>
@@ -345,7 +350,8 @@ function PaView({ file, meta, p, ps, gamePs, onBack, onPick }: { file: PitcherFi
       title={t.paView(batterName(file, p), !!p.lhb)}
       sub={t.paViewSub(situation(p, tt), paResult(p, tt), signedPct(p.wpa))}
       right={
-        <button className="text-xs text-accent-ink underline underline-offset-2" onClick={onBack}>
+        <button className="inline-flex items-center gap-0.5 text-[13px] font-medium text-accent-ink hover:underline underline-offset-2" onClick={onBack}>
+          <Icon name="chevronLeft" size={14} />
           {t.back}
         </button>
       }

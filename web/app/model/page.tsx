@@ -6,10 +6,11 @@ import Methodology from "@/components/Methodology";
 import { loadMonitor } from "@/lib/data";
 import { useT } from "@/lib/i18n";
 import type { Monitor, MonitorMetrics } from "@/lib/types";
+import Icon from "@/components/Icon";
 
 const AXIS = { stroke: "var(--axis)", tick: { fill: "var(--muted)", fontSize: 11 }, tickLine: false };
 const tooltipStyle = {
-  contentStyle: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 8, fontSize: 12, color: "var(--ink)" },
+  contentStyle: { background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, fontSize: 12, color: "var(--ink)", boxShadow: "var(--shadow-pop)" },
   labelStyle: { color: "var(--ink)", fontWeight: 600 },
   itemStyle: { color: "var(--ink-2)" },
 };
@@ -36,7 +37,7 @@ export default function ModelPage() {
   }, []);
 
   return (
-    <main className="mx-auto w-full max-w-[1280px] px-4 pb-10 flex flex-col gap-5">
+    <main className="mx-auto w-full max-w-[1280px] px-4 pb-12 flex flex-col gap-5">
       {mon === undefined ? (
         <div className="pt-5">
           <LoadingBlock label={tt.common.seasonLoading} rows={4} />
@@ -60,25 +61,28 @@ function Body({ mon, metric, setMetric }: { mon: Monitor; metric: Metric; setMet
   const base = mon.ref.baseline;
   const featName = (f: string) => t.feat[f] ?? f;
 
-  const statusTone = mon.status === "ok" ? "text-good" : mon.status === "warn" ? "text-bad" : "text-muted";
+  const statusTone = mon.status === "ok" ? "text-good bg-good/10" : mon.status === "warn" ? "text-bad bg-bad/10" : "text-muted bg-surface-3";
   const statusDot = mon.status === "ok" ? "bg-good" : mon.status === "warn" ? "bg-bad" : "bg-muted";
 
   return (
     <>
-      <header className="pt-6 flex flex-col gap-2">
+      <header className="pt-8 flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-3">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-ink">{t.title}</h1>
-          <span className={`inline-flex items-center gap-1.5 rounded-full border border-line px-3 py-1 text-xs font-semibold ${statusTone}`}>
+          <h1 className="text-[28px] sm:text-[32px] font-bold tracking-tight text-ink leading-tight">{t.title}</h1>
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[13px] font-semibold ${statusTone}`}>
             <span className={`w-2 h-2 rounded-full ${statusDot}`} aria-hidden="true" />
             {t.status[mon.status]}
           </span>
-          {mon.offseason && <span className="rounded-full bg-surface-2 px-3 py-1 text-xs text-muted">{t.offseason}</span>}
+          {mon.offseason && <span className="rounded-full bg-surface-3 px-3 py-1 text-[13px] font-medium text-ink-2">{t.offseason}</span>}
         </div>
         <p className="text-sm text-muted">{t.sub(mon.season, mon.dataThrough, mon.generatedAt)}</p>
         {mon.reasons.length > 0 && (
-          <ul className="text-sm text-bad list-disc pl-5">
+          <ul className="card px-5 py-4 mt-2 flex flex-col gap-1.5 text-sm text-bad">
             {mon.reasons.map((r, i) => (
-              <li key={i}>{r.code === "rho" ? t.reasonRho(f3s(r.value), f3s(r.limit)) : t.reasonPsi(featName(r.feature ?? ""), r.value.toFixed(3))}</li>
+              <li key={i} className="flex items-start gap-2">
+                <Icon name="trendDown" size={15} strokeWidth={2} className="mt-0.5" />
+                {r.code === "rho" ? t.reasonRho(f3s(r.value), f3s(r.limit)) : t.reasonPsi(featName(r.feature ?? ""), r.value.toFixed(3))}
+              </li>
             ))}
           </ul>
         )}
@@ -120,14 +124,14 @@ function Body({ mon, metric, setMetric }: { mon: Monitor; metric: Metric; setMet
 
 function Tile({ label, value, ci, sub, base }: { label: string; value: string; ci?: string; sub: string; base: string }) {
   return (
-    <div className="card p-4 flex flex-col gap-1">
-      <p className="text-xs text-muted">{label}</p>
-      <p className="flex items-baseline gap-2">
-        <span className="num text-2xl font-semibold text-ink">{value}</span>
-        {ci && <span className="num text-xs text-muted">{ci}</span>}
+    <div className="card px-5 py-5 sm:px-6 flex flex-col gap-1">
+      <p className="text-[13px] text-muted">{label}</p>
+      <p className="flex items-baseline gap-2 mt-0.5">
+        <span className="num text-[28px] text-ink">{value}</span>
+        {ci && <span className="tnum text-xs text-muted">{ci}</span>}
       </p>
-      <p className="text-[11px] text-muted">{sub}</p>
-      <p className="text-[11px] text-ink-2">{base}</p>
+      <p className="text-xs text-muted mt-1">{sub}</p>
+      <p className="text-xs text-ink-2">{base}</p>
     </div>
   );
 }
@@ -181,7 +185,7 @@ function DriftCharts({ mon, featName }: { mon: Monitor; featName: (f: string) =>
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
       <div>
-        <p className="text-xs font-semibold text-ink-2 mb-2">{t.psiSeason}</p>
+        <p className="text-[13px] font-semibold text-ink-2 mb-3">{t.psiSeason}</p>
         <div className="h-[360px]">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={bars} layout="vertical" margin={{ top: 4, right: 16, left: 8, bottom: 0 }}>
@@ -197,7 +201,7 @@ function DriftCharts({ mon, featName }: { mon: Monitor; featName: (f: string) =>
         </div>
       </div>
       <div>
-        <p className="text-xs font-semibold text-ink-2 mb-2">{t.psiWeekMax}</p>
+        <p className="text-[13px] font-semibold text-ink-2 mb-3">{t.psiWeekMax}</p>
         <div className="h-[360px]">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={weekly} margin={{ top: 4, right: 12, left: -12, bottom: 0 }}>
@@ -236,7 +240,7 @@ function GateCard({ mon }: { mon: Monitor }) {
       title={t.gate}
       sub={t.gateSub(g.holdout[0], g.holdout[1])}
       right={
-        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${replace ? "border-bad text-bad" : "border-line text-ink"}`}>
+        <span className={`rounded-full px-3 py-1 text-[13px] font-semibold ${replace ? "bg-bad/10 text-bad" : "bg-surface-2 text-ink"}`}>
           {t.decision[g.decision]} · {g.date}
         </span>
       }
@@ -244,28 +248,28 @@ function GateCard({ mon }: { mon: Monitor }) {
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-xs text-muted text-left border-b border-line">
-              <th className="py-2 pr-3 font-medium">{t.colMetric}</th>
-              <th className="py-2 px-3 font-medium text-right">{t.colChampion}</th>
-              <th className="py-2 px-3 font-medium text-right">{t.colChallenger}</th>
-              <th className="py-2 px-3 font-medium text-right">{t.colDelta}</th>
-              <th className="py-2 pl-3 font-medium text-right">{t.colCI}</th>
+            <tr className="text-[13px] text-muted text-left border-b border-line">
+              <th className="py-2.5 pr-3 font-normal">{t.colMetric}</th>
+              <th className="py-2.5 px-3 font-normal text-right">{t.colChampion}</th>
+              <th className="py-2.5 px-3 font-normal text-right">{t.colChallenger}</th>
+              <th className="py-2.5 px-3 font-normal text-right">{t.colDelta}</th>
+              <th className="py-2.5 pl-3 font-normal text-right">{t.colCI}</th>
             </tr>
           </thead>
           <tbody>
             {rows.map(([name, a, b, d, c, nd]) => (
               <tr key={name} className="border-b border-line last:border-0">
-                <td className="py-2 pr-3 text-ink-2">{name}</td>
-                <td className="py-2 px-3 text-right num">{a === null ? "-" : a.toFixed(nd)}</td>
-                <td className="py-2 px-3 text-right num">{b === null ? "-" : b.toFixed(nd)}</td>
-                <td className="py-2 px-3 text-right num">{sgn(d, nd)}</td>
-                <td className="py-2 pl-3 text-right num text-muted">{c ? `[${sgn(c[0])}, ${sgn(c[1])}]` : "-"}</td>
+                <td className="py-3 pr-3 text-ink-2">{name}</td>
+                <td className="py-3 px-3 text-right num">{a === null ? "-" : a.toFixed(nd)}</td>
+                <td className="py-3 px-3 text-right num">{b === null ? "-" : b.toFixed(nd)}</td>
+                <td className="py-3 px-3 text-right num">{sgn(d, nd)}</td>
+                <td className="py-3 pl-3 text-right num text-muted">{c ? `[${sgn(c[0])}, ${sgn(c[1])}]` : "-"}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
-      <p className="text-[11px] text-muted mt-3">{t.gateRule}</p>
+      <p className="text-xs text-muted mt-4">{t.gateRule}</p>
     </Section>
   );
 }
@@ -292,7 +296,7 @@ function ModelCard({ mon, featName }: { mon: Monitor; featName: (f: string) => s
   ];
   return (
     <Section title={t.card}>
-      <dl className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-x-4 gap-y-2 text-sm">
+      <dl className="grid grid-cols-1 sm:grid-cols-[160px_1fr] gap-x-6 gap-y-3 text-sm">
         {items.map(([k, v]) => (
           <div key={k} className="contents">
             <dt className="text-muted">{k}</dt>

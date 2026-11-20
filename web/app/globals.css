@@ -3,69 +3,72 @@
 /* 테마 : 기본은 OS 설정, 사용자가 고르면 html[data-theme] 로 고정 (lib/theme.ts) */
 :root {
   color-scheme: light;
-  --page: #f4f4f1;
+  --page: #f2f4f6;
   --surface: #ffffff;
-  --surface-2: #f1f1ed;
-  --surface-3: #e8e7e2;
-  --ink: #111110;
-  --ink-2: #4a4945;
-  --muted: #86857f;
-  --grid: #e9e8e3;
-  --axis: #c3c2b7;
-  --border: rgba(17, 17, 16, 0.08);
-  --border-strong: rgba(17, 17, 16, 0.16);
-  --accent: #2a78d6;
-  --accent-ink: #1c5cab;
-  --accent-soft: rgba(42, 120, 214, 0.1);
-  --good: #0a7a2f;
-  --bad: #c0352b;
-  --zone-line: #52514e;
-  --shadow: 0 1px 2px rgba(17, 17, 16, 0.04), 0 1px 1px rgba(17, 17, 16, 0.02);
+  --surface-2: #f2f4f6;
+  --surface-3: #e5e8eb;
+  --ink: #191f28;
+  --ink-2: #4e5968;
+  --muted: #8b95a1;
+  --grid: #eef0f3;
+  --axis: #c9cfd6;
+  --border: rgba(0, 23, 51, 0.06);
+  --border-strong: rgba(0, 23, 51, 0.13);
+  --accent: #3182f6;
+  --accent-ink: #1b64da;
+  --accent-soft: rgba(49, 130, 246, 0.1);
+  --good: #0f9d58;
+  --bad: #e42939;
+  --zone-line: #4e5968;
+  --shadow: none;
+  --shadow-pop: 0 8px 28px rgba(0, 23, 51, 0.12), 0 1px 3px rgba(0, 23, 51, 0.06);
 }
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --page: #0c0d0f;
-  --surface: #15161a;
-  --surface-2: #1d1f23;
-  --surface-3: #272a2f;
-  --ink: #f3f3f1;
-  --ink-2: #bdbcb6;
-  --muted: #7f7e79;
-  --grid: #25272b;
-  --axis: #3a3c40;
-  --border: rgba(255, 255, 255, 0.07);
-  --border-strong: rgba(255, 255, 255, 0.14);
-  --accent: #4b93ea;
-  --accent-ink: #8ebcf2;
-  --accent-soft: rgba(75, 147, 234, 0.14);
-  --good: #3cc46a;
-  --bad: #f06a5f;
-  --zone-line: #c3c2b7;
+  --page: #101013;
+  --surface: #1b1b20;
+  --surface-2: #26262c;
+  --surface-3: #303037;
+  --ink: #f2f3f5;
+  --ink-2: #b0b8c1;
+  --muted: #7e8590;
+  --grid: #2a2a31;
+  --axis: #41414a;
+  --border: rgba(255, 255, 255, 0.06);
+  --border-strong: rgba(255, 255, 255, 0.13);
+  --accent: #4c94f8;
+  --accent-ink: #90bdfb;
+  --accent-soft: rgba(76, 148, 248, 0.16);
+  --good: #3cc47c;
+  --bad: #f25c69;
+  --zone-line: #b0b8c1;
   --shadow: none;
+  --shadow-pop: 0 10px 32px rgba(0, 0, 0, 0.5);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --page: #0c0d0f;
-    --surface: #15161a;
-    --surface-2: #1d1f23;
-    --surface-3: #272a2f;
-    --ink: #f3f3f1;
-    --ink-2: #bdbcb6;
-    --muted: #7f7e79;
-    --grid: #25272b;
-    --axis: #3a3c40;
-    --border: rgba(255, 255, 255, 0.07);
-    --border-strong: rgba(255, 255, 255, 0.14);
-    --accent: #4b93ea;
-    --accent-ink: #8ebcf2;
-    --accent-soft: rgba(75, 147, 234, 0.14);
-    --good: #3cc46a;
-    --bad: #f06a5f;
-    --zone-line: #c3c2b7;
+    --page: #101013;
+    --surface: #1b1b20;
+    --surface-2: #26262c;
+    --surface-3: #303037;
+    --ink: #f2f3f5;
+    --ink-2: #b0b8c1;
+    --muted: #7e8590;
+    --grid: #2a2a31;
+    --axis: #41414a;
+    --border: rgba(255, 255, 255, 0.06);
+    --border-strong: rgba(255, 255, 255, 0.13);
+    --accent: #4c94f8;
+    --accent-ink: #90bdfb;
+    --accent-soft: rgba(76, 148, 248, 0.16);
+    --good: #3cc47c;
+    --bad: #f25c69;
+    --zone-line: #b0b8c1;
     --shadow: none;
+    --shadow-pop: 0 10px 32px rgba(0, 0, 0, 0.5);
   }
 }
 
@@ -92,7 +95,8 @@ html,
 body {
   background: var(--page);
   color: var(--ink);
-  letter-spacing: -0.005em;
+  letter-spacing: -0.01em;
+  word-break: keep-all;
 }
 
 /* 영어 방문자 : 정적 HTML(한국어)이 보이지 않도록 하이드레이션까지 가림 (lib/i18n/init.ts) */
@@ -100,11 +104,20 @@ html.lang-pending body {
   visibility: hidden;
 }
 
+/* 카드 : 테두리 없이 배경 대비로 구분 (다크는 아주 옅은 테두리) */
 .card {
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: 1px solid transparent;
+  border-radius: 20px;
   box-shadow: var(--shadow);
+}
+:root[data-theme="dark"] .card {
+  border-color: var(--border);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .card {
+    border-color: var(--border);
+  }
 }
 a.card,
 button.card {
@@ -112,7 +125,15 @@ button.card {
 }
 a.card:hover,
 button.card:hover {
-  border-color: var(--border-strong);
+  background-color: var(--surface-2);
+}
+
+/* 떠 있는 층 (검색 결과 등) */
+.pop {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-pop);
 }
 
 .tnum {
@@ -122,16 +143,14 @@ button.card:hover {
 /* 큰 숫자 (KPI·구위 점수) */
 .num {
   font-variant-numeric: tabular-nums;
-  letter-spacing: -0.02em;
-  font-weight: 650;
+  letter-spacing: -0.025em;
+  font-weight: 700;
 }
 
-/* 섹션 위 작은 대문자 라벨 */
+/* 섹션 위 작은 라벨 */
 .eyebrow {
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
   color: var(--muted);
 }
 
@@ -139,12 +158,13 @@ button.card:hover {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 10px;
+  padding: 4px 12px;
   border-radius: 999px;
-  border: 1px solid var(--border);
-  font-size: 12px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 500;
   color: var(--ink-2);
-  background: var(--surface);
+  background: var(--surface-2);
   cursor: pointer;
   user-select: none;
   min-height: 28px;
@@ -152,7 +172,7 @@ button.card:hover {
   transition: background-color 0.12s, border-color 0.12s, color 0.12s;
 }
 .chip:hover:not(:disabled) {
-  border-color: var(--border-strong);
+  background: var(--surface-3);
   color: var(--ink);
 }
 .chip[aria-pressed="true"] {
@@ -177,9 +197,9 @@ select,
 input[type="text"],
 input[type="search"],
 input[type="number"] {
-  background: var(--surface);
-  border: 1px solid var(--border-strong);
-  border-radius: 10px;
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: 12px;
   padding: 8px 12px;
   font-size: 14px;
   color: var(--ink);
@@ -188,6 +208,7 @@ input[type="number"] {
 }
 input[type="text"]:focus,
 input[type="search"]:focus {
+  background: var(--surface);
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
   outline: none;

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Script from "next/script";
 import "./globals.css";
 import AppNav from "@/components/AppNav";
+import SiteFooter from "@/components/SiteFooter";
 import { LANG_INIT_SCRIPT } from "@/lib/i18n/init";
 
 export const metadata: Metadata = {
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         </Script>
         <AppNav />
         {children}
+        <SiteFooter />
       </body>
     </html>
   );

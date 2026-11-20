@@ -33,7 +33,8 @@ export default function ExplainShell({
       <PitcherHeader
         title={t.titles[active]}
         name={entry?.name ?? null}
-        info={entry ? `${tt.common.throws(entry.throws)} · ${entry.teams.join(" → ")} · ${t.info(season)}` : t.idle}
+        info={entry ? `${tt.common.throws(entry.throws)} · ${t.info(season)}` : t.idle}
+        teams={entry?.teams}
         stuff={entry?.stuff}
         season={season}
         pitcherId={entry ? pitcherId : null}

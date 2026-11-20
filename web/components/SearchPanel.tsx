@@ -2,6 +2,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { PitcherEntry, SeasonIndex } from "@/lib/types";
 import { useT } from "@/lib/i18n";
+import Icon from "@/components/Icon";
+import { PlayerPhoto, TeamLogos } from "@/components/Avatar";
 
 const normalize = (s: string) =>
   s
@@ -34,7 +36,7 @@ export default function SearchPanel({ index, selectedId, onSelect, compact = fal
 
   return (
     <div className={hero ? "" : "card p-4"}>
-      <div role="tablist" aria-label={t.modeAria} className="flex gap-1 mb-3 text-sm">
+      <div role="tablist" aria-label={t.modeAria} className="inline-flex rounded-[10px] bg-surface-2 p-[3px] mb-3 text-sm">
         {(
           [
             ["name", t.byName],
@@ -46,7 +48,7 @@ export default function SearchPanel({ index, selectedId, onSelect, compact = fal
             role="tab"
             aria-selected={mode === key}
             onClick={() => setMode(key)}
-            className={`px-3 py-1.5 rounded-lg transition-colors ${mode === key ? "bg-ink text-surface font-medium" : "text-ink-2 hover:bg-surface-2"}`}
+            className={`px-3.5 py-1.5 rounded-[8px] font-medium transition-colors ${mode === key ? "bg-surface text-ink font-semibold shadow-[0_1px_2px_rgba(0,23,51,0.08)]" : "text-muted hover:text-ink"}`}
           >
             {label}
           </button>
@@ -97,6 +99,7 @@ function NameSearch({ pitchers, onSelect, small = false, large = false, placehol
 
   return (
     <div ref={boxRef} className="relative">
+      <Icon name="search" size={large ? 20 : 16} className={`absolute top-1/2 -translate-y-1/2 text-muted pointer-events-none ${large ? "left-4" : "left-3"}`} />
       <input
         type="search"
         role="combobox"
@@ -104,7 +107,7 @@ function NameSearch({ pitchers, onSelect, small = false, large = false, placehol
         aria-controls="pitcher-results"
         aria-label={t.nameAria}
         placeholder={placeholder ?? t.placeholder}
-        className={`w-full ${small ? "!min-h-9 !py-1.5 !text-sm" : ""} ${large ? "!min-h-12 !text-base !px-4 !rounded-xl" : ""}`}
+        className={`w-full ${small ? "!min-h-9 !py-1.5 !text-sm !pl-9" : "!pl-10"} ${large ? "!min-h-14 !text-[17px] !pl-12 !pr-4 !rounded-2xl" : ""}`}
         value={q}
         onChange={(e) => (setQ(e.target.value), setOpen(true), setActive(0))}
         onFocus={() => setOpen(true)}
@@ -120,8 +123,8 @@ function NameSearch({ pitchers, onSelect, small = false, large = false, placehol
         }}
       />
       {open && q && (
-        <ul id="pitcher-results" role="listbox" className={`absolute z-40 mt-1 card !shadow-xl max-h-80 overflow-auto py-1 ${small ? "right-0 w-[min(92vw,380px)]" : "w-full"}`}>
-          {results.length === 0 && <li className="px-3 py-2 text-sm text-muted">{t.none}</li>}
+        <ul id="pitcher-results" role="listbox" className={`absolute z-40 mt-2 pop max-h-96 overflow-auto p-1.5 ${small ? "right-0 w-[min(92vw,400px)]" : "w-full"}`}>
+          {results.length === 0 && <li className="px-3 py-2.5 text-sm text-muted">{t.none}</li>}
           {results.map((p, i) => (
             <li
               key={p.id}
@@ -129,15 +132,17 @@ function NameSearch({ pitchers, onSelect, small = false, large = false, placehol
               aria-selected={i === active}
               onMouseEnter={() => setActive(i)}
               onMouseDown={(e) => (e.preventDefault(), pick(p))}
-              className={`px-3 py-2 text-sm flex justify-between gap-3 cursor-pointer ${i === active ? "bg-surface-2" : ""}`}
+              className={`px-2.5 py-2 text-sm flex items-center gap-3 rounded-xl cursor-pointer ${i === active ? "bg-surface-2" : ""}`}
             >
-              <span>
-                <span className="font-medium">{p.name}</span>
-                <span className="text-muted ml-2">
+              <PlayerPhoto id={p.id} name={p.name} size={32} />
+              <span className="flex-1 min-w-0">
+                <span className="block truncate font-semibold text-ink">{p.name}</span>
+                <span className="flex items-center gap-1.5 text-xs text-muted mt-0.5">
+                  <TeamLogos teams={p.teams} size={13} />
                   {p.throws}HP · {p.teams.join(" / ")}
                 </span>
               </span>
-              <span className="text-muted tnum shrink-0">
+              <span className="text-xs text-muted tnum shrink-0">
                 {t.resultMeta(p.n, p.stuff?.toFixed(1) ?? "-")}
               </span>
             </li>
