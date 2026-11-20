@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { loadIndex, loadLeague, loadMeta, loadPitches } from "./data";
-import { DEFAULT_MODEL, getModel, parseModel, setModel, useModel, type ModelId } from "./model";
+import { DATA_BASE_MODEL, DEFAULT_MODEL, getModel, parseModel, setModel, useModel, type ModelId } from "./model";
 import type { League, Meta, Pitch, PitcherFile, SeasonIndex } from "./types";
 
 // ---------------------------------------------------------------------------
@@ -31,7 +31,7 @@ export function useNavCtx(): NavCtx {
   );
 }
 
-/** 맥락을 쿼리 문자열로 (extra 는 페이지 고유 키). 구위 모델은 현재 선택이 기본(lgbm)이 아닐 때만 model= 로 붙는다 */
+/** 맥락을 쿼리 문자열로 (extra 는 페이지 고유 키). 구위 모델은 현재 선택이 웹 기본(DEFAULT_MODEL)이 아닐 때만 model= 로 붙는다 */
 export function ctxHref(path: string, c: Partial<NavCtx>, extra: Record<string, string | number | null | undefined> = {}) {
   const q = new URLSearchParams();
   if (c.season) q.set("season", String(c.season));
@@ -77,7 +77,7 @@ export function usePageState(extra: Record<string, string | number | null | unde
         const q = readQuery();
         const s = numParam(q, "season");
         const md = parseModel(q.get("model"));
-        setModel(m.models?.some((x) => x.id === md) ? md : DEFAULT_MODEL); // 데이터에 없는 모델이면 기본
+        setModel(m.models?.some((x) => x.id === md) ? md : DATA_BASE_MODEL); // 데이터에 없는 모델이면 항상 있는 기준 모델
         setMeta(m);
         setSeason(s && m.seasons.includes(s) ? s : m.seasons[0]);
         setPitcherId(numParam(q, "pitcher"));
