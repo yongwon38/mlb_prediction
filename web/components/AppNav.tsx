@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { ctxHref, useNavCtx } from "@/lib/appState";
 import { loadMeta } from "@/lib/data";
 import { type Lang, setLang, useLangEffects, useT } from "@/lib/i18n";
-import { type ModelId, setModel, useModel } from "@/lib/model";
+import { type ModelId, SHOW_MODEL_PICKER, setModel, useModel } from "@/lib/model";
 import { type Theme, setTheme, useTheme } from "@/lib/theme";
 import { ko } from "@/lib/i18n/ko";
 import { en } from "@/lib/i18n/en";
@@ -63,7 +63,7 @@ export default function AppNav() {
   }, []);
   const controls = (
     <div className="flex items-center gap-2 pl-3 shrink-0">
-      {models.length > 1 && <Segmented label={t.model.aria} value={model} options={models.map((m) => [m, t.model.names[m]])} onChange={setModel} titles={t.model.titles} />}
+      {SHOW_MODEL_PICKER && models.length > 1 && <Segmented label={t.model.aria} value={model} options={models.map((m) => [m, t.model.names[m]])} onChange={setModel} titles={t.model.titles} />}
       <Segmented label={t.langAria} value={lang} options={LANGS} onChange={setLang} />
       <button
         onClick={() => setTheme(THEME_NEXT[theme])}
@@ -104,7 +104,7 @@ export default function AppNav() {
           <div className="px-4 py-1.5 flex justify-end">{controls}</div>
         </div>
       </nav>
-      {model !== "lgbm" && (
+      {SHOW_MODEL_PICKER && model === "hof" && (
         <div role="note" className="border-b border-line bg-accent-soft text-xs text-ink-2">
           <p className="mx-auto w-full max-w-[1280px] px-4 py-2.5 flex items-start gap-2"><Icon name="layers" size={15} className="mt-px text-accent" />{t.model.notice}</p>
         </div>
