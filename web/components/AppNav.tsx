@@ -9,6 +9,7 @@ import { type ModelId, setModel, useModel } from "@/lib/model";
 import { type Theme, setTheme, useTheme } from "@/lib/theme";
 import { ko } from "@/lib/i18n/ko";
 import { en } from "@/lib/i18n/en";
+import Icon, { type IconName, LogoMark } from "@/components/Icon";
 
 const ITEMS = [
   { href: "/", key: "home", match: (p: string) => p === "/" },
@@ -24,50 +25,19 @@ const LANGS: [Lang, string][] = [
 
 const THEME_NEXT: Record<Theme, Theme> = { system: "light", light: "dark", dark: "system" };
 
-/** 로고 : 야구공 (원 + 실밥 두 줄) */
-export function LogoMark({ size = 22 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true">
-      <circle cx="12" cy="12" r="10.5" fill="var(--ink)" />
-      <path d="M7.2 3.6c2.3 2.2 3.3 5 3.3 8.4s-1 6.2-3.3 8.4M16.8 3.6c-2.3 2.2-3.3 5-3.3 8.4s1 6.2 3.3 8.4" fill="none" stroke="#e5484d" strokeWidth="1.6" strokeLinecap="round" />
-    </svg>
-  );
-}
-
-function ThemeIcon({ theme }: { theme: Theme }) {
-  const common = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 1.8, strokeLinecap: "round" as const, strokeLinejoin: "round" as const, "aria-hidden": true };
-  if (theme === "light")
-    return (
-      <svg {...common}>
-        <circle cx="12" cy="12" r="4" />
-        <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" />
-      </svg>
-    );
-  if (theme === "dark")
-    return (
-      <svg {...common}>
-        <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" />
-      </svg>
-    );
-  return (
-    <svg {...common}>
-      <rect x="3" y="4" width="18" height="12" rx="2" />
-      <path d="M8 20h8M12 16v4" />
-    </svg>
-  );
-}
+const THEME_ICON: Record<Theme, IconName> = { light: "sun", dark: "moon", system: "monitor" };
 
 /** 세그먼트 컨트롤 (모델·언어) */
 function Segmented<T extends string>({ value, options, onChange, label, titles }: { value: T; options: [T, string][]; onChange: (v: T) => void; label: string; titles?: Record<string, string> }) {
   return (
-    <div role="group" aria-label={label} className="flex rounded-lg bg-surface-2 p-0.5 text-xs shrink-0">
+    <div role="group" aria-label={label} className="flex rounded-[10px] bg-surface-2 p-[3px] text-xs shrink-0">
       {options.map(([k, l]) => (
         <button
           key={k}
           aria-pressed={value === k}
           title={titles?.[k]}
           onClick={() => onChange(k)}
-          className={`px-2.5 py-1 rounded-md transition-colors ${value === k ? "bg-surface text-ink font-semibold shadow-sm" : "text-muted hover:text-ink"}`}
+          className={`px-2.5 py-1 rounded-[8px] font-medium transition-colors ${value === k ? "bg-surface text-ink font-semibold shadow-[0_1px_2px_rgba(0,23,51,0.08)]" : "text-muted hover:text-ink"}`}
         >
           {l}
         </button>
@@ -98,21 +68,21 @@ export default function AppNav() {
         onClick={() => setTheme(THEME_NEXT[theme])}
         aria-label={`${t.theme.aria}: ${t.theme[theme]}`}
         title={`${t.theme.aria}: ${t.theme[theme]}`}
-        className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-2 hover:text-ink hover:bg-surface-2"
+        className="w-9 h-9 rounded-[10px] flex items-center justify-center text-ink-2 hover:text-ink hover:bg-surface-2 transition-colors"
       >
-        <ThemeIcon theme={theme} />
+        <Icon name={THEME_ICON[theme]} size={18} />
       </button>
     </div>
   );
   return (
     <>
-      <nav className="sticky top-0 z-30 border-b border-line bg-page/80 backdrop-blur-md">
-        <div className="mx-auto w-full max-w-[1280px] px-4 h-14 flex items-center gap-1">
-          <Link href={ctxHref("/", { season: c.season, gt: c.gt })} className="flex items-center gap-2 font-bold tracking-tight text-ink mr-3 shrink-0">
-            <LogoMark />
-            <span className="text-[15px] hidden min-[420px]:inline">Stuff Lab</span>
+      <nav className="sticky top-0 z-30 border-b border-line bg-surface/90 backdrop-blur-md">
+        <div className="mx-auto w-full max-w-[1280px] px-4 h-[60px] flex items-stretch gap-1">
+          <Link href={ctxHref("/", { season: c.season, gt: c.gt })} className="flex items-center gap-2 font-bold tracking-tight text-ink mr-4 shrink-0">
+            <LogoMark size={24} />
+            <span className="text-[17px] hidden min-[420px]:inline">Stuff Lab</span>
           </Link>
-          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar min-w-0 flex-1">
+          <div className="flex items-stretch gap-1 overflow-x-auto no-scrollbar min-w-0 flex-1">
             {ITEMS.map((it) => {
               const active = it.match(path);
               return (
@@ -120,14 +90,14 @@ export default function AppNav() {
                   key={it.href}
                   href={ctxHref(it.href, it.href === "/" ? { season: c.season, gt: c.gt } : c)}
                   aria-current={active ? "page" : undefined}
-                  className={`shrink-0 px-3 py-1.5 rounded-lg text-sm transition-colors ${active ? "bg-surface-2 text-ink font-semibold" : "text-ink-2 hover:text-ink hover:bg-surface-2/60"}`}
+                  className={`shrink-0 flex items-center px-3 text-[15px] border-b-2 transition-colors ${active ? "border-ink text-ink font-semibold" : "border-transparent text-muted hover:text-ink"}`}
                 >
                   {t.nav[it.key]}
                 </Link>
               );
             })}
           </div>
-          <div className="hidden md:flex">{controls}</div>
+          <div className="hidden md:flex items-center">{controls}</div>
         </div>
         <div className="md:hidden border-t border-line">
           <div className="px-4 py-1.5 flex justify-end">{controls}</div>
@@ -135,7 +105,7 @@ export default function AppNav() {
       </nav>
       {model !== "lgbm" && (
         <div role="note" className="border-b border-line bg-accent-soft text-xs text-ink-2">
-          <p className="mx-auto w-full max-w-[1280px] px-4 py-2">{t.model.notice}</p>
+          <p className="mx-auto w-full max-w-[1280px] px-4 py-2.5 flex items-start gap-2"><Icon name="layers" size={15} className="mt-px text-accent" />{t.model.notice}</p>
         </div>
       )}
     </>

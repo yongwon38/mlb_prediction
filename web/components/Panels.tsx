@@ -4,6 +4,7 @@ import type { League, Pitch } from "@/lib/types";
 import { type Note, type Stats, groupBy, percentileOf, stats } from "@/lib/analysis";
 import { pitchColor, stuffColor, stuffTint, useDarkMode } from "@/lib/colors";
 import { type Dict, useT } from "@/lib/i18n";
+import Icon, { LogoMark } from "@/components/Icon";
 
 export const f3 = (x: number | null | undefined) => (x === null || x === undefined ? "-" : x.toFixed(3).replace(/^0/, ""));
 export const pct = (x: number | null | undefined, d = 1) => (x === null || x === undefined ? "-" : `${(x * 100).toFixed(d)}%`);
@@ -11,11 +12,11 @@ export const f1 = (x: number | null | undefined, d = 1) => (x === null || x === 
 
 export function Section({ title, sub, children, right, className = "" }: { title: string; sub?: string; children: React.ReactNode; right?: React.ReactNode; className?: string }) {
   return (
-    <section className={`card p-5 min-w-0 ${className}`}>
-      <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 mb-4">
+    <section className={`card p-5 sm:p-6 min-w-0 ${className}`}>
+      <header className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2 mb-5">
         <div className="min-w-0 max-w-[68ch]">
-          <h2 className="text-[15px] font-semibold tracking-tight text-ink">{title}</h2>
-          {sub && <p className="text-xs text-muted mt-1 leading-relaxed">{sub}</p>}
+          <h2 className="text-[17px] font-bold tracking-tight text-ink">{title}</h2>
+          {sub && <p className="text-[13px] text-muted mt-1 leading-relaxed">{sub}</p>}
         </div>
         {right}
       </header>
@@ -28,7 +29,7 @@ export function Section({ title, sub, children, right, className = "" }: { title
 export function StuffBadge({ v, size = "md", className = "" }: { v: number | null | undefined; size?: "sm" | "md" | "lg"; className?: string }) {
   const dark = useDarkMode();
   if (v === null || v === undefined) return <span className="text-muted">-</span>;
-  const cls = size === "lg" ? "text-2xl px-3 py-1 rounded-xl" : size === "sm" ? "text-xs px-1.5 py-0.5 rounded-md" : "text-sm px-2 py-0.5 rounded-lg";
+  const cls = size === "lg" ? "text-2xl px-3.5 py-1 rounded-full" : size === "sm" ? "text-xs px-2 py-0.5 rounded-full" : "text-sm px-2.5 py-0.5 rounded-full";
   return (
     <span className={`inline-flex items-center gap-1.5 num text-ink ${cls} ${className}`} style={{ background: stuffTint(v, dark, dark ? 0.22 : 0.16) }}>
       <span className={`rounded-full shrink-0 ${size === "lg" ? "w-2.5 h-2.5" : "w-1.5 h-1.5"}`} style={{ background: stuffColor(v, dark) }} />
@@ -52,11 +53,10 @@ export function PctlBar({ v, className = "" }: { v: number | null; className?: s
 export function EmptyState({ title, body, action, className = "" }: { title: string; body?: string; action?: React.ReactNode; className?: string }) {
   return (
     <div className={`card px-6 py-12 flex flex-col items-center justify-center text-center gap-2 ${className}`}>
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" strokeWidth="1.6" aria-hidden="true">
-        <circle cx="12" cy="12" r="9.5" />
-        <path d="M8.2 4.2c1.6 2 2.4 4.6 2.4 7.8s-.8 5.8-2.4 7.8M15.8 4.2c-1.6 2-2.4 4.6-2.4 7.8s.8 5.8 2.4 7.8" strokeLinecap="round" />
-      </svg>
-      <p className="text-sm font-medium text-ink">{title}</p>
+      <span className="w-12 h-12 rounded-full bg-surface-2 flex items-center justify-center mb-1 opacity-80">
+        <LogoMark size={26} />
+      </span>
+      <p className="text-[15px] font-semibold text-ink">{title}</p>
       {body && <p className="text-xs text-muted max-w-[44ch] leading-relaxed">{body}</p>}
       {action}
     </div>
@@ -66,7 +66,7 @@ export function EmptyState({ title, body, action, className = "" }: { title: str
 /** 로딩 자리 : 스켈레톤 블록 + 스크린리더용 문구 */
 export function LoadingBlock({ label, rows = 3 }: { label: string; rows?: number }) {
   return (
-    <div className="card p-5 flex flex-col gap-3" role="status" aria-live="polite">
+    <div className="card p-5 sm:p-6 flex flex-col gap-3" role="status" aria-live="polite">
       <span className="sr-only">{label}</span>
       <div className="skeleton h-4 w-40" />
       {Array.from({ length: rows }, (_, i) => (
@@ -79,14 +79,14 @@ export function LoadingBlock({ label, rows = 3 }: { label: string; rows?: number
 
 export function Toggle<T extends string>({ value, options, onChange, label }: { value: T; options: [T, string][]; onChange: (v: T) => void; label: string }) {
   return (
-    <div role="radiogroup" aria-label={label} className="flex rounded-lg bg-surface-2 p-0.5 text-xs shrink-0">
+    <div role="radiogroup" aria-label={label} className="flex rounded-[10px] bg-surface-2 p-[3px] text-xs shrink-0">
       {options.map(([k, l]) => (
         <button
           key={k}
           role="radio"
           aria-checked={value === k}
           onClick={() => onChange(k)}
-          className={`px-2.5 py-1 rounded-md transition-colors ${value === k ? "bg-surface text-ink font-semibold shadow-sm" : "text-muted hover:text-ink"}`}
+          className={`px-2.5 py-1 rounded-[8px] font-medium transition-colors ${value === k ? "bg-surface text-ink font-semibold shadow-[0_1px_2px_rgba(0,23,51,0.08)]" : "text-muted hover:text-ink"}`}
         >
           {l}
         </button>
@@ -100,9 +100,9 @@ export function Toggle<T extends string>({ value, options, onChange, label }: { 
 // ---------------------------------------------------------------------------
 function Tile({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "good" | "bad" }) {
   return (
-    <div className="rounded-xl bg-surface-2 px-3.5 py-3">
-      <div className="text-xs text-muted">{label}</div>
-      <div className="text-xl num text-ink mt-1 whitespace-nowrap">{value}</div>
+    <div className="rounded-2xl bg-surface-2 px-4 py-3.5">
+      <div className="text-[13px] text-muted">{label}</div>
+      <div className="text-[22px] num text-ink mt-1 whitespace-nowrap">{value}</div>
       {sub && <div className={`text-xs mt-1 ${tone === "good" ? "text-good" : tone === "bad" ? "text-bad" : "text-muted"}`}>{sub}</div>}
     </div>
   );
@@ -135,18 +135,19 @@ export function SummaryTiles({ st, league }: { st: Stats; league: League }) {
 }
 
 export function NotesList({ notes }: { notes: Note[] }) {
-  const icon = { good: "▲", bad: "▼", info: "•" };
+  const icon = { good: "trendUp", bad: "trendDown", info: "dot" } as const;
   const label = useT().noteTone;
   return (
     <ul className="flex flex-col gap-2 text-sm">
       {notes.map((n, i) => (
         <li key={i} className="flex gap-2 leading-relaxed">
           <span
-            className={`shrink-0 mt-0.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-md h-fit whitespace-nowrap ${
+            className={`shrink-0 mt-px inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full h-fit whitespace-nowrap ${
               n.tone === "good" ? "text-good bg-good/10" : n.tone === "bad" ? "text-bad bg-bad/10" : "text-muted bg-surface-2"
             }`}
           >
-            {icon[n.tone]} {label[n.tone]}
+            <Icon name={icon[n.tone]} size={12} strokeWidth={2} />
+            {label[n.tone]}
           </span>
           <span className="text-ink-2">{n.text}</span>
         </li>
@@ -206,13 +207,13 @@ export function ArsenalTable({ ps, pitchTypes, league, pitchNames }: { ps: Pitch
     <div className="overflow-x-auto -mx-4 px-4">
       <table className="w-full text-xs tnum border-collapse min-w-[860px]">
         <thead>
-          <tr className="text-muted border-b border-grid">
-            <th className="text-left font-normal py-2 pr-2">{t.arsenal.pitch}</th>
+          <tr className="text-muted border-b border-line">
+            <th className="text-left font-normal py-2.5 pr-2">{t.arsenal.pitch}</th>
             {COLS.map((c) => (
-              <th key={c.key} className="text-right font-normal py-2 px-1.5" title={c.title} aria-sort={sort.key === c.key ? (sort.desc ? "descending" : "ascending") : "none"}>
-                <button className="hover:text-ink" onClick={() => setSort({ key: c.key, desc: sort.key === c.key ? !sort.desc : true })}>
+              <th key={c.key} className="text-right font-normal py-2.5 px-1.5" title={c.title} aria-sort={sort.key === c.key ? (sort.desc ? "descending" : "ascending") : "none"}>
+                <button className={`inline-flex items-center gap-0.5 hover:text-ink ${sort.key === c.key ? "text-ink font-semibold" : ""}`} onClick={() => setSort({ key: c.key, desc: sort.key === c.key ? !sort.desc : true })}>
                   {c.label}
-                  {sort.key === c.key ? (sort.desc ? " ↓" : " ↑") : ""}
+                  {sort.key === c.key && <Icon name={sort.desc ? "sortDown" : "sortUp"} size={12} strokeWidth={2} />}
                 </button>
               </th>
             ))}
@@ -223,13 +224,13 @@ export function ArsenalTable({ ps, pitchTypes, league, pitchNames }: { ps: Pitch
             const small = r.st.n < 20;
             return (
               <tr key={r.pt} className={`border-b border-grid last:border-0 ${small ? "opacity-50" : ""}`}>
-                <td className="py-2 pr-2 whitespace-nowrap">
+                <td className="py-2.5 pr-2 whitespace-nowrap">
                   <span className="inline-block w-2.5 h-2.5 rounded-full mr-2 align-middle" style={{ background: pitchColor(pitchTypes, r.pt, dark) }} />
                   <span className="font-medium text-ink">{r.pt}</span>
                   <span className="text-muted ml-1.5">{pitchNames[r.pt]}</span>
                 </td>
                 {COLS.map((c) => (
-                  <td key={c.key} className={`text-right py-2 px-1.5 ${c.key === "stuff" || c.key === "pctl" ? "font-semibold text-ink" : "text-ink-2"}`}>
+                  <td key={c.key} className={`text-right py-2.5 px-1.5 ${c.key === "stuff" || c.key === "pctl" ? "font-semibold text-ink" : "text-ink-2"}`}>
                     {c.key === "pctl" ? <PctlBadge v={r.pctl} /> : c.key === "stuff" ? <StuffBadge v={r.st.stuff} size="sm" /> : c.fmt(c.get(r))}
                   </td>
                 ))}

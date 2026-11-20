@@ -5,6 +5,7 @@ import { ZONE_BOT, ZONE_HALF_WIDTH, ZONE_TOP, resultShape } from "@/lib/analysis
 import { STUFF_DOMAIN, stuffColor, stuffOpacity, useDarkMode } from "@/lib/colors";
 import { useT } from "@/lib/i18n";
 import { ResultLegend, ResultMarker } from "@/components/ResultMarker";
+import Icon from "@/components/Icon";
 
 const W = 440;
 const H = 500;
@@ -193,7 +194,12 @@ export function Tooltip({ p, left, top, pitchNames, hint }: { p: Pitch; left: nu
         <dt>{t.inGame}</dt>
         <dd>{t.gamePitch(p.gp)}</dd>
       </dl>
-      {hint && <div className="mt-1.5 text-accent-ink">{hint} →</div>}
+      {hint && (
+        <div className="mt-1.5 text-accent-ink font-medium inline-flex items-center gap-0.5">
+          {hint}
+          <Icon name="chevronRight" size={12} />
+        </div>
+      )}
     </div>
   );
 }

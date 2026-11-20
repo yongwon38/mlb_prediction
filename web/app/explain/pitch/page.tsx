@@ -10,6 +10,7 @@ import { pitchColor, stuffColor, useDarkMode } from "@/lib/colors";
 import { batterName, gameLabel, paResult, scoreText, signedPct, situation } from "@/lib/games";
 import { useExplainState } from "@/lib/useExplain";
 import { groupNames, useT } from "@/lib/i18n";
+import Icon from "@/components/Icon";
 
 /** 구위 산출 근거 — 투구 1개 : 목록에서 고르거나 URL(pitch=) 로 바로 진입 */
 export default function ExplainPitch() {
@@ -51,11 +52,13 @@ export default function ExplainPitch() {
                   title={t.context}
                   right={
                     <div className="flex gap-2 text-xs">
-                      <button className="chip" disabled={!prev} onClick={() => prev && setSel(prev.i)}>
+                      <button className="chip disabled:opacity-40" disabled={!prev} onClick={() => prev && setSel(prev.i)}>
+                        <Icon name="chevronLeft" size={14} />
                         {t.prev}
                       </button>
-                      <button className="chip" disabled={!next} onClick={() => next && setSel(next.i)}>
+                      <button className="chip disabled:opacity-40" disabled={!next} onClick={() => next && setSel(next.i)}>
                         {t.next}
+                        <Icon name="chevronRight" size={14} />
                       </button>
                     </div>
                   }
@@ -91,11 +94,13 @@ export default function ExplainPitch() {
                         ))}
                       </div>
                       <div className="flex gap-4 text-xs">
-                        <Link className="text-accent-ink underline underline-offset-2" href={ctxHref("/games", c, { game: selPitch.game, pa: selPitch.pai })}>
+                        <Link className="inline-flex items-center gap-0.5 text-[13px] font-medium text-accent-ink hover:underline underline-offset-2" href={ctxHref("/games", c, { game: selPitch.game, pa: selPitch.pai })}>
                           {t.openPa}
+                          <Icon name="chevronRight" size={14} />
                         </Link>
-                        <a className="text-accent-ink underline underline-offset-2" href={`https://baseballsavant.mlb.com/gamefeed?gamePk=${game.pk}`} target="_blank" rel="noreferrer">
+                        <a className="inline-flex items-center gap-0.5 text-[13px] font-medium text-accent-ink hover:underline underline-offset-2" href={`https://baseballsavant.mlb.com/gamefeed?gamePk=${game.pk}`} target="_blank" rel="noreferrer">
                           {tt.common.savantFeed}
+                          <Icon name="arrowUpRight" size={14} />
                         </a>
                       </div>
                     </div>

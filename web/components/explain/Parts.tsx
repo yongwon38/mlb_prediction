@@ -4,6 +4,7 @@ import { pitchColor } from "@/lib/colors";
 import { EXPLAIN_FEAT_KEYS, FEAT_INFO, GROUP_FEATS, fmtSigned, groupDetail, topReasons } from "@/lib/explain";
 import type { ExplainMethod, ExplainPitch, LeagueExplain } from "@/lib/types";
 import { groupNames, useT } from "@/lib/i18n";
+import Icon from "@/components/Icon";
 
 export function PtLabel({ pt, pitchTypes, dark, name }: { pt: string; pitchTypes: string[]; dark: boolean; name?: string }) {
   return (
@@ -20,7 +21,10 @@ export function ReasonList({ reasons }: { reasons: ReturnType<typeof topReasons>
   if (!reasons || (!reasons.up.length && !reasons.down.length)) return <p className="text-sm text-muted">{t.explain.noneStandout}</p>;
   const item = (r: (typeof reasons.up)[number], up: boolean) => (
     <li key={r.name} className="flex gap-2">
-      <span className={`shrink-0 text-xs font-medium px-1.5 py-0.5 rounded ${up ? "text-good bg-surface-2" : "text-bad bg-surface-2"}`}>{up ? t.explain.up : t.explain.down}</span>
+      <span className={`shrink-0 h-fit inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-full ${up ? "text-good bg-good/10" : "text-bad bg-bad/10"}`}>
+        <Icon name={up ? "trendUp" : "trendDown"} size={12} strokeWidth={2} />
+        {up ? t.explain.up : t.explain.down}
+      </span>
       <span>
         <b className="text-ink">
           {r.name} {t.common.points(fmtSigned(r.value, 1))}
@@ -88,7 +92,7 @@ export function VariableGuide({ lg }: { lg: LeagueExplain }) {
   const names = groupNames(t, lg.groups);
   return (
     <details className="card p-4 text-xs text-ink-2 leading-relaxed">
-      <summary className="cursor-pointer font-semibold text-ink text-sm flex items-center gap-2"><span className="chev text-muted">›</span>{g.summary}</summary>
+      <summary className="cursor-pointer font-semibold text-ink text-sm flex items-center gap-2"><Icon name="chevronRight" size={14} className="chev text-muted" />{g.summary}</summary>
       <ul className="list-disc pl-5 mt-2 flex flex-col gap-1">
         {g.intro.map((s) => (
           <li key={s}>{s}</li>
@@ -122,7 +126,7 @@ export function Caveats({ method }: { method: ExplainMethod }) {
   const name = { shap: c.shap, saabas: c.saabas, shapley: c.shapley, "shapley-sampled": c.shapleySampled, "shapley-mixed": c.shapleyMixed }[method];
   return (
     <details className="card p-4 text-xs text-ink-2 leading-relaxed" open>
-      <summary className="cursor-pointer font-semibold text-ink text-sm flex items-center gap-2"><span className="chev text-muted">›</span>{c.summary}</summary>
+      <summary className="cursor-pointer font-semibold text-ink text-sm flex items-center gap-2"><Icon name="chevronRight" size={14} className="chev text-muted" />{c.summary}</summary>
       <ul className="list-disc pl-5 mt-2 flex flex-col gap-1">
         <li>
           {hof ? c.c1aHof : c.c1a}

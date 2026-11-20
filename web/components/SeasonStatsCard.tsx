@@ -70,7 +70,7 @@ export default function SeasonStatsCard({ stats, pitcherId, gt }: { stats: Seaso
     >
       <dl className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-6 gap-2">
         {cells.map(([l, v, t]) => (
-          <div key={l} className="rounded-xl bg-surface-2 px-3.5 py-2.5" title={t}>
+          <div key={l} className="rounded-2xl bg-surface-2 px-4 py-3" title={t}>
             <dt className="text-xs text-muted">{l}</dt>
             <dd className="text-lg num text-ink mt-0.5">{v}</dd>
           </div>
