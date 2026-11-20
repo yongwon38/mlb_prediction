@@ -9,6 +9,7 @@ import { ctxHref } from "@/lib/appState";
 import { fmtSigned, meanContrib, meanScore, mixReference, scored, topReasons } from "@/lib/explain";
 import { useExplainState } from "@/lib/useExplain";
 import { groupNames, useT } from "@/lib/i18n";
+import Icon from "@/components/Icon";
 
 const SUBPAGES = ["pitch-types", "bands", "pitch"] as const;
 
@@ -43,9 +44,12 @@ export default function ExplainOverview() {
           </div>
           <div className="grid gap-3 sm:grid-cols-3">
             {SUBPAGES.map((k) => (
-              <Link key={k} href={ctxHref(`/explain/${k}`, c, keep)} className="card p-4 hover:bg-surface-2 flex flex-col gap-1">
-                <span className="text-sm font-semibold text-ink">{tt.header.tabs[`explain/${k}`]} →</span>
-                <span className="text-xs text-muted">{t.sub[k]}</span>
+              <Link key={k} href={ctxHref(`/explain/${k}`, c, keep)} className="card p-5 flex items-center gap-3 group">
+                <span className="flex-1 min-w-0 flex flex-col gap-1">
+                  <span className="text-[15px] font-semibold text-ink">{tt.header.tabs[`explain/${k}`]}</span>
+                  <span className="text-[13px] text-muted">{t.sub[k]}</span>
+                </span>
+                <Icon name="chevronRight" size={18} className="text-muted group-hover:translate-x-0.5 transition-transform" />
               </Link>
             ))}
           </div>

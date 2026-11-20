@@ -17,6 +17,8 @@ import { loadStats } from "@/lib/data";
 import { bandOf, percentileOf, scoutingNotes, stats } from "@/lib/analysis";
 import type { League, Pitch, SeasonIndex, SeasonStats } from "@/lib/types";
 import { useT } from "@/lib/i18n";
+import Icon from "@/components/Icon";
+import { PlayerPhoto, TeamLogos } from "@/components/Avatar";
 
 export default function PitcherPage() {
   const { meta, season, setSeason, pitcherId, setPitcherId, gt, setGt, index, league, entry, error, setError } = usePageState();
@@ -86,15 +88,17 @@ export default function PitcherPage() {
         info={
           data && entry ? (
             <>
-              {tt.common.throws(data.file.throws)} · {data.file.teams.join(" → ")} · {t.info(season, data.pitches.length)} ·{" "}
-              <a className="text-accent-ink underline underline-offset-2" href={`https://baseballsavant.mlb.com/savant-player/${data.file.id}`} target="_blank" rel="noreferrer">
-                Baseball Savant ↗
+              {tt.common.throws(data.file.throws)} · {t.info(season, data.pitches.length)}
+              <a className="inline-flex items-center gap-0.5 text-accent-ink font-medium hover:underline underline-offset-2 ml-1" href={`https://baseballsavant.mlb.com/savant-player/${data.file.id}`} target="_blank" rel="noreferrer">
+                Baseball Savant
+                <Icon name="arrowUpRight" size={14} />
               </a>
             </>
           ) : (
             t.idle
           )
         }
+        teams={data && entry ? data.file.teams : undefined}
         stuff={entry?.stuff}
         season={season}
         pitcherId={entry ? pitcherId : null}
@@ -262,12 +266,20 @@ function Leaderboard({
                 <tr key={p.id} onClick={() => onSelect(p.id)} className="border-b border-grid last:border-0 cursor-pointer hover:bg-surface-2 transition-colors">
                   <td className="text-right py-2.5 pr-3 text-muted">{i + 1}</td>
                   <td className="py-2.5">
-                    <button onClick={() => onSelect(p.id)} className="font-medium text-ink hover:underline underline-offset-2 text-left">
-                      {p.name}
-                    </button>
-                    <span className="text-muted ml-2 text-xs">{p.throws}HP</span>
+                    <span className="flex items-center gap-2.5">
+                      <PlayerPhoto id={p.id} name={p.name} size={30} />
+                      <button onClick={() => onSelect(p.id)} className="font-semibold text-ink hover:underline underline-offset-2 text-left">
+                        {p.name}
+                      </button>
+                      <span className="text-muted text-xs">{p.throws}HP</span>
+                    </span>
                   </td>
-                  <td className="py-2.5 text-ink-2 text-xs">{p.teams.join(" / ")}</td>
+                  <td className="py-2.5 text-ink-2 text-xs">
+                    <span className="inline-flex items-center gap-1.5">
+                      <TeamLogos teams={p.teams} size={16} />
+                      {p.teams.join(" / ")}
+                    </span>
+                  </td>
                   <td className="py-2.5 pr-4 text-right text-ink-2 text-xs">{tt.common.pitches(v![0])}</td>
                   <td className="py-2.5">
                     <StuffBadge v={v![1]} size="sm" />

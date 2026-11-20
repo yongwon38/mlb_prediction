@@ -36,7 +36,7 @@ export default function PitchList({ ps, pitchTypes, groups, selected, onSelect }
             <button
               onClick={() => onSelect(p.i)}
               aria-pressed={selected === p.i}
-              className={`w-full text-left grid grid-cols-[auto_auto_1fr_auto] items-center gap-x-2 px-1.5 py-1.5 border-b border-grid hover:bg-surface-2 ${selected === p.i ? "bg-surface-2" : ""}`}
+              className={`w-full text-left grid grid-cols-[auto_auto_1fr_auto] items-center gap-x-2 px-2.5 py-2 rounded-xl transition-colors ${selected === p.i ? "bg-accent-soft" : "hover:bg-surface-2"}`}
             >
               <span className="tnum text-muted w-[68px]">{p.date.slice(5)}</span>
               <span className="flex items-center gap-1 w-10">

@@ -13,8 +13,11 @@ import { stuffColor, useDarkMode } from "@/lib/colors";
 import { scoreText, signedPct, ipText } from "@/lib/games";
 import { type Dict, useT } from "@/lib/i18n";
 import type { SeasonSummary, SeasonSummaryGt } from "@/lib/types";
+import Icon, { type IconName } from "@/components/Icon";
+import { PlayerPhoto, TeamLogo, TeamLogos } from "@/components/Avatar";
 
 const SECTIONS = ["pitcher", "games", "explain"] as const;
+const SECTION_ICON: Record<(typeof SECTIONS)[number], IconName> = { pitcher: "user", games: "calendar", explain: "layers" };
 type HiTab = "imp" | "stuff" | "pa";
 
 /** 홈 : 시즌 요약 (리그 지표, 구위 리더, 승부처, 구위 하이라이트) */
@@ -47,23 +50,28 @@ export default function Home() {
   const go = (path: string, pitcher: number, extra: Record<string, number> = {}) => ctxHref(path, { season, pitcher, gt: [g] }, extra);
 
   return (
-    <main className="mx-auto w-full max-w-[1280px] px-4 pb-10 flex flex-col gap-5">
+    <main className="mx-auto w-full max-w-[1280px] px-4 pb-12 flex flex-col gap-5">
       {/* 히어로 : 사이트 소개 + 큰 검색창 */}
-      <section className="relative overflow-hidden rounded-b-3xl -mx-4 px-4 sm:mx-0 sm:px-8 pt-10 pb-8 sm:rounded-3xl sm:mt-5 bg-surface border-b sm:border border-line">
-        <HeroArt />
-        <div className="relative max-w-[640px]">
-          {t.eyebrow && <p className="eyebrow mb-3">{t.eyebrow}</p>}
-          <h1 className="text-4xl sm:text-5xl font-bold tracking-tight text-ink leading-[1.1]">{t.heroTitle}</h1>
-          <p className="text-base text-ink-2 mt-3">{t.tagline}</p>
+      <section className="pt-10 pb-2 sm:pt-14">
+        <div className="max-w-[720px]">
+          {t.eyebrow && <p className="eyebrow mb-3 text-accent">{t.eyebrow}</p>}
+          <h1 className="text-[36px] sm:text-[48px] font-bold tracking-[-0.035em] text-ink leading-[1.12]">{t.heroTitle}</h1>
+          <p className="text-[17px] text-ink-2 mt-3">{t.tagline}</p>
+          <div className="mt-8 card p-4 sm:p-5">
+            <SearchPanel key={season ?? 0} index={index} selectedId={null} hero onSelect={(id) => router.push(ctxHref("/pitcher", { season, pitcher: id, gt: [g] }))} />
+          </div>
         </div>
-        <div className="relative mt-7 max-w-[720px]">
-          <SearchPanel key={season ?? 0} index={index} selectedId={null} hero onSelect={(id) => router.push(ctxHref("/pitcher", { season, pitcher: id, gt: [g] }))} />
-        </div>
-        <nav aria-label={t.explore} className="relative mt-6 flex flex-wrap gap-2">
+        <nav aria-label={t.explore} className="mt-4 grid gap-3 sm:grid-cols-3">
           {SECTIONS.map((k) => (
-            <Link key={k} href={ctxHref(`/${k}`, { season, gt: [g] })} title={t.cards[k]} className="group flex items-center gap-2 rounded-full border border-line bg-page/60 px-4 py-2 text-sm text-ink-2 hover:text-ink hover:border-line-strong transition-colors">
-              {tt.nav[k]}
-              <span className="text-muted group-hover:translate-x-0.5 transition-transform">→</span>
+            <Link key={k} href={ctxHref(`/${k}`, { season, gt: [g] })} className="card group flex items-center gap-3.5 px-5 py-4">
+              <span className="w-10 h-10 rounded-full bg-accent-soft text-accent flex items-center justify-center shrink-0">
+                <Icon name={SECTION_ICON[k]} size={20} />
+              </span>
+              <span className="flex-1 min-w-0">
+                <span className="block text-[15px] font-semibold text-ink">{tt.nav[k]}</span>
+                <span className="block text-[13px] text-muted truncate">{t.cards[k]}</span>
+              </span>
+              <Icon name="chevronRight" size={18} className="text-muted group-hover:translate-x-0.5 transition-transform" />
             </Link>
           ))}
         </nav>
@@ -87,14 +95,19 @@ export default function Home() {
               <ol className="text-sm -mx-2">
                 {sm.leaders.map((p, i) => (
                   <li key={p.id}>
-                    <Link href={go("/pitcher", p.id)} className="flex items-center gap-3 py-2 px-2 rounded-lg hover:bg-surface-2 transition-colors">
-                      <span className={`w-6 text-right tnum ${i < 3 ? "text-ink font-bold" : "text-muted"}`}>{i + 1}</span>
-                      <span className="flex-1 min-w-0 truncate">
-                        <span className="font-medium text-ink">{p.name}</span>
-                        <span className="text-muted ml-2 text-xs">{p.teams.join("/")}</span>
+                    <Link href={go("/pitcher", p.id)} className="flex items-center gap-3 py-2 px-2 rounded-xl hover:bg-surface-2 transition-colors">
+                      <span className={`w-5 text-center tnum text-[15px] ${i < 3 ? "text-accent font-bold" : "text-muted font-medium"}`}>{i + 1}</span>
+                      <PlayerPhoto id={p.id} name={p.name} size={36} />
+                      <span className="flex-1 min-w-0">
+                        <span className="block truncate font-semibold text-ink">{p.name}</span>
+                        <span className="flex items-center gap-1.5 text-xs text-muted mt-0.5">
+                          <TeamLogos teams={p.teams} size={14} />
+                          {p.teams.join(" / ")}
+                        </span>
                       </span>
                       <span className="text-xs text-muted tnum hidden sm:inline">{tt.common.pitches(p.n)}</span>
                       <StuffBadge v={p.stuff} size="sm" className="w-[4.25rem] justify-center" />
+                      <Icon name="chevronRight" size={16} className="text-muted hidden sm:block" />
                     </Link>
                   </li>
                 ))}
@@ -125,13 +138,17 @@ export default function Home() {
               <ul className="text-sm -mx-2">
                 {sm.impPas.map((r) => (
                   <li key={`${r.pid}-${r.pai}`}>
-                    <Link href={go("/games", r.pid, { game: r.g, pa: r.pai })} className="grid grid-cols-[auto_1fr_auto] items-center gap-x-4 py-2 px-2 rounded-lg hover:bg-surface-2 transition-colors">
-                      <span className="text-xs text-muted tnum w-20">{r.date}</span>
+                    <Link href={go("/games", r.pid, { game: r.g, pa: r.pai })} className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-x-3 sm:gap-x-4 py-2.5 px-2 rounded-xl hover:bg-surface-2 transition-colors">
+                      <span className="text-xs text-muted tnum w-[4.5rem]">{r.date}</span>
+                      <PlayerPhoto id={r.pid} name={r.name} size={32} />
                       <span className="min-w-0">
                         <span className="block truncate text-ink">
                           <b className="font-semibold">{r.name}</b> vs {r.batName} · {r.ev === 0 ? t.removed : tt.paEvents[r.ev]}
-                          <span className="text-muted text-xs ml-2">
-                            {r.team} vs {r.opp} · {tt.game.innOuts(r.inn, r.o)}
+                          <span className="text-muted text-xs ml-2 inline-flex items-center gap-1 align-middle">
+                            <TeamLogo abbr={r.team} size={14} />
+                            {r.team} vs
+                            <TeamLogo abbr={r.opp} size={14} />
+                            {r.opp} · {tt.game.innOuts(r.inn, r.o)}
                           </span>
                         </span>
                         {r.des && <span className="block truncate text-xs text-muted mt-0.5">{r.des}</span>}
@@ -153,28 +170,6 @@ export default function Home() {
   );
 }
 
-/** 히어로 배경 : 옅은 스트라이크 존 격자 + 구위 색 점 (장식) */
-function HeroArt() {
-  const dark = useDarkMode();
-  const dots: [number, number, number][] = [
-    [62, 30, 68], [70, 44, 61], [58, 52, 55], [76, 60, 47], [66, 70, 38], [82, 36, 64], [54, 40, 50], [74, 24, 71], [86, 54, 44], [60, 64, 58], [80, 72, 33], [68, 56, 66],
-  ];
-  return (
-    <svg className="absolute right-10 top-8 bottom-8 w-[24%] max-w-[260px] pointer-events-none hidden lg:block" viewBox="48 18 44 60" preserveAspectRatio="xMaxYMid meet" aria-hidden="true">
-      <rect x="56" y="26" width="24" height="44" fill="none" stroke="var(--border-strong)" strokeWidth="0.4" />
-      {[1, 2].map((i) => (
-        <g key={i}>
-          <line x1={56 + i * 8} x2={56 + i * 8} y1="26" y2="70" stroke="var(--border)" strokeWidth="0.3" />
-          <line x1="56" x2="80" y1={26 + (i * 44) / 3} y2={26 + (i * 44) / 3} stroke="var(--border)" strokeWidth="0.3" />
-        </g>
-      ))}
-      {dots.map(([x, y, s], i) => (
-        <circle key={i} cx={x} cy={y} r={1.25} fill={stuffColor(s, dark)} opacity={0.35 + Math.abs(s - 50) / 40} />
-      ))}
-    </svg>
-  );
-}
-
 function LeagueStrip({ sm, label, t }: { sm: SeasonSummaryGt; label: string; t: Dict }) {
   const cells: [string, string][] = [
     [t.home.tiles.pitches(label), sm.pitches.toLocaleString()],
@@ -187,14 +182,13 @@ function LeagueStrip({ sm, label, t }: { sm: SeasonSummaryGt; label: string; t: 
     ["xwOBA", f3(sm.rates.xwoba)],
   ];
   return (
-    // 칸 사이 1px 선 = 배경(line) 위에 gap-px
-    <dl className="card !bg-line grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-px overflow-hidden">
+    <dl className="card px-5 sm:px-6 py-5 grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-x-6 gap-y-5">
       {cells.map(([l, v]) => (
-        <div key={l} className="bg-surface px-4 py-3.5">
-          <dt className="text-[11px] text-muted truncate" title={l}>
+        <div key={l} className="min-w-0">
+          <dt className="text-[13px] text-muted truncate" title={l}>
             {l}
           </dt>
-          <dd className="text-xl num text-ink mt-1">{v}</dd>
+          <dd className="text-[22px] num text-ink mt-1">{v}</dd>
         </div>
       ))}
     </dl>
@@ -242,13 +236,16 @@ function GameList({ rows, metric, href }: { rows: SeasonSummaryGt["impGames"]; m
     <ul className="text-sm -mx-2">
       {rows.map((r) => (
         <li key={`${r.pid}-${r.gi}`}>
-          <Link href={href(r)} className="grid grid-cols-[auto_1fr_auto] items-center gap-x-4 py-2 px-2 rounded-lg hover:bg-surface-2 transition-colors">
-            <span className="text-xs text-muted tnum w-20">{r.date}</span>
+          <Link href={href(r)} className="grid grid-cols-[auto_auto_1fr_auto] items-center gap-x-3 sm:gap-x-4 py-2.5 px-2 rounded-xl hover:bg-surface-2 transition-colors">
+            <span className="text-xs text-muted tnum w-[4.5rem]">{r.date}</span>
+            <PlayerPhoto id={r.pid} name={r.name} size={32} />
             <span className="min-w-0 truncate">
               <b className="text-ink font-semibold">{r.name}</b>
-              <span className="text-ink-2">
-                {" "}
-                {r.team} {r.home ? "vs" : "@"} {r.opp}
+              <span className="text-ink-2 inline-flex items-center gap-1 ml-1.5 align-middle">
+                <TeamLogo abbr={r.team} size={14} />
+                {r.team} {r.home ? "vs" : "@"}
+                <TeamLogo abbr={r.opp} size={14} />
+                {r.opp}
               </span>
               <span className="text-muted text-xs ml-2">
                 {r.rd !== "R" ? `${t.rounds[r.rd] ?? r.rd} · ` : ""}
