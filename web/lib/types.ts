@@ -163,10 +163,21 @@ export interface SeasonSummaryGt {
   rates: Rates;
   buckets: (Rates & { label: string })[];
   minPitches: number;
-  leaders: { id: number; name: string; teams: string[]; n: number; stuff: number }[];
+  leaders: SummaryLeader[];
   impGames: LeagueGameRow[];
   stuffGames: LeagueGameRow[];
   impPas: LeaguePaRow[];
+  /** 구종별 구위 Top 5 (리그 구종 평균 구위 높은 순). 이전 export 데이터에는 없음 */
+  minPtPitches?: number;
+  pitchTypes?: { pt: string; n: number; pitchers: number; stuff: number; leaders: SummaryLeader[] }[];
+}
+
+export interface SummaryLeader {
+  id: number;
+  name: string;
+  teams: string[];
+  n: number;
+  stuff: number;
 }
 
 export interface SeasonSummary {

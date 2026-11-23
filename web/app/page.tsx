@@ -118,6 +118,12 @@ export default function Home() {
             </Section>
           </div>
 
+          {sm.pitchTypes && sm.pitchTypes.length > 0 && (
+            <Section title={t.ptLeaders(tt.gameTypes[g])} sub={t.ptLeadersSub(sm.minPtPitches ?? 0)}>
+              <PitchTypeLeaders rows={sm.pitchTypes} names={meta.pitchNames} href={(id) => go("/pitcher", id)} />
+            </Section>
+          )}
+
           <Section
             title={t.highlights}
             right={
@@ -224,6 +230,45 @@ function BucketBars({ sm, t }: { sm: SeasonSummaryGt; t: Dict }) {
             <span className="text-ink-2">{f3(b.ba)}</span>
           </span>
           <span className="text-right text-ink-2">{f3(b.xwobacon)}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** 구종별 구위 Top 5 : 구종 카드(리그 구종 평균 구위 높은 순) 안에 투수 5명 */
+function PitchTypeLeaders({ rows, names, href }: { rows: NonNullable<SeasonSummaryGt["pitchTypes"]>; names: Record<string, string>; href: (id: number) => string }) {
+  const t = useT();
+  const dark = useDarkMode();
+  return (
+    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {rows.map((r) => (
+        <div key={r.pt} className="rounded-2xl border border-line p-3 min-w-0">
+          <div className="flex items-center gap-2 px-1 pb-2 mb-1 border-b border-grid">
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: stuffColor(r.stuff, dark) }} />
+            <span className="flex-1 min-w-0 truncate font-semibold text-ink text-[15px]" title={t.common.pitches(r.n)}>
+              {t.notes.pitchName(names[r.pt] ?? r.pt, r.pt)}
+            </span>
+            <span className="text-xs text-muted tnum shrink-0">{t.home.ptAvg(f1(r.stuff))}</span>
+          </div>
+          <ol className="text-sm">
+            {r.leaders.map((p, i) => (
+              <li key={p.id}>
+                <Link href={href(p.id)} className="flex items-center gap-2.5 py-1.5 px-1 rounded-xl hover:bg-surface-2 transition-colors">
+                  <span className={`w-4 text-center tnum text-[13px] ${i === 0 ? "text-accent font-bold" : "text-muted font-medium"}`}>{i + 1}</span>
+                  <PlayerPhoto id={p.id} name={p.name} size={28} />
+                  <span className="flex-1 min-w-0">
+                    <span className="block truncate font-medium text-ink">{p.name}</span>
+                    <span className="flex items-center gap-1 text-[11px] text-muted">
+                      <TeamLogos teams={p.teams} size={12} />
+                      <span className="truncate">{p.teams.join(" / ")} · {t.common.pitches(p.n)}</span>
+                    </span>
+                  </span>
+                  <StuffBadge v={p.stuff} size="sm" className="w-[3.75rem] justify-center" />
+                </Link>
+              </li>
+            ))}
+          </ol>
         </div>
       ))}
     </div>
