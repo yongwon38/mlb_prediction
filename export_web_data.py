@@ -111,6 +111,9 @@ ROUND_LABELS = {'R': '정규시즌', 'S': '시범경기', 'F': '와일드카드'
 IMPORTANCE_WEIGHT = {'R': 1.0, 'S': 0.5, 'F': 1.5, 'D': 1.5, 'L': 1.5, 'W': 2.0}
 # 리그 요약(메인 페이지) 리더보드 최소 투구 수 (유형별)
 SUMMARY_MIN_PITCHES = {0: 300, 1: 40, 2: 100}
+# 리그 요약 구종별 구위 Top 5 : 투수×구종 최소 투구 수 (유형별, 위와 같은 비율), 자격 투수가 이보다 적은 구종은 제외
+SUMMARY_MIN_PT_PITCHES = {0: 100, 1: 15, 2: 35}
+PT_LEADERS_MIN_PITCHERS = 5
 HIGHLIGHT_MIN_GAME_PITCHES = 15    # 투수 경기 구위 하이라이트 최소 투구
 HIGHLIGHT_MIN_LEAGUE_GAME_PITCHES = 40    # 리그 전체 구위 하이라이트 경기 최소 투구
 # 타석 종료 이벤트별 아웃 수 (경기 IP 추정용)
@@ -740,8 +743,25 @@ def summary_payload(d, pitchers, games, pas):
             'impGames': games_json(g_.sort_values('imp', ascending=False).head(10)),
             'stuffGames': games_json(g_[g_['n'] >= HIGHLIGHT_MIN_LEAGUE_GAME_PITCHES].sort_values('s', ascending=False).head(10)),
             'impPas': records_json(p_.reindex(p_['wpa'].abs().sort_values(ascending=False).index).head(10), PA_ND),
+            'minPtPitches': SUMMARY_MIN_PT_PITCHES[gt],
+            'pitchTypes': pitch_type_leaders(x, info, SUMMARY_MIN_PT_PITCHES[gt]),
         }
     return by_gt
+
+
+def pitch_type_leaders(x, info, min_n, top=5):
+    """구종별 구위 Top 5 : 리그 구종 평균 구위가 높은 순, 구종마다 투수 평균 구위 상위 top 명 (투수×구종 min_n 구 이상)"""
+    out = []
+    for pt, g in x.groupby('pitch_type', observed=True):
+        pm = g.groupby('pitcher')['stuff_score'].agg(['mean', 'size'])
+        pm = pm[pm['size'] >= min_n]
+        if len(pm) < PT_LEADERS_MIN_PITCHERS:
+            continue
+        lead = pm.sort_values('mean', ascending=False).head(top)
+        out.append({'pt': str(pt), 'n': int(len(g)), 'pitchers': int(len(pm)), 'stuff': _num(g['stuff_score'].mean(), 2),
+                    'leaders': [{'id': int(pid), 'name': info[pid]['name'], 'teams': info[pid]['teams'], 'n': int(r['size']),
+                                 'stuff': _num(r['mean'], 2)} for pid, r in lead.iterrows()]})
+    return sorted(out, key=lambda r: -r['stuff'])
 
 
 def export_season(season, path, model, scaler, alts=None):
