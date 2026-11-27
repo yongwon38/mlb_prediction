@@ -17,7 +17,8 @@ export type IconName =
   | "layers"
   | "sun"
   | "moon"
-  | "monitor";
+  | "monitor"
+  | "sliders";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   chevronRight: <path d="m9 5.5 6.5 6.5L9 18.5" />,
@@ -66,6 +67,13 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <rect x="3" y="4" width="18" height="12" rx="2.5" />
       <path d="M8 20h8M12 16v4" />
+    </>
+  ),
+  sliders: (
+    <>
+      <path d="M4 7h9.5M18.5 7H20M4 17h2.5M11.5 17H20" />
+      <circle cx="16" cy="7" r="2.25" />
+      <circle cx="9" cy="17" r="2.25" />
     </>
   ),
 };
