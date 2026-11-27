@@ -76,9 +76,10 @@ outputs/                       예측 결과, 지표, 그림
 업무일지/업무일지_YYYYMMDD.md    일일 업무일지
 export_web_data.py             웹용 데이터 export (시즌별 구위 score -> web/public/data/{season}/ : index·league·summary·stats(MLB 공식 기록).json, p/ e/ 투수별 .json.gz(경기·타석 표 포함))
 export_sim_starts.py           구위 시뮬레이터 시작점 -> web/public/data/{season}/sim_starts.json (리그 구종별 입력 중앙값·1/99 분위, 투수×구종 정규시즌 100구+ 평균 입력). export_web_data 다음에 실행 (시즌 폴더를 비우므로)
+export_similar.py              유사 투구 검색 인덱스 -> web/public/data/{season}/similar.json (투수×구종 정규 100구+ : HOF ZIB 은닉 64 평균 float16 + 입력 14 평균, 검색은 브라우저 web/lib/similar.ts). export_sim_starts 다음에 실행. 평가 : similar_eval.py -> outputs/similar/
 export_sim_model.py            구위 시뮬레이터 모델 -> web/public/sim/hof_r.json (시드 42 HOF 가중치·전처리·스케일러 표, git 커밋) + 패리티 고정 세트 web/scripts/fixtures/sim_parity.json. 모델이 바뀔 때만 실행. 검증 : web 에서 node scripts/sim_parity.mjs
 compute_shap.py                정확한 SHAP 캐시 계산 (outputs/{모델 버전}/shap/, 약 12시간 : 정규 shap_{season}.npz + 시범·포스트 shap_{season}_extra.npz). 없으면 export 가 Saabas 기여 사용
-web/                           Next.js 분석 페이지 (static export, Vercel 배포) : / 홈, /pitcher, /games, /explain(/pitch-types, /bands, /pitch)
+web/                           Next.js 분석 페이지 (static export, Vercel 배포) : / 홈, /pitcher, /games, /explain(/pitch-types, /bands, /pitch), /simulator, /similar
 data_store.py                  온라인 데이터 저장소 (HF Datasets : statcast 월별 parquet, SHAP 캐시, 웹 데이터 스냅샷)
 ops.py                         클라우드 운영 명령 (update / bootstrap / pull-web / push-web / pull-shap / push-shap / shap-todo)
 .github/workflows/             daily(매일 갱신·배포) / deploy(push 시 배포) / shap(끝난 시즌 SHAP) / bootstrap(처음 적재)
@@ -116,8 +117,8 @@ data_status.json               데이터 기준일 (daily 가 커밋)
 
 ## 7. 클라우드 운영 (무료, 로컬 PC 없이 동작)
 - 구성 : GitHub Actions(공개 레포 무료) + Hugging Face 데이터셋 `elcax1/mlb-statcast`(공개) + Vercel Hobby(`stuff-lab`)
-- **daily** (매일 15:00 KST) : 현재 시즌 최근 3일 Statcast 재수집 -> 경기 단위 교체 -> 바뀌었으면 현재 시즌 SHAP 증분 계산 + HOF 기여 증분(순열 표본 근사, `--approx`) -> export -> 시뮬레이터 시작점(`export_sim_starts.py`) -> 배포 -> `data_status.json` 커밋
-- **deploy** (main push) : HF 의 웹 데이터 스냅샷(`web_data/{web_id}/`)으로 빌드·배포. `web_id` = 3·4단계 모델 + `export_web_data.py` + `export_sim_starts.py` + `stuff_pipeline.py` + `stuff_model.py` 해시 -> 모델·export 코드가 바뀌면 스냅샷이 없으므로 전 시즌 자동 재생성
+- **daily** (매일 15:00 KST) : 현재 시즌 최근 3일 Statcast 재수집 -> 경기 단위 교체 -> 바뀌었으면 현재 시즌 SHAP 증분 계산 + HOF 기여 증분(순열 표본 근사, `--approx`) -> export -> 시뮬레이터 시작점(`export_sim_starts.py`) -> 유사 검색 인덱스(`export_similar.py`) -> 배포 -> `data_status.json` 커밋
+- **deploy** (main push) : HF 의 웹 데이터 스냅샷(`web_data/{web_id}/`)으로 빌드·배포. `web_id` = 3·4단계 모델 + `export_web_data.py` + `export_sim_starts.py` + `export_similar.py` + `stuff_pipeline.py` + `stuff_model.py` 해시 -> 모델·export 코드가 바뀌면 스냅샷이 없으므로 전 시즌 자동 재생성
 - **SHAP 캐시** = 투구 키 + 피처 해시(`compute_shap.feature_hash`). 키·해시가 같은 투구는 재사용, 새 투구와 피처가 바뀐 투구만 계산 (`--incremental`)
   - 진행 중 시즌은 새 투구가 들어오면 그 투수의 주 패스트볼 평균이 바뀌어 시즌 전체 피처가 바뀜 -> 하루 약 12~14만 구 재계산 (daily, 25만 구 초과면 건너뛰고 그날은 Saabas)
   - **shap** (models push / 매월 / 수동) : 모델(`ops.py shap-plan` : LGBM + HOF) × 캐시 없는 시즌을 8조각 병렬 계산 -> 합치기 -> 해당 시즌 재생성. 처음 계산·모델 변경 후용. HOF 는 매월 현재 시즌의 근사 투구를 정확값으로 다시 계산

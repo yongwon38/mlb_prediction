@@ -23,7 +23,7 @@ export const en: Dict = {
       "HOF-Net-R (experimental) grades. Pitch-level accuracy is on par with LightGBM; correlation between Stuff rank and whiff rate is slightly lower. Breakdowns are factor-group Shapley values.",
   },
 
-  nav: { home: "Home", pitcher: "Pitchers", games: "Games", explain: "Breakdown", simulator: "Simulator" },
+  nav: { home: "Home", pitcher: "Pitchers", games: "Games", explain: "Breakdown", simulator: "Simulator", similar: "Similar" },
   footer: { credit: "Data: Baseball Savant (Statcast) · Player photos and team logos © MLB · Unofficial analysis site" },
 
   common: {
@@ -235,6 +235,33 @@ export const en: Dict = {
     xwobaconTitle: "xwOBA on contact",
     foot: (min) => `%ile: avg Stuff among pitchers with ${n(min)}+ of the same pitch. Pitches thrown under 20 times are dimmed.`,
     simLink: (pt) => `${pt} in Stuff simulator`,
+    similarLink: (pt) => `Pitches similar to this ${pt}`,
+  },
+
+  similar: {
+    title: "Similar pitch search",
+    sub: "The most similar pitches from other pitchers, among pitcher-pitch types with 100+ regular-season pitches",
+    pickPlaceholder: "Pitcher name",
+    pitch: "Pitch",
+    idle: "No pitcher or pitch selected",
+    idleBody: "Find a pitcher by name and pick a pitch type to list its 10 most similar pitches",
+    space: "Similarity",
+    spaceModel: "Model view",
+    spaceInput: "Physical inputs",
+    spaceModelDef: "Closest average of the internal representation HOF-Net-R uses to grade stuff (ZIB head hidden layer, 64 dims). Tends to group pitches with similar whiff and contact outcomes",
+    spaceInputDef: "Closest average of the 14 model inputs (velocity, movement, release, spin, differences from the primary fastball, HAVAA, handedness)",
+    query: "Reference pitch",
+    results: "10 similar pitches",
+    resultsSub: (asOf, total) => `As of ${asOf} · among ${n(total)} regular-season pitcher-pitch types · the same pitcher's other pitches excluded`,
+    cols: ["#", "Pitcher", "Pitch", "Similarity", "Avg Stuff", "Whiff%", "Input differences vs reference (top 3)"],
+    diffNote: "Input difference = neighbor − reference, lefties mirrored to the right-hander frame, the 3 largest in standard-deviation units. Similarity is cosine after per-dimension standardization.",
+    searchThis: "Search with this pitch",
+    openSim: "Open in simulator",
+    notInIndex: (name, pt) => `${name}'s ${pt} has under 100 regular-season pitches and is not indexed`,
+    handDiff: "Different hand",
+    noData: "No similar-pitch data for this season",
+    loading: "Loading…",
+    whiff: (v) => `Whiff ${v}`,
   },
 
   sim: {
@@ -274,6 +301,9 @@ export const en: Dict = {
     whyNote: "Factor contributions (Shapley) are provided for real pitches on the Breakdown page.",
     loading: "Loading model…",
     noStarts: "No simulator start data for this season",
+    similarTitle: "Similar real pitches",
+    similarSub: "Five pitcher-pitch-type averages closest to this one hypothetical pitch · model view",
+    similarMore: "More in similar-pitch search",
     feats: {
       release_speed: "Velocity",
       pfx_z: "Induced vertical break",

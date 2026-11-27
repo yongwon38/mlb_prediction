@@ -240,7 +240,8 @@ def torch_trace(Xs):
         z, _ = blk(z, need_weights=False)
         blocks.append(z)
     h = z.flatten(1)
-    return {'tokens': e0, 'blocks': blocks, 'basis': net.basis(h), 'zib': head.mlp(h)}
+    m = head.mlp
+    return {'tokens': e0, 'blocks': blocks, 'basis': net.basis(h), 'zib': m(h), 'hidden': m[3](m[2](m[1](m[0](h))))}
 
 
 def flat(t):
@@ -248,6 +249,7 @@ def flat(t):
 
 
 tr = torch_trace(F.iloc[:8])
+hid200 = torch_trace(F.iloc[:200])['hidden']    # 유사 투구 검색 embed() 패리티 (ZIB 은닉 64)
 
 # 반응 곡선 20개 : 기준 행의 변수 하나를 같은 구종 1–99 분위 41점으로 (나머지 고정). HAVAA 곡선은 vaa = 목표 + (a + b·plate_z) 로 역산해 Python 에 넣음
 N_PT = 41
@@ -292,6 +294,7 @@ fixture = {'model_sha256': out['model_sha256'], 'note': 'export_sim_model.py 가
            'trace_rows': 8, 'trace': {'tokens': flat(tr['tokens']), 'blocks': [flat(b) for b in tr['blocks']], 'basis': flat(tr['basis']),
                                       'zib': flat(tr['zib'])},
            'curves': curves,
+           'hidden_rows': 200, 'hidden': flat(hid200),
            'erf': {'x': [float(x) for x in ex], 'y': [float(y) for y in sp_erf(ex)]}}
 FIX = os.path.join('web', 'scripts', 'fixtures', 'sim_parity.json')
 os.makedirs(os.path.dirname(FIX), exist_ok=True)

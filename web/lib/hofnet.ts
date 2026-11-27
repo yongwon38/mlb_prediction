@@ -45,6 +45,7 @@ export interface SimTrace {
   blocks?: Float32Array[]; // 블록마다 (B, K, d)
   basis?: Float32Array; // (B, d_r)
   zib?: Float32Array; // (B, 3) : logit π, m_B 앞 항, precision 원값
+  hidden?: Float32Array; // (B, 64) : ZIB 헤드 두 번째 은닉 (GELU 후) — 유사 투구 검색의 모델 공간
 }
 
 export function loadSimModel(json: SimModelJson): SimModel {
@@ -262,6 +263,7 @@ export function predict(m: SimModel, rows: PitchInput[], trace?: SimTrace): Floa
   if (trace) {
     trace.basis = zb;
     trace.zib = o3;
+    trace.hidden = z2;
   }
 
   const omega = w["zib.omega"];
@@ -279,6 +281,15 @@ export function predict(m: SimModel, rows: PitchInput[], trace?: SimTrace): Floa
     out[r] = (1 - pi) * (al / (al + be));
   }
   return out;
+}
+
+/** 유사 투구 검색용 표현 : 구마다 ZIB 헤드 두 번째 은닉 64차원 (export_similar.py 의 pitch_vectors 와 같은 층) */
+export function embed(m: SimModel, rows: PitchInput[]): Float32Array[] {
+  const tr: SimTrace = {};
+  predict(m, rows, tr);
+  const h = tr.hidden!;
+  const dim = h.length / rows.length;
+  return rows.map((_, r) => h.slice(r * dim, (r + 1) * dim));
 }
 
 /** 예측 E[Y] -> 구위 20–80 (−예측을 등간격 구위 격자 표에서 선형보간) */

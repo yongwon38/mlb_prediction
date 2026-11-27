@@ -14,6 +14,19 @@
 !/build_hof_web_model.py
 !/export_sim_model.py
 !/export_sim_starts.py
+!/export_similar.py
+!/similar_eval.py
+# 논문 초안 (소스 + 최종 PDF, LaTeX 중간 산출물 제외)
+!/HOF-Net_논문초안_20261127.pdf
+!/paper/
+/paper/*
+!/paper/hofnet_20261127/
+/paper/hofnet_20261127/*
+!/paper/hofnet_20261127/*.tex
+!/paper/hofnet_20261127/*.bib
+!/paper/hofnet_20261127/*.py
+!/paper/hofnet_20261127/*.md
+!/paper/hofnet_20261127/figs/
 !/model_choice_analysis.py
 !/hofnet_diag_experiment.py
 !/barrel_out_experiment.py
@@ -57,6 +70,10 @@
 !/outputs/model_choice/*.csv
 !/outputs/model_choice/*.json
 !/outputs/model_choice/*_log.txt
+!/outputs/similar/
+/outputs/similar/*
+!/outputs/similar/*.csv
+!/outputs/similar/*.json
 !/outputs/hofnet_diag/
 /outputs/hofnet_diag/*
 !/outputs/hofnet_diag/*.csv
