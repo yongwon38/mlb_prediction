@@ -33,11 +33,11 @@ export const FEAT_FMT: Record<string, { unit: string; nd: number; step: number }
   pfx_x: { unit: " in", nd: 1, step: 0.1 },
   release_spin_rate: { unit: " rpm", nd: 0, step: 10 },
   spin_axis: { unit: "°", nd: 0, step: 1 },
-  vaa_aa: { unit: "°", nd: 2, step: 0.01 },
+  vaa_aa: { unit: "°", nd: 3, step: 0.005 },
   release_extension: { unit: " ft", nd: 2, step: 0.05 },
   release_pos_z: { unit: " ft", nd: 2, step: 0.05 },
   release_pos_x: { unit: " ft", nd: 2, step: 0.05 },
-  arm_angle: { unit: "°", nd: 0, step: 1 },
+  arm_angle: { unit: "°", nd: 1, step: 0.1 }, // 모델이 민감 (0.5° 반올림에 구위 최대 0.7점) -> Statcast 정밀도 그대로
   velo_diff: { unit: " mph", nd: 1, step: 0.1 },
   hb_diff: { unit: " in", nd: 1, step: 0.1 },
   ivb_diff: { unit: " in", nd: 1, step: 0.1 },
