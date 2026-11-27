@@ -6,8 +6,9 @@ import { LoadingBlock, Section, StuffBadge } from "@/components/Panels";
 import { SeasonSelect } from "@/components/PageHeader";
 import Icon from "@/components/Icon";
 import { ctxHref, usePageState } from "@/lib/appState";
-import { loadLeague, loadSimModel, loadSimStarts } from "@/lib/data";
-import { predictScores, responseCurve, type SimModel } from "@/lib/hofnet";
+import { loadLeague, loadSimModel, loadSimStarts, loadSimilar } from "@/lib/data";
+import { embed, modelInputs, predictScores, responseCurve, type SimModel } from "@/lib/hofnet";
+import { type InputDiff, type SimilarIndex, inputDiffs, queryUnit, search } from "@/lib/similar";
 import { DIFF_COLS, FB_INPUTS, FEAT_FMT, SIM_INPUTS, type SimInputKey, type SimState, type StartSource, fmtFeat, outOfRange, rangeOf, startState, toRow } from "@/lib/simulator";
 import { percentileOf } from "@/lib/analysis";
 import { useT } from "@/lib/i18n";
@@ -95,6 +96,29 @@ export default function SimulatorPage() {
   const startX = base && curPt ? Number(toRow(base, curPt)[curveVar]) : null;
 
   const pctl = scores && curPt ? percentileOf(league?.pitchTypes[curPt]?.pitcherPercentiles, scores.now) : null;
+
+  // 비슷한 실제 구종 : 가상 투구 한 구의 ZIB 은닉 → 시즌 인덱스(투수×구종 평균)에서 모델 공간 상위 5 (export_similar / lib/similar)
+  const [simIdx, setSimIdx] = useState<{ season: number; idx: SimilarIndex | null } | null>(null);
+  useEffect(() => {
+    if (!season) return;
+    let alive = true;
+    loadSimilar(season)
+      .then((idx) => alive && setSimIdx({ season, idx }))
+      .catch(() => alive && setSimIdx({ season, idx: null }));
+    return () => {
+      alive = false;
+    };
+  }, [season]);
+  const sidx = simIdx?.season === season ? simIdx.idx : null;
+  const similar = useMemo(() => {
+    if (!model || !sidx || !curDeferred || !curPt) return null;
+    const row = toRow(curDeferred, curPt);
+    const [e] = embed(model, [row]);
+    const raw = [...modelInputs(model, row), curDeferred.hand === "L" ? -1 : 1];
+    return search(sidx, "model", queryUnit(sidx, "model", e), usePitcher ? pitcherId : null, 5).map((x) => ({ ...x, diffs: inputDiffs(sidx, raw, x.i, 2) }));
+  }, [model, sidx, curDeferred, curPt, usePitcher, pitcherId]);
+  const fmtDiff = (d: InputDiff) =>
+    d.col === "p_throws" ? tt.similar.handDiff : `${t.feats[d.col] ?? d.col} ${d.diff >= 0 ? "+" : "−"}${Math.abs(d.diff).toFixed(FEAT_FMT[d.col]?.nd ?? 2)}${FEAT_FMT[d.col]?.unit ?? ""}`;
   const pitcherNames = useMemo(() => (st ? Object.entries(st.pitchers).sort((a, b) => a[1].name.localeCompare(b[1].name)) : []), [st]);
   const [query, setQuery] = useState("");
   const pickPitcher = (v: string) => {
@@ -275,6 +299,37 @@ export default function SimulatorPage() {
                 )}
                 <p className="text-[11px] text-muted mt-2 leading-relaxed">{t.curveNote}</p>
               </Section>
+
+              {/* 비슷한 실제 구종 */}
+              {similar && sidx && (
+                <Section title={t.similarTitle} sub={t.similarSub}>
+                  <ul className="flex flex-col divide-y divide-grid">
+                    {similar.map(({ i, sim, diffs }) => {
+                      const it = sidx.json.items[i];
+                      return (
+                        <li key={`${it.id}-${it.pt}`} className="py-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+                          <Link href={ctxHref("/similar", { season, pitcher: it.id }, { pt: it.pt })} className="font-semibold text-ink hover:underline underline-offset-2">
+                            {it.name}
+                          </Link>
+                          <span className="text-ink">
+                            {it.pt} <span className="text-muted text-xs">{meta?.pitchNames[it.pt]}</span>
+                          </span>
+                          <StuffBadge v={it.stuff} size="sm" />
+                          <span className="num text-xs text-muted">{sim.toFixed(3)}</span>
+                          <span className="text-xs text-ink-2 basis-full sm:basis-auto">{diffs.map(fmtDiff).join(" · ")}</span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                  <Link
+                    href={ctxHref("/similar", { season, pitcher: usePitcher ? pitcherId : null }, { pt: usePitcher ? curPt : null })}
+                    className="inline-flex items-center gap-0.5 mt-3 text-xs text-accent-ink font-medium hover:underline underline-offset-2"
+                  >
+                    {t.similarMore}
+                    <Icon name="arrowUpRight" size={13} />
+                  </Link>
+                </Section>
+              )}
             </div>
           </div>
         </>

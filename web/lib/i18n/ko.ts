@@ -18,7 +18,7 @@ export const ko = {
       "HOF-Net-R(실험 모델) 점수. 투구별 예측 정확도는 LightGBM과 비슷하고, 구위 순위와 헛스윙률의 일치도는 약간 낮음. 산출 근거는 요인 그룹 Shapley 값.",
   },
 
-  nav: { home: "홈", pitcher: "투수", games: "경기·타석", explain: "산출 근거", simulator: "시뮬레이터" },
+  nav: { home: "홈", pitcher: "투수", games: "경기·타석", explain: "산출 근거", simulator: "시뮬레이터", similar: "유사 구종" },
   footer: { credit: "데이터 Baseball Savant (Statcast) · 선수 사진·구단 로고 © MLB · 비공식 분석 사이트" },
 
   common: {
@@ -233,6 +233,33 @@ export const ko = {
     xwobaconTitle: "인플레이 타구 xwOBA",
     foot: (min: number) => `%ile : 같은 구종 ${n(min)}구 이상 투수의 평균 구위 분포 기준. 20구 미만 구종은 흐리게.`,
     simLink: (pt: string) => `${pt} 구위 시뮬레이터`,
+    similarLink: (pt: string) => `${pt}와 비슷한 구종`,
+  },
+
+  similar: {
+    title: "유사 구종 검색",
+    sub: "정규시즌 100구 이상 투수×구종 가운데 가장 비슷한 다른 투수의 구종",
+    pickPlaceholder: "투수 이름",
+    pitch: "구종",
+    idle: "선택한 투수·구종 없음",
+    idleBody: "투수 이름으로 찾은 뒤 구종을 고르면 비슷한 구종 10개가 표시됨",
+    space: "유사성 기준",
+    spaceModel: "모델이 보는 유사성",
+    spaceInput: "물리량 유사성",
+    spaceModelDef: "HOF-Net-R이 구위를 매길 때 쓰는 내부 표현(ZIB 헤드 은닉 64차원)의 평균이 가까운 구종. 헛스윙·타구 결과가 비슷한 공끼리 묶이는 경향",
+    spaceInputDef: "모델 입력 14개(구속·무브먼트·릴리스·회전·주 패스트볼 대비 차이·HAVAA·투구손)의 평균이 가까운 구종",
+    query: "기준 구종",
+    results: "유사 구종 10개",
+    resultsSub: (asOf: string, total: number) => `${asOf} 기준 · 정규시즌 투수×구종 ${n(total)}개 중 · 같은 투수의 다른 구종 제외`,
+    cols: ["#", "투수", "구종", "유사도", "평균 구위", "헛스윙률", "기준 대비 입력 차이 (상위 3)"],
+    diffNote: "입력 차이 = 이웃 − 기준, 좌투는 우투 기준으로 반전한 값, 표준편차 단위로 가장 크게 다른 3개. 유사도는 차원별 표준화 후 코사인.",
+    searchThis: "이 구종으로 검색",
+    openSim: "시뮬레이터에서 열기",
+    notInIndex: (name: string, pt: string) => `${name}의 ${pt}는 정규시즌 100구 미만이라 검색 대상이 아님`,
+    handDiff: "투구손 다름",
+    noData: "이 시즌 유사 검색 데이터 없음",
+    loading: "불러오는 중…",
+    whiff: (v: string) => `헛스윙률 ${v}`,
   },
 
   sim: {
@@ -272,6 +299,9 @@ export const ko = {
     whyNote: "요인별 기여(Shapley)는 실제 투구에 대해 산출 근거 페이지에서 제공.",
     loading: "모델 불러오는 중…",
     noStarts: "이 시즌 시작점 데이터 없음",
+    similarTitle: "비슷한 실제 구종",
+    similarSub: "현재 가상 투구 한 구와 가까운 투수×구종 평균 5개 · 모델이 보는 유사성",
+    similarMore: "유사 구종 검색에서 더 보기",
     feats: {
       release_speed: "구속",
       pfx_z: "수직 무브먼트(IVB)",

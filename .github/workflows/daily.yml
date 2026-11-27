@@ -56,6 +56,7 @@ jobs:
           python ops.py push-shap $C --model hof_r
           python export_web_data.py --seasons $S
           python export_sim_starts.py --seasons $S    # 시뮬레이터 시작점 (export 가 시즌 폴더를 비우므로 그 다음)
+          python export_similar.py --seasons $S       # 유사 투구 검색 인덱스
           python ops.py push-web $S
 
       - name: 배포

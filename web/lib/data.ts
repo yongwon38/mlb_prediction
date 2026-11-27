@@ -1,5 +1,6 @@
 import type { ExplainFile, ExplainPitch, League, Meta, Pitch, PitcherFile, SeasonIndex, SeasonStats, SeasonSummary, SimStarts } from "./types";
 import { loadSimModel as parseSimModel, type SimModel, type SimModelJson } from "./hofnet";
+import { loadSimilarIndex, type SimilarIndex, type SimilarIndexJson } from "./similar";
 import { getModel, MODEL_FIELD, modelSuffix, type ModelId } from "./model";
 
 const cache = new Map<string, Promise<unknown>>();
@@ -31,6 +32,16 @@ export function loadSimModel(): Promise<SimModel> {
   return simModel;
 }
 export const loadSimStarts = (season: number) => getJSON<SimStarts>(`/data/${season}/sim_starts.json`);
+/** 유사 투구 검색 인덱스 (시즌별, 표준화까지 한 번만) */
+const similar = new Map<number, Promise<SimilarIndex>>();
+export function loadSimilar(season: number): Promise<SimilarIndex> {
+  if (!similar.has(season)) {
+    const p = getJSON<SimilarIndexJson>(`/data/${season}/similar.json`).then(loadSimilarIndex);
+    p.catch(() => similar.delete(season));
+    similar.set(season, p);
+  }
+  return similar.get(season)!;
+}
 /** 공식 기록은 네트워크 실패 시 export 에서 생략될 수 있음 -> 없으면 null */
 export const loadStats = (season: number) => getJSON<SeasonStats>(`/data/${season}/stats.json`).catch(() => null);
 

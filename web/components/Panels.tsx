@@ -241,6 +241,16 @@ export function ArsenalTable({ ps, pitchTypes, league, pitchNames }: { ps: Pitch
                       <Icon name="sliders" size={14} />
                     </Link>
                   )}
+                  {nav.pitcher && (
+                    <Link
+                      href={ctxHref("/similar", { season: nav.season, pitcher: nav.pitcher }, { pt: r.pt })}
+                      title={t.arsenal.similarLink(r.pt)}
+                      aria-label={t.arsenal.similarLink(r.pt)}
+                      className="inline-flex align-middle ml-0.5 p-0.5 rounded text-muted hover:text-accent-ink"
+                    >
+                      <Icon name="search" size={14} />
+                    </Link>
+                  )}
                 </td>
                 {COLS.map((c) => (
                   <td key={c.key} className={`text-right py-2.5 px-1.5 ${c.key === "stuff" || c.key === "pctl" ? "font-semibold text-ink" : "text-ink-2"}`}>

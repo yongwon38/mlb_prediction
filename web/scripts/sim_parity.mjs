@@ -4,7 +4,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
-import { loadSimModel, predict, score, erf, responseCurve, CURVE_POINTS } from "../lib/hofnet.ts";
+import { loadSimModel, predict, score, erf, responseCurve, embed, CURVE_POINTS } from "../lib/hofnet.ts";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const json = JSON.parse(readFileSync(join(here, "..", "public", "sim", "hof_r.json"), "utf-8"));
@@ -53,6 +53,12 @@ const feats = new Set(fx.curves.map((c) => c.feature));
 check(`곡선 예측 |Δ| 최대 (${fx.curves.length}개 × ${CURVE_POINTS}점, 변수 ${feats.size}개)`, cPred, 1e-5);
 check("곡선 구위 |Δ| 최대 (vs StuffScaler 정확값)", cScore, 0.05);
 check("곡선 격자 끝점 |Δ|", cX, 1e-9);
+
+// 4b. 유사 투구 검색 표현 embed() : ZIB 은닉 64 (앞 hidden_rows 구)
+if (fx.hidden) {
+  const emb = embed(m, fx.rows.slice(0, fx.hidden_rows)).flatMap((v) => Array.from(v));
+  check(`embed() ZIB 은닉 |Δ| 최대 (${fx.hidden_rows}구 × 64)`, maxAbs(emb, fx.hidden), 1e-5);
+}
 
 // 5. 속도 (참고, Node 기준) : 1구, 41구 배치 (반응 곡선)
 const time = (f, n) => {
