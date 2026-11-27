@@ -1,5 +1,7 @@
 "use client";
 import { useMemo, useState } from "react";
+import Link from "next/link";
+import { ctxHref, useNavCtx } from "@/lib/appState";
 import type { League, Pitch } from "@/lib/types";
 import { type Note, type Stats, groupBy, percentileOf, stats } from "@/lib/analysis";
 import { pitchColor, stuffColor, stuffTint, useDarkMode } from "@/lib/colors";
@@ -189,6 +191,7 @@ export function ArsenalTable({ ps, pitchTypes, league, pitchNames }: { ps: Pitch
   const dark = useDarkMode();
   const t = useT();
   const COLS = useMemo(() => arsenalCols(t), [t]);
+  const nav = useNavCtx();
   const [sort, setSort] = useState<{ key: string; desc: boolean }>({ key: "usage", desc: true });
   const rows = useMemo(() => {
     const g = groupBy(ps, (p) => p.pt);
@@ -228,6 +231,16 @@ export function ArsenalTable({ ps, pitchTypes, league, pitchNames }: { ps: Pitch
                   <span className="inline-block w-2.5 h-2.5 rounded-full mr-2 align-middle" style={{ background: pitchColor(pitchTypes, r.pt, dark) }} />
                   <span className="font-medium text-ink">{r.pt}</span>
                   <span className="text-muted ml-1.5">{pitchNames[r.pt]}</span>
+                  {nav.pitcher && (
+                    <Link
+                      href={ctxHref("/simulator", { season: nav.season, pitcher: nav.pitcher }, { pt: r.pt })}
+                      title={t.arsenal.simLink(r.pt)}
+                      aria-label={t.arsenal.simLink(r.pt)}
+                      className="inline-flex align-middle ml-1.5 p-0.5 rounded text-muted hover:text-accent-ink"
+                    >
+                      <Icon name="sliders" size={14} />
+                    </Link>
+                  )}
                 </td>
                 {COLS.map((c) => (
                   <td key={c.key} className={`text-right py-2.5 px-1.5 ${c.key === "stuff" || c.key === "pctl" ? "font-semibold text-ink" : "text-ink-2"}`}>

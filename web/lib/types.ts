@@ -233,3 +233,16 @@ export interface Pitch {
   hx: number | null; // 타구 좌표 (ft, 홈 = 0,0 / +x = 1루 쪽)
   hy: number | null;
 }
+
+/** 구위 시뮬레이터 시작점 (export_sim_starts.py : data/{season}/sim_starts.json). 값 순서 = cols, 모델 입력 기준 (좌투 반전, inch) */
+export interface SimStarts {
+  season: number;
+  asOf: string;
+  model: string;
+  cols: string[];
+  minN: number;
+  /** 리그 구종별 : n, 중앙값, 1% · 99% 분위 */
+  league: Record<string, { n: number; med: (number | null)[]; lo: (number | null)[]; hi: (number | null)[] }>;
+  /** 투수 id -> 이름·투구손·주 패스트볼(구속, 수평, 수직)·구종별(정규시즌 minN 구 이상) 입력 평균 */
+  pitchers: Record<string, { name: string; hand: string; fb: (number | null)[]; types: Record<string, { n: number; x: (number | null)[] }> }>;
+}

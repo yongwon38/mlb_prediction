@@ -106,6 +106,7 @@ jobs:
           python ops.py pull-shap ${{ steps.web.outputs.missing }}
           python ops.py pull-shap ${{ steps.web.outputs.missing }} --model hof_r
           python export_web_data.py --seasons $S ${{ steps.web.outputs.missing }}
+          python export_sim_starts.py --seasons $S ${{ steps.web.outputs.missing }}
           python ops.py push-web $S ${{ steps.web.outputs.missing }}
       - uses: ./.github/actions/deploy-web
         with:

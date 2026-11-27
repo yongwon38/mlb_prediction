@@ -20,7 +20,7 @@ import tarfile
 import data_store as ds
 
 STATUS_FILE = 'data_status.json'
-WEB_CODE = ['export_web_data.py', 'stuff_pipeline.py', 'stuff_model.py', 'hof_net.py', 'hof_net_r.py']    # 웹 산출물에 영향을 주는 코드
+WEB_CODE = ['export_web_data.py', 'export_sim_starts.py', 'stuff_pipeline.py', 'stuff_model.py', 'hof_net.py', 'hof_net_r.py']    # 웹 산출물에 영향을 주는 코드
 
 
 def _out(**kv):

@@ -12,6 +12,7 @@ on:
       - 'hof_net.py'
       - 'hof_net_r.py'
       - 'export_web_data.py'
+      - 'export_sim_starts.py'
       - 'data_store.py'
       - 'ops.py'
       - 'requirements.txt'
@@ -57,6 +58,7 @@ jobs:
           python ops.py pull-shap
           python ops.py pull-shap --model hof_r
           python export_web_data.py --seasons $S
+          python export_sim_starts.py --seasons $S
           python ops.py push-web $S
 
       - name: 배포

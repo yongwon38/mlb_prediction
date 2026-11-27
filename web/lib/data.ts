@@ -1,4 +1,5 @@
-import type { ExplainFile, ExplainPitch, League, Meta, Pitch, PitcherFile, SeasonIndex, SeasonStats, SeasonSummary } from "./types";
+import type { ExplainFile, ExplainPitch, League, Meta, Pitch, PitcherFile, SeasonIndex, SeasonStats, SeasonSummary, SimStarts } from "./types";
+import { loadSimModel as parseSimModel, type SimModel, type SimModelJson } from "./hofnet";
 import { getModel, MODEL_FIELD, modelSuffix, type ModelId } from "./model";
 
 const cache = new Map<string, Promise<unknown>>();
@@ -20,6 +21,16 @@ export const loadMeta = () => getJSON<Meta>("/data/meta.json");
 export const loadIndex = (season: number, m: ModelId = getModel()) => getJSON<SeasonIndex>(`/data/${season}/index${modelSuffix(m)}.json`);
 export const loadLeague = (season: number, m: ModelId = getModel()) => getJSON<League>(`/data/${season}/league${modelSuffix(m)}.json`);
 export const loadSummary = (season: number, m: ModelId = getModel()) => getJSON<SeasonSummary>(`/data/${season}/summary${modelSuffix(m)}.json`);
+/** 구위 시뮬레이터 : 모델(public/sim, 모델이 바뀔 때만 갱신)과 시즌별 시작점 */
+let simModel: Promise<SimModel> | null = null;
+export function loadSimModel(): Promise<SimModel> {
+  if (!simModel) {
+    simModel = getJSON<SimModelJson>("/sim/hof_r.json").then(parseSimModel);
+    simModel.catch(() => (simModel = null));
+  }
+  return simModel;
+}
+export const loadSimStarts = (season: number) => getJSON<SimStarts>(`/data/${season}/sim_starts.json`);
 /** 공식 기록은 네트워크 실패 시 export 에서 생략될 수 있음 -> 없으면 null */
 export const loadStats = (season: number) => getJSON<SeasonStats>(`/data/${season}/stats.json`).catch(() => null);
 
