@@ -12,6 +12,8 @@
 !/hof_net_r.py
 !/hofnet_r_experiment.py
 !/build_hof_web_model.py
+!/export_sim_model.py
+!/export_sim_starts.py
 !/model_choice_analysis.py
 !/hofnet_diag_experiment.py
 !/barrel_out_experiment.py
